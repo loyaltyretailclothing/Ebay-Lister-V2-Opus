@@ -44,7 +44,14 @@ export async function listPhotos(folder = "ebay-listings") {
 }
 
 export async function deletePhotos(publicIds) {
-  return cloudinary.api.delete_resources(publicIds);
+  // Cloudinary limits to 100 per request — batch if needed
+  const results = [];
+  for (let i = 0; i < publicIds.length; i += 100) {
+    const batch = publicIds.slice(i, i + 100);
+    const result = await cloudinary.api.delete_resources(batch);
+    results.push(result);
+  }
+  return results.length === 1 ? results[0] : results;
 }
 
 export async function updatePhotoMetadata(publicId, context) {
