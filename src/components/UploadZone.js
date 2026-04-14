@@ -2,6 +2,54 @@
 
 import { useState, useRef, useCallback } from "react";
 
+// Resize image in the browser before uploading
+function resizeImage(file, maxSize = 1600, quality = 0.75) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+
+      let { width, height } = img;
+
+      // Only resize if larger than maxSize
+      if (width > maxSize || height > maxSize) {
+        if (width > height) {
+          height = Math.round((height / width) * maxSize);
+          width = maxSize;
+        } else {
+          width = Math.round((width / height) * maxSize);
+          height = maxSize;
+        }
+      }
+
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(img, 0, 0, width, height);
+
+      canvas.toBlob(
+        (blob) => {
+          const resized = new File([blob], file.name, { type: "image/jpeg" });
+          resolve(resized);
+        },
+        "image/jpeg",
+        quality
+      );
+    };
+
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      // If resize fails, send the original
+      resolve(file);
+    };
+
+    img.src = url;
+  });
+}
+
 export default function UploadZone({ folder, onUploadComplete }) {
   const [isDragging, setIsDragging] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -20,8 +68,11 @@ export default function UploadZone({ folder, onUploadComplete }) {
       for (let i = 0; i < total; i++) {
         setProgress(`Uploading ${i + 1}/${total}...`);
 
+        // Resize on client before uploading
+        const resized = await resizeImage(files[i]);
+
         const formData = new FormData();
-        formData.append("files", files[i]);
+        formData.append("files", resized);
         formData.append("folder", folder);
 
         try {
