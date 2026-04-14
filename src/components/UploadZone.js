@@ -62,17 +62,21 @@ export default function UploadZone({ folder, onUploadComplete }) {
 
       setUploading(true);
       const total = files.length;
+      const BATCH_SIZE = 5;
       const allPhotos = [];
       const failedFiles = [];
 
-      for (let i = 0; i < total; i++) {
-        setProgress(`Uploading ${i + 1}/${total}...`);
+      for (let i = 0; i < total; i += BATCH_SIZE) {
+        const batch = files.slice(i, i + BATCH_SIZE);
+        setProgress(`Uploading ${Math.min(i + BATCH_SIZE, total)}/${total}...`);
 
-        // Resize on client before uploading
-        const resized = await resizeImage(files[i]);
+        // Resize all photos in this batch on the client
+        const resizedBatch = await Promise.all(batch.map((f) => resizeImage(f)));
 
         const formData = new FormData();
-        formData.append("files", resized);
+        for (const resized of resizedBatch) {
+          formData.append("files", resized);
+        }
         formData.append("folder", folder);
 
         try {
@@ -85,10 +89,10 @@ export default function UploadZone({ folder, onUploadComplete }) {
           if (data.success) {
             allPhotos.push(...data.photos);
           } else {
-            failedFiles.push(files[i]);
+            failedFiles.push(...batch);
           }
         } catch {
-          failedFiles.push(files[i]);
+          failedFiles.push(...batch);
         }
       }
 
