@@ -1,5 +1,7 @@
 "use client";
 
+import { useState, useEffect } from "react";
+
 export default function PhotoGrid({
   photos,
   selected,
@@ -31,6 +33,20 @@ export default function PhotoGrid({
     );
   }
 
+  const [lightboxIndex, setLightboxIndex] = useState(null);
+
+  // Keyboard navigation for lightbox
+  useEffect(() => {
+    if (lightboxIndex === null) return;
+    function handleKey(e) {
+      if (e.key === "Escape") setLightboxIndex(null);
+      if (e.key === "ArrowLeft") setLightboxIndex((i) => (i > 0 ? i - 1 : photos.length - 1));
+      if (e.key === "ArrowRight") setLightboxIndex((i) => (i < photos.length - 1 ? i + 1 : 0));
+    }
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  }, [lightboxIndex, photos.length]);
+
   function handleClick(e, publicId) {
     if (e.ctrlKey || e.metaKey) {
       onToggle(publicId);
@@ -54,7 +70,9 @@ export default function PhotoGrid({
 
     let dragPhotos;
     if (selected.length > 0 && selected.includes(photo.public_id)) {
-      dragPhotos = photos.filter((p) => selected.includes(p.public_id));
+      // Use selected order (click order) not grid order
+      const photoMap = Object.fromEntries(photos.map((p) => [p.public_id, p]));
+      dragPhotos = selected.map((id) => photoMap[id]).filter(Boolean);
     } else {
       dragPhotos = [photo];
     }
@@ -86,6 +104,7 @@ export default function PhotoGrid({
             draggable={draggable}
             onDragStart={(e) => handleDragStart(e, photo)}
             onClick={(e) => handleClick(e, photo.public_id)}
+            onDoubleClick={() => setLightboxIndex(photos.indexOf(photo))}
             className={`group relative cursor-pointer overflow-hidden rounded-lg border-2 transition-all ${
               isSelected
                 ? "border-blue-500 ring-2 ring-blue-500/30"
@@ -138,6 +157,63 @@ export default function PhotoGrid({
           </div>
         );
       })}
+
+      {/* Lightbox */}
+      {lightboxIndex !== null && photos[lightboxIndex] && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80"
+          onClick={() => setLightboxIndex(null)}
+        >
+          {/* Close button */}
+          <button
+            onClick={() => setLightboxIndex(null)}
+            className="absolute top-4 right-4 flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20"
+          >
+            <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+
+          {/* Left arrow */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setLightboxIndex((i) => (i > 0 ? i - 1 : photos.length - 1));
+            }}
+            className="absolute left-4 flex h-12 w-12 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20"
+          >
+            <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
+
+          {/* Image */}
+          <img
+            src={photos[lightboxIndex].secure_url}
+            alt=""
+            className="max-h-[85vh] max-w-[85vw] rounded-lg object-contain"
+            onClick={(e) => e.stopPropagation()}
+          />
+
+          {/* Right arrow */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setLightboxIndex((i) => (i < photos.length - 1 ? i + 1 : 0));
+            }}
+            className="absolute right-4 flex h-12 w-12 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20"
+          >
+            <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+            </svg>
+          </button>
+
+          {/* Photo counter */}
+          <span className="absolute bottom-4 rounded-full bg-white/10 px-3 py-1 text-sm text-white">
+            {lightboxIndex + 1} / {photos.length}
+          </span>
+        </div>
+      )}
     </div>
   );
 }

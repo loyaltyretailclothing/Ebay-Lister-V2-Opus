@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 
 export default function PhotoZone({
   title,
@@ -8,13 +8,29 @@ export default function PhotoZone({
   photos,
   onPhotosChange,
   maxPhotos,
+  visionToggle,
+  onVisionToggle,
 }) {
   const [isDragging, setIsDragging] = useState(false);
   const [dragIndex, setDragIndex] = useState(null);
+  const [dropTarget, setDropTarget] = useState(null);
   const [dragOriginal, setDragOriginal] = useState(null);
   const [uploading, setUploading] = useState(false);
+  const [lightboxIndex, setLightboxIndex] = useState(null);
   const fileInputRef = useRef(null);
   const droppedInSelf = useRef(false);
+
+  // Keyboard navigation for lightbox
+  useEffect(() => {
+    if (lightboxIndex === null) return;
+    function handleKey(e) {
+      if (e.key === "Escape") setLightboxIndex(null);
+      if (e.key === "ArrowLeft") setLightboxIndex((i) => (i > 0 ? i - 1 : photos.length - 1));
+      if (e.key === "ArrowRight") setLightboxIndex((i) => (i < photos.length - 1 ? i + 1 : 0));
+    }
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  }, [lightboxIndex, photos.length]);
 
   const handleFiles = useCallback(
     async (files) => {
@@ -72,7 +88,15 @@ export default function PhotoZone({
 
     if (dragIndex !== null) {
       droppedInSelf.current = true;
+      // Commit the reorder on drop
+      if (dropTarget !== null && dropTarget !== dragIndex) {
+        const updated = [...photos];
+        const [moved] = updated.splice(dragIndex, 1);
+        updated.splice(dropTarget, 0, moved);
+        onPhotosChange(updated);
+      }
       setDragIndex(null);
+      setDropTarget(null);
       setDragOriginal(null);
       return;
     }
@@ -128,20 +152,13 @@ export default function PhotoZone({
   function handleReorderOver(e, index) {
     e.preventDefault();
     if (dragIndex === null || dragIndex === index) return;
-
-    const updated = [...photos];
-    const [moved] = updated.splice(dragIndex, 1);
-    updated.splice(index, 0, moved);
-    onPhotosChange(updated);
-    setDragIndex(index);
+    setDropTarget(index);
   }
 
   function handleReorderEnd() {
-    // If dropped outside this zone, restore original order
-    if (!droppedInSelf.current && dragOriginal) {
-      onPhotosChange(dragOriginal);
-    }
+    // If dropped outside this zone, order stays as-is (no restore needed since we don't reorder during drag)
     setDragIndex(null);
+    setDropTarget(null);
     setDragOriginal(null);
     droppedInSelf.current = false;
   }
@@ -168,67 +185,92 @@ export default function PhotoZone({
             {subtitle}
           </p>
         </div>
-        {maxPhotos && (
-          <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
-            {photos.length}/{maxPhotos}
-          </span>
-        )}
+        <div className="flex items-center gap-3">
+          {onVisionToggle !== undefined && (
+            <button
+              onClick={() => onVisionToggle(!visionToggle)}
+              className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${
+                visionToggle
+                  ? "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300"
+                  : "bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400"
+              }`}
+            >
+              <span className={`inline-block h-2 w-2 rounded-full ${
+                visionToggle ? "bg-green-500" : "bg-zinc-400"
+              }`} />
+              Vision {visionToggle ? "ON" : "OFF"}
+            </button>
+          )}
+          {maxPhotos && (
+            <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
+              {photos.length}/{maxPhotos}
+            </span>
+          )}
+        </div>
       </div>
 
       {photos.length > 0 && (
-        <div className="mt-4 grid grid-cols-4 gap-2">
-          {photos.map((photo, index) => {
-            const thumb = photo.secure_url.replace(
-              "/upload/",
-              "/upload/c_fill,w_200,h_200/"
-            );
-            return (
-              <div
-                key={photo.public_id + "-" + index}
-                draggable
-                onDragStart={(e) => handleReorderStart(e, index)}
-                onDragOver={(e) => handleReorderOver(e, index)}
-                onDragEnd={handleReorderEnd}
-                className={`group relative cursor-grab overflow-hidden rounded-lg border-2 transition-all ${
-                  dragIndex === index
-                    ? "border-blue-500 opacity-50"
-                    : "border-transparent"
-                }`}
-              >
-                <div className="aspect-square">
+        <div className="mt-4 max-h-56 overflow-y-auto">
+          <div className="flex flex-wrap gap-2">
+            {photos.map((photo, index) => {
+              const thumb = photo.secure_url.replace(
+                "/upload/",
+                "/upload/c_fill,w_200,h_200/"
+              );
+              return (
+                <div
+                  key={photo.public_id + "-" + index}
+                  draggable
+                  onDoubleClick={() => setLightboxIndex(index)}
+                  onDragStart={(e) => handleReorderStart(e, index)}
+                  onDragOver={(e) => handleReorderOver(e, index)}
+                  onDragEnd={handleReorderEnd}
+                  className={`group relative h-24 w-24 flex-shrink-0 cursor-grab overflow-hidden rounded-lg border-2 transition-all ${
+                    dragIndex === index
+                      ? "border-blue-500 opacity-50"
+                      : dropTarget === index && dragIndex !== null
+                        ? "border-blue-500 ring-2 ring-blue-300"
+                        : "border-transparent"
+                  }`}
+                >
                   <img
                     src={thumb}
                     alt=""
                     className="h-full w-full object-cover"
                     draggable={false}
                   />
-                </div>
-                {index === 0 && (
-                  <span className="absolute top-1 left-1 rounded bg-blue-600 px-1.5 py-0.5 text-[10px] font-bold text-white">
-                    MAIN
-                  </span>
-                )}
-                <button
-                  onClick={() => handleRemove(index)}
-                  className="absolute top-1 right-1 flex h-5 w-5 items-center justify-center rounded-full bg-black/60 text-white opacity-0 transition-opacity group-hover:opacity-100"
-                >
-                  <svg
-                    className="h-3 w-3"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth={3}
+                  {index === 0 && onVisionToggle !== undefined && visionToggle && (
+                    <span className="absolute top-1 left-1 rounded bg-green-600 px-1.5 py-0.5 text-[10px] font-bold text-white">
+                      VISION
+                    </span>
+                  )}
+                  {index === 0 && onVisionToggle === undefined && (
+                    <span className="absolute top-1 left-1 rounded bg-blue-600 px-1.5 py-0.5 text-[10px] font-bold text-white">
+                      MAIN
+                    </span>
+                  )}
+                  <button
+                    onClick={() => handleRemove(index)}
+                    className="absolute top-1 right-1 flex h-5 w-5 items-center justify-center rounded-full bg-black/60 text-white opacity-0 transition-opacity group-hover:opacity-100"
                   >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M6 18L18 6M6 6l12 12"
-                    />
-                  </svg>
-                </button>
-              </div>
-            );
-          })}
+                    <svg
+                      className="h-3 w-3"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={3}
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M6 18L18 6M6 6l12 12"
+                      />
+                    </svg>
+                  </button>
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
 
@@ -283,6 +325,63 @@ export default function PhotoZone({
         onChange={handleFileSelect}
         className="hidden"
       />
+
+      {/* Lightbox */}
+      {lightboxIndex !== null && photos[lightboxIndex] && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80"
+          onClick={() => setLightboxIndex(null)}
+        >
+          {/* Close button */}
+          <button
+            onClick={() => setLightboxIndex(null)}
+            className="absolute top-4 right-4 flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20"
+          >
+            <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+
+          {/* Left arrow */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setLightboxIndex((i) => (i > 0 ? i - 1 : photos.length - 1));
+            }}
+            className="absolute left-4 flex h-12 w-12 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20"
+          >
+            <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
+
+          {/* Image */}
+          <img
+            src={photos[lightboxIndex].secure_url}
+            alt=""
+            className="max-h-[85vh] max-w-[85vw] rounded-lg object-contain"
+            onClick={(e) => e.stopPropagation()}
+          />
+
+          {/* Right arrow */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setLightboxIndex((i) => (i < photos.length - 1 ? i + 1 : 0));
+            }}
+            className="absolute right-4 flex h-12 w-12 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20"
+          >
+            <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+            </svg>
+          </button>
+
+          {/* Photo counter */}
+          <span className="absolute bottom-4 rounded-full bg-white/10 px-3 py-1 text-sm text-white">
+            {lightboxIndex + 1} / {photos.length}
+          </span>
+        </div>
+      )}
     </div>
   );
 }

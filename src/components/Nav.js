@@ -3,7 +3,10 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-const links = [{ href: "/generate", label: "Create Listing" }];
+const links = [
+  { href: "/generate", label: "Create Listing" },
+  { href: "/settings", label: "Settings" },
+];
 
 export default function Nav() {
   const pathname = usePathname();
