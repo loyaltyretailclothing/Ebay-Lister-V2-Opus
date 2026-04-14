@@ -13,34 +13,48 @@ export default function UploadZone({ folder, onUploadComplete }) {
       if (!files.length) return;
 
       setUploading(true);
-      setProgress(`Uploading ${files.length} photo${files.length > 1 ? "s" : ""}...`);
+      const total = files.length;
+      const BATCH_SIZE = 5;
+      const allPhotos = [];
+      let failed = 0;
 
-      const formData = new FormData();
-      for (const file of files) {
-        formData.append("files", file);
-      }
-      formData.append("folder", folder);
+      for (let i = 0; i < total; i += BATCH_SIZE) {
+        const batch = files.slice(i, i + BATCH_SIZE);
+        setProgress(`Uploading ${Math.min(i + BATCH_SIZE, total)}/${total}...`);
 
-      try {
-        const res = await fetch("/api/cloudinary/upload", {
-          method: "POST",
-          body: formData,
-        });
-
-        const data = await res.json();
-
-        if (!data.success) {
-          throw new Error(data.error);
+        const formData = new FormData();
+        for (const file of batch) {
+          formData.append("files", file);
         }
+        formData.append("folder", folder);
 
-        setProgress(`Uploaded ${data.photos.length} photo${data.photos.length > 1 ? "s" : ""}`);
-        onUploadComplete?.(data.photos);
-      } catch (err) {
-        setProgress(`Upload failed: ${err.message}`);
-      } finally {
-        setUploading(false);
-        setTimeout(() => setProgress(""), 3000);
+        try {
+          const res = await fetch("/api/cloudinary/upload", {
+            method: "POST",
+            body: formData,
+          });
+
+          const data = await res.json();
+          if (data.success) {
+            allPhotos.push(...data.photos);
+          } else {
+            failed += batch.length;
+          }
+        } catch {
+          failed += batch.length;
+        }
       }
+
+      if (allPhotos.length > 0) {
+        onUploadComplete?.(allPhotos);
+      }
+
+      const msg = failed > 0
+        ? `Uploaded ${allPhotos.length}/${total} (${failed} failed)`
+        : `Uploaded ${allPhotos.length} photo${allPhotos.length > 1 ? "s" : ""}`;
+      setProgress(msg);
+      setUploading(false);
+      setTimeout(() => setProgress(""), 5000);
     },
     [folder, onUploadComplete]
   );
