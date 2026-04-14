@@ -425,7 +425,9 @@ export default function ListingForm({ listing, onListingChange, onSubmit, submit
                 handleChange("condition_description", e.target.value)
               }
               rows={2}
-              className="mt-1 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+              ref={(el) => { if (el) { el.style.height = "auto"; el.style.height = el.scrollHeight + "px"; } }}
+              onInput={(e) => { e.target.style.height = "auto"; e.target.style.height = e.target.scrollHeight + "px"; }}
+              className="mt-1 w-full resize-none overflow-hidden rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
             />
           </div>
         )}
@@ -440,7 +442,9 @@ export default function ListingForm({ listing, onListingChange, onSubmit, submit
           value={listing.item_description || ""}
           onChange={(e) => handleChange("item_description", e.target.value)}
           rows={3}
-          className="mt-1 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+          ref={(el) => { if (el) { el.style.height = "auto"; el.style.height = el.scrollHeight + "px"; } }}
+          onInput={(e) => { e.target.style.height = "auto"; e.target.style.height = e.target.scrollHeight + "px"; }}
+          className="mt-1 w-full resize-none overflow-hidden rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
         />
       </div>
 
@@ -559,32 +563,21 @@ export default function ListingForm({ listing, onListingChange, onSubmit, submit
           </h3>
           <button
             type="button"
-            onClick={() => {
-              if (listing.scheduledDate) {
-                handleChange("scheduledDate", "");
-                handleChange("scheduledTime", "");
-              } else {
-                // Default to tomorrow at 8am
-                const tomorrow = new Date();
-                tomorrow.setDate(tomorrow.getDate() + 1);
-                handleChange("scheduledDate", tomorrow.toISOString().split("T")[0]);
-                handleChange("scheduledTime", "08:00");
-              }
-            }}
+            onClick={() => handleChange("scheduleEnabled", !listing.scheduleEnabled)}
             className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-              listing.scheduledDate
+              listing.scheduleEnabled
                 ? "bg-blue-600"
                 : "bg-zinc-300 dark:bg-zinc-600"
             }`}
           >
             <span
               className={`inline-block h-4 w-4 rounded-full bg-white transition-transform ${
-                listing.scheduledDate ? "translate-x-6" : "translate-x-1"
+                listing.scheduleEnabled ? "translate-x-6" : "translate-x-1"
               }`}
             />
           </button>
         </div>
-        {listing.scheduledDate && (
+        {listing.scheduleEnabled && (
           <div className="mt-3 grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
@@ -604,7 +597,7 @@ export default function ListingForm({ listing, onListingChange, onSubmit, submit
               </label>
               <input
                 type="time"
-                value={listing.scheduledTime || "08:00"}
+                value={listing.scheduledTime || "17:00"}
                 onChange={(e) => handleChange("scheduledTime", e.target.value)}
                 className="mt-1 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
               />
@@ -942,7 +935,7 @@ export default function ListingForm({ listing, onListingChange, onSubmit, submit
         >
           {submitting
             ? "Listing on eBay..."
-            : listing.scheduledDate
+            : listing.scheduleEnabled && listing.scheduledDate
               ? `Schedule Listing for ${listing.scheduledDate}`
               : "List on eBay"}
         </button>

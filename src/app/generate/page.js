@@ -34,8 +34,9 @@ export default function Generate() {
     returnPolicyId: "",
     itemSpecifics: {},
     sku: "",
+    scheduleEnabled: true,
     scheduledDate: "",
-    scheduledTime: "",
+    scheduledTime: "17:00",
   });
   const [analyzing, setAnalyzing] = useState(false);
   const [analysisStep, setAnalysisStep] = useState("");

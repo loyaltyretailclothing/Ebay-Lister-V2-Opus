@@ -56,6 +56,7 @@ export async function POST(request) {
       photos,
       itemSpecifics,
       sku,
+      scheduleEnabled,
       scheduledDate,
       scheduledTime,
       shippingPolicyId,
@@ -225,7 +226,7 @@ export async function POST(request) {
     const publishBody = {};
 
     // If scheduled, add the scheduled time
-    if (scheduledDate) {
+    if (scheduleEnabled && scheduledDate) {
       const time = scheduledTime || "08:00";
       const scheduledDateTime = new Date(`${scheduledDate}T${time}:00`);
       publishBody.listingStartDate = scheduledDateTime.toISOString();
