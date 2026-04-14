@@ -14,18 +14,14 @@ export default function UploadZone({ folder, onUploadComplete }) {
 
       setUploading(true);
       const total = files.length;
-      const BATCH_SIZE = 5;
       const allPhotos = [];
-      let failed = 0;
+      const failedFiles = [];
 
-      for (let i = 0; i < total; i += BATCH_SIZE) {
-        const batch = files.slice(i, i + BATCH_SIZE);
-        setProgress(`Uploading ${Math.min(i + BATCH_SIZE, total)}/${total}...`);
+      for (let i = 0; i < total; i++) {
+        setProgress(`Uploading ${i + 1}/${total}...`);
 
         const formData = new FormData();
-        for (const file of batch) {
-          formData.append("files", file);
-        }
+        formData.append("files", files[i]);
         formData.append("folder", folder);
 
         try {
@@ -38,12 +34,14 @@ export default function UploadZone({ folder, onUploadComplete }) {
           if (data.success) {
             allPhotos.push(...data.photos);
           } else {
-            failed += batch.length;
+            failedFiles.push(files[i]);
           }
         } catch {
-          failed += batch.length;
+          failedFiles.push(files[i]);
         }
       }
+
+      const failed = failedFiles.length;
 
       if (allPhotos.length > 0) {
         onUploadComplete?.(allPhotos);
