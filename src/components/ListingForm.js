@@ -342,7 +342,7 @@ export default function ListingForm({ listing, onListingChange, onSubmit, submit
               <p className="mt-3 text-xs font-medium text-zinc-400">
                 Required
               </p>
-              <div className="mt-2 grid grid-cols-2 gap-4">
+              <div className="mt-2 grid grid-cols-1 gap-4 md:grid-cols-2">
                 {requiredSpecifics.map((spec) => {
                   const catConfig = settingsConfig[listing.categoryId];
                   const specConfig = catConfig?.specifics?.[spec.name];
@@ -369,7 +369,7 @@ export default function ListingForm({ listing, onListingChange, onSubmit, submit
               <p className="mt-5 text-xs font-medium text-zinc-400">
                 Additional
               </p>
-              <div className="mt-2 grid grid-cols-2 gap-4">
+              <div className="mt-2 grid grid-cols-1 gap-4 md:grid-cols-2">
                 {additionalSpecifics.map((spec) => {
                   const catConfig = settingsConfig[listing.categoryId];
                   const specConfig = catConfig?.specifics?.[spec.name];
@@ -453,7 +453,7 @@ export default function ListingForm({ listing, onListingChange, onSubmit, submit
         <h3 className="text-sm font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
           Pricing
         </h3>
-        <div className="mt-4 grid grid-cols-3 gap-4">
+        <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-3">
           <div>
             <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
               Format
@@ -522,7 +522,7 @@ export default function ListingForm({ listing, onListingChange, onSubmit, submit
           </button>
         </div>
         {listing.bestOffer && (
-          <div className="mt-3 grid grid-cols-2 gap-4">
+          <div className="mt-3 grid grid-cols-1 gap-4 md:grid-cols-2">
             <div>
               <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
                 Minimum Offer ($)
@@ -578,7 +578,7 @@ export default function ListingForm({ listing, onListingChange, onSubmit, submit
           </button>
         </div>
         {listing.scheduleEnabled && (
-          <div className="mt-3 grid grid-cols-2 gap-4">
+          <div className="mt-3 grid grid-cols-1 gap-4 md:grid-cols-2">
             <div>
               <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
                 Date
@@ -730,7 +730,7 @@ export default function ListingForm({ listing, onListingChange, onSubmit, submit
         <h3 className="text-sm font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
           Preferences
         </h3>
-        <div className="mt-4 grid grid-cols-2 gap-4">
+        <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
           {/* Payment Policy */}
           <div>
             <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">

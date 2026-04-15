@@ -251,7 +251,7 @@ export default function PhotoZone({
                   )}
                   <button
                     onClick={() => handleRemove(index)}
-                    className="absolute top-1 right-1 flex h-5 w-5 items-center justify-center rounded-full bg-black/60 text-white opacity-0 transition-opacity group-hover:opacity-100"
+                    className="absolute top-1 right-1 flex h-5 w-5 items-center justify-center rounded-full bg-black/60 text-white opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100"
                   >
                     <svg
                       className="h-3 w-3"
@@ -308,9 +308,12 @@ export default function PhotoZone({
             </div>
           ) : (
             <p className="text-sm text-zinc-400">
-              Drop photos here or{" "}
-              <span className="font-medium text-blue-600 dark:text-blue-400">
-                browse
+              <span className="md:hidden">Tap to add photos</span>
+              <span className="hidden md:inline">
+                Drop photos here or{" "}
+                <span className="font-medium text-blue-600 dark:text-blue-400">
+                  browse
+                </span>
               </span>
             </p>
           )}

@@ -13,9 +13,29 @@ export default function SettingsLayout({ children }) {
   const pathname = usePathname();
 
   return (
-    <div className="flex h-[calc(100vh-3.5rem)]">
-      {/* Settings Sidebar */}
-      <div className="w-56 min-w-56 border-r border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950">
+    <div className="flex h-[calc(100dvh-4rem)] flex-col md:h-[calc(100vh-3.5rem)] md:flex-row">
+      {/* Mobile: Horizontal tab bar */}
+      <div className="flex gap-1 overflow-x-auto border-b border-zinc-200 bg-white px-4 py-2 md:hidden dark:border-zinc-800 dark:bg-zinc-950">
+        {settingsLinks.map(({ href, label }) => {
+          const isActive = pathname === href;
+          return (
+            <Link
+              key={href}
+              href={href}
+              className={`flex-shrink-0 rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
+                isActive
+                  ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
+                  : "text-zinc-500 hover:bg-zinc-100 hover:text-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
+              }`}
+            >
+              {label}
+            </Link>
+          );
+        })}
+      </div>
+
+      {/* Desktop: Settings Sidebar */}
+      <div className="hidden w-56 min-w-56 border-r border-zinc-200 bg-white md:block dark:border-zinc-800 dark:bg-zinc-950">
         <div className="px-4 py-5">
           <h2 className="text-sm font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
             Settings

@@ -1,5 +1,7 @@
 import { Geist, Geist_Mono } from "next/font/google";
 import Nav from "@/components/Nav";
+import BottomNav from "@/components/BottomNav";
+import { PhotoTransferProvider } from "@/contexts/PhotoTransferContext";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -17,6 +19,13 @@ export const metadata = {
   description: "AI-powered eBay listing tool",
 };
 
+export const viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  viewportFit: "cover",
+};
+
 export default function RootLayout({ children }) {
   return (
     <html
@@ -24,8 +33,11 @@ export default function RootLayout({ children }) {
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col bg-zinc-50 dark:bg-zinc-950">
-        <Nav />
-        <main className="flex-1">{children}</main>
+        <PhotoTransferProvider>
+          <Nav />
+          <main className="flex-1 pb-16 md:pb-0">{children}</main>
+          <BottomNav />
+        </PhotoTransferProvider>
       </body>
     </html>
   );

@@ -12,7 +12,7 @@ export default function Nav() {
   const pathname = usePathname();
 
   return (
-    <nav className="border-b border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950">
+    <nav className="hidden border-b border-zinc-200 bg-white md:block dark:border-zinc-800 dark:bg-zinc-950">
       <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4">
         <Link
           href="/"

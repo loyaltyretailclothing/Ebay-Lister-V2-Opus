@@ -75,7 +75,7 @@ export default function SoldComps({ searchTerms, onPriceSelect }) {
       )}
 
       {stats && !loading && (
-        <div className="mt-3 grid grid-cols-4 gap-3">
+        <div className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-4">
           <div className="rounded-lg bg-zinc-50 p-3 dark:bg-zinc-800">
             <p className="text-xs text-zinc-500 dark:text-zinc-400">Average</p>
             <p className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">

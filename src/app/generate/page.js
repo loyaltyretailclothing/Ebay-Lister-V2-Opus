@@ -1,12 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import PhotoLibrarySidebar from "@/components/PhotoLibrarySidebar";
 import PhotoZone from "@/components/PhotoZone";
 import ListingForm from "@/components/ListingForm";
 import SoldComps from "@/components/SoldComps";
+import { usePhotoTransfer } from "@/contexts/PhotoTransferContext";
 
 export default function Generate() {
+  const { pendingPhotos, transferTarget, consumeTransfer } = usePhotoTransfer();
+  const transferConsumed = useRef(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [aiPhotos, setAiPhotos] = useState([]);
   const [listingPhotos, setListingPhotos] = useState([]);
@@ -46,6 +49,19 @@ export default function Generate() {
   const [submitStatus, setSubmitStatus] = useState(null);
 
   const canAnalyze = aiPhotos.length > 0 && !analyzing;
+
+  // Consume photos transferred from Library page
+  useEffect(() => {
+    if (pendingPhotos.length > 0 && !transferConsumed.current) {
+      transferConsumed.current = true;
+      const { photos, target } = consumeTransfer();
+      if (target === "listing") {
+        setListingPhotos((prev) => [...prev, ...photos]);
+      } else if (target === "ai") {
+        setAiPhotos((prev) => [...prev, ...photos]);
+      }
+    }
+  }, [pendingPhotos, consumeTransfer]);
 
   // Parse "32x30" or "32 x 30" format into [waist, inseam] numbers
   function parsePantSize(sizeStr) {
@@ -248,45 +264,53 @@ export default function Generate() {
   }
 
   return (
-    <div className="flex h-[calc(100vh-3.5rem)]">
-      {/* Photo Library Sidebar */}
-      <PhotoLibrarySidebar
-        collapsed={!sidebarOpen}
-        onToggle={() => setSidebarOpen(!sidebarOpen)}
-      />
+    <div className="flex h-[calc(100dvh-4rem)] md:h-[calc(100vh-3.5rem)]">
+      {/* Photo Library Sidebar — hidden on mobile */}
+      <div className="hidden md:flex">
+        <PhotoLibrarySidebar
+          collapsed={!sidebarOpen}
+          onToggle={() => setSidebarOpen(!sidebarOpen)}
+        />
 
-      {/* Sidebar expand button (when collapsed) */}
-      {!sidebarOpen && (
-        <button
-          onClick={() => setSidebarOpen(true)}
-          className="flex h-full w-8 flex-shrink-0 items-start justify-center border-r border-zinc-200 bg-white pt-3 text-zinc-400 hover:bg-zinc-50 hover:text-zinc-600 dark:border-zinc-800 dark:bg-zinc-950 dark:hover:bg-zinc-900 dark:hover:text-zinc-300"
-          title="Open photo library"
-        >
-          <svg
-            className="h-4 w-4"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={2}
+        {/* Sidebar expand button (when collapsed) */}
+        {!sidebarOpen && (
+          <button
+            onClick={() => setSidebarOpen(true)}
+            className="flex h-full w-8 flex-shrink-0 items-start justify-center border-r border-zinc-200 bg-white pt-3 text-zinc-400 hover:bg-zinc-50 hover:text-zinc-600 dark:border-zinc-800 dark:bg-zinc-950 dark:hover:bg-zinc-900 dark:hover:text-zinc-300"
+            title="Open photo library"
           >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M8.25 4.5l7.5 7.5-7.5 7.5"
-            />
-          </svg>
-        </button>
-      )}
+            <svg
+              className="h-4 w-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M8.25 4.5l7.5 7.5-7.5 7.5"
+              />
+            </svg>
+          </button>
+        )}
+      </div>
 
       {/* Main Content */}
       <div className="flex-1 overflow-y-auto">
-        <div className="mx-auto max-w-5xl px-6 py-6">
+        <div className="mx-auto max-w-5xl px-4 py-4 md:px-6 md:py-6">
           <h1 className="text-2xl font-semibold text-zinc-900 dark:text-zinc-100">
             Create Listing
           </h1>
           <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-            Drag photos from the library into the zones below, then let AI
-            generate listing details.
+            <span className="hidden md:inline">
+              Drag photos from the library into the zones below, then let AI
+              generate listing details.
+            </span>
+            <span className="md:hidden">
+              Add photos from the Library tab, then let AI generate listing
+              details.
+            </span>
           </p>
 
           {/* Photo Zones — stacked vertically */}

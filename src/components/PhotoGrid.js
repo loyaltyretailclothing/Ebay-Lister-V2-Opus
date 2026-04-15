@@ -9,6 +9,7 @@ export default function PhotoGrid({
   onToggle,
   draggable = false,
   compact = false,
+  tapToToggle = false,
 }) {
   if (!photos.length) {
     return (
@@ -48,6 +49,10 @@ export default function PhotoGrid({
   }, [lightboxIndex, photos.length]);
 
   function handleClick(e, publicId) {
+    if (tapToToggle) {
+      onToggle(publicId);
+      return;
+    }
     if (e.ctrlKey || e.metaKey) {
       onToggle(publicId);
     } else if (e.shiftKey && selected.length > 0) {
