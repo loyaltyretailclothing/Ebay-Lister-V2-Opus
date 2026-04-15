@@ -2,14 +2,16 @@ import { getUserToken } from "@/lib/ebay";
 import { EBAY_BASE_URL } from "@/lib/constants";
 import { NextResponse } from "next/server";
 
-// Map our condition values to eBay condition IDs
+// Map our condition values to eBay Inventory API fields
+// condition = enum string (required for serialization)
+// conditionId = numeric ID override (needed for clothing-specific pre-owned IDs)
 const CONDITION_MAP = {
-  NEW_WITH_TAGS: { conditionId: "1000", conditionDescription: "" },
-  NEW_WITHOUT_TAGS: { conditionId: "1500", conditionDescription: "" },
-  NEW_WITH_DEFECTS: { conditionId: "1750", conditionDescription: "" },
-  PRE_OWNED_EXCELLENT: { conditionId: "3000", conditionDescription: "" },
-  PRE_OWNED_GOOD: { conditionId: "3000", conditionDescription: "" },
-  PRE_OWNED_FAIR: { conditionId: "3000", conditionDescription: "" },
+  NEW_WITH_TAGS:      { condition: "NEW",              conditionId: "1000" },
+  NEW_WITHOUT_TAGS:   { condition: "NEW_OTHER",        conditionId: "1500" },
+  NEW_WITH_DEFECTS:   { condition: "NEW_WITH_DEFECTS", conditionId: "1750" },
+  PRE_OWNED_EXCELLENT:{ condition: "USED_EXCELLENT",   conditionId: "2990" },
+  PRE_OWNED_GOOD:     { condition: "USED_GOOD",        conditionId: "3000" },
+  PRE_OWNED_FAIR:     { condition: "USED_ACCEPTABLE",  conditionId: "3010" },
 };
 
 async function ebayFetch(path, options, token) {
@@ -20,6 +22,7 @@ async function ebayFetch(path, options, token) {
       "Content-Type": "application/json",
       Accept: "application/json",
       "Content-Language": "en-US",
+      "Accept-Language": "en-US",
       ...options.headers,
     },
   });
@@ -82,8 +85,43 @@ export async function POST(request) {
     const token = await getUserToken();
     const itemSku = sku || `LISTING-${Date.now()}`;
 
+    // --- Step 0: Ensure inventory location exists ---
+    const locationKey = "warehouse-47904";
+    // Try to delete any old bad location, then create fresh
+    const locationCheck = await ebayFetch(
+      `/sell/inventory/v1/location/${locationKey}`,
+      { method: "GET" },
+      token
+    );
+
+    if (!locationCheck.ok) {
+      // Location doesn't exist — create it
+      const createBody = {
+        location: {
+          address: {
+            postalCode: "47904",
+            country: "US",
+            stateOrProvince: "IN",
+            city: "Lafayette",
+          },
+        },
+        merchantLocationStatus: "ENABLED",
+        name: "Warehouse 47904",
+        locationTypes: ["WAREHOUSE"],
+      };
+      console.log("Creating location:", JSON.stringify(createBody, null, 2));
+      const locationRes = await ebayFetch(
+        `/sell/inventory/v1/location/${locationKey}`,
+        { method: "POST", body: JSON.stringify(createBody) },
+        token
+      );
+      console.log("Location create response:", locationRes.status, JSON.stringify(locationRes.data, null, 2));
+    } else {
+      console.log("Location already exists:", JSON.stringify(locationCheck.data, null, 2));
+    }
+
     // --- Step 1: Create/Update Inventory Item ---
-    const conditionInfo = CONDITION_MAP[condition] || CONDITION_MAP.PRE_OWNED_GOOD;
+    const ebayCondition = CONDITION_MAP[condition] || { condition: "USED_GOOD", conditionId: "3000" };
 
     // Build item specifics as name-value pairs
     const aspects = {};
@@ -105,8 +143,9 @@ export async function POST(request) {
           quantity: parseInt(quantity) || 1,
         },
       },
-      condition: conditionInfo.conditionId,
-      conditionDescription: condition_description || conditionInfo.conditionDescription,
+      condition: ebayCondition.condition,
+      conditionId: ebayCondition.conditionId,
+      conditionDescription: condition_description || "",
       product: {
         title,
         description: item_description || "",
@@ -137,13 +176,19 @@ export async function POST(request) {
 
     const inventoryRes = await ebayFetch(
       `/sell/inventory/v1/inventory_item/${encodeURIComponent(itemSku)}`,
-      { method: "PUT", body: JSON.stringify(inventoryItem) },
+      {
+        method: "PUT",
+        body: JSON.stringify(inventoryItem),
+      },
       token
     );
 
     if (!inventoryRes.ok) {
-      const errMsg = inventoryRes.data?.errors
-        ? inventoryRes.data.errors.map((e) => e.message).join("; ")
+      console.error("eBay inventory error:", JSON.stringify(inventoryRes.data, null, 2));
+      console.error("Inventory payload sent:", JSON.stringify(inventoryItem, null, 2));
+      const errors = inventoryRes.data?.errors || [];
+      const errMsg = errors.length > 0
+        ? errors.map((e) => `${e.message}${e.longMessage ? ` — ${e.longMessage}` : ""}${e.parameters ? ` (${JSON.stringify(e.parameters)})` : ""}`).join("; ")
         : JSON.stringify(inventoryRes.data);
       return NextResponse.json(
         { success: false, error: `Inventory item failed: ${errMsg}`, step: "inventory" },
@@ -157,6 +202,7 @@ export async function POST(request) {
       marketplaceId: "EBAY_US",
       format: listingType || "FIXED_PRICE",
       categoryId,
+      merchantLocationKey: locationKey,
       listingDescription: item_description || "",
       pricingSummary: {
         price: {
@@ -198,43 +244,54 @@ export async function POST(request) {
       offer.listingPolicies.returnPolicyId = returnPolicyId;
     }
 
-    const offerRes = await ebayFetch(
+    // Add scheduled start date to offer
+    if (scheduleEnabled && scheduledDate) {
+      const time = scheduledTime || "08:00";
+      const scheduledDateTime = new Date(`${scheduledDate}T${time}:00`);
+      offer.listingStartDate = scheduledDateTime.toISOString();
+    }
+
+    let offerRes = await ebayFetch(
       "/sell/inventory/v1/offer",
       { method: "POST", body: JSON.stringify(offer) },
       token
     );
 
-    if (!offerRes.ok) {
-      const errMsg = offerRes.data?.errors
-        ? offerRes.data.errors.map((e) => e.message).join("; ")
-        : JSON.stringify(offerRes.data);
-      return NextResponse.json(
-        { success: false, error: `Create offer failed: ${errMsg}`, step: "offer" },
-        { status: 400 }
-      );
-    }
+    let offerId = offerRes.data?.offerId;
 
-    const offerId = offerRes.data?.offerId;
-    if (!offerId) {
-      return NextResponse.json(
-        { success: false, error: "No offer ID returned from eBay", step: "offer" },
-        { status: 500 }
+    // If offer already exists for this SKU, fetch the existing offer ID
+    if (!offerRes.ok) {
+      const alreadyExists = offerRes.data?.errors?.some(
+        (e) => e.errorId === 25002 || e.message?.includes("already exists")
       );
+
+      if (alreadyExists) {
+        // Look up existing offers for this SKU — prefer one with a location
+        const existingRes = await ebayFetch(
+          `/sell/inventory/v1/offer?sku=${encodeURIComponent(itemSku)}`,
+          { method: "GET" },
+          token
+        );
+        const offers = existingRes.data?.offers || [];
+        const withLocation = offers.find((o) => o.merchantLocationKey);
+        offerId = withLocation?.offerId || offers[0]?.offerId;
+      }
+
+      if (!offerId) {
+        const errMsg = offerRes.data?.errors
+          ? offerRes.data.errors.map((e) => e.message).join("; ")
+          : JSON.stringify(offerRes.data);
+        return NextResponse.json(
+          { success: false, error: `Create offer failed: ${errMsg}`, step: "offer" },
+          { status: 400 }
+        );
+      }
     }
 
     // --- Step 3: Publish Offer ---
-    const publishBody = {};
-
-    // If scheduled, add the scheduled time
-    if (scheduleEnabled && scheduledDate) {
-      const time = scheduledTime || "08:00";
-      const scheduledDateTime = new Date(`${scheduledDate}T${time}:00`);
-      publishBody.listingStartDate = scheduledDateTime.toISOString();
-    }
-
     const publishRes = await ebayFetch(
       `/sell/inventory/v1/offer/${offerId}/publish`,
-      { method: "POST", body: JSON.stringify(publishBody) },
+      { method: "POST", body: JSON.stringify({}) },
       token
     );
 
@@ -254,20 +311,83 @@ export async function POST(request) {
     let promoResult = null;
     if (promotedListing && listingId) {
       try {
-        // Create a promoted listing standard campaign or add to existing
-        const promoRes = await ebayFetch(
-          "/sell/marketing/v1/ad_campaign/create_by_listing_id",
-          {
-            method: "POST",
-            body: JSON.stringify({
-              listingId,
-              bidPercentage: String(promoRate || 5),
-            }),
-          },
+        const adRate = String(parseFloat(promoRate) || 5) + ".0";
+
+        // 4a: Find an existing running Promoted Listings Standard campaign
+        const campaignsRes = await ebayFetch(
+          "/sell/marketing/v1/ad_campaign?campaign_status=RUNNING&limit=100",
+          { method: "GET" },
           token
         );
-        promoResult = promoRes.ok ? "promoted" : "promo_failed";
-      } catch {
+
+        let campaignId = null;
+        if (campaignsRes.ok && campaignsRes.data?.campaigns) {
+          const standardCampaign = campaignsRes.data.campaigns.find(
+            (c) => c.fundingStrategy?.fundingModel === "COST_PER_SALE"
+          );
+          if (standardCampaign) {
+            campaignId = standardCampaign.campaignId;
+          }
+        }
+
+        // 4b: If no campaign exists, create one
+        if (!campaignId) {
+          const createCampaignRes = await ebayFetch(
+            "/sell/marketing/v1/ad_campaign",
+            {
+              method: "POST",
+              body: JSON.stringify({
+                marketplaceId: "EBAY_US",
+                campaignName: `Promoted Listings Standard - ${new Date().toISOString().slice(0, 10)}`,
+                fundingStrategy: {
+                  fundingModel: "COST_PER_SALE",
+                  bidPercentage: adRate,
+                },
+              }),
+            },
+            token
+          );
+
+          if (createCampaignRes.ok || createCampaignRes.status === 201) {
+            // Campaign ID is in the Location header or response
+            campaignId = createCampaignRes.data?.campaignId;
+            // If not in body, parse from Location header URI
+            if (!campaignId) {
+              const locationUri = createCampaignRes.data?.location;
+              if (locationUri) {
+                campaignId = locationUri.split("/").pop();
+              }
+            }
+          } else {
+            console.error("Create campaign error:", JSON.stringify(createCampaignRes.data, null, 2));
+          }
+        }
+
+        // 4c: Add the listing as an ad to the campaign
+        if (campaignId) {
+          const adRes = await ebayFetch(
+            `/sell/marketing/v1/ad_campaign/${campaignId}/ad`,
+            {
+              method: "POST",
+              body: JSON.stringify({
+                listingId,
+                bidPercentage: adRate,
+              }),
+            },
+            token
+          );
+
+          if (adRes.ok || adRes.status === 201) {
+            promoResult = "promoted";
+          } else {
+            console.error("Create ad error:", JSON.stringify(adRes.data, null, 2));
+            promoResult = "promo_failed";
+          }
+        } else {
+          promoResult = "no_campaign";
+        }
+      } catch (promoError) {
+        console.error("Promotion error:", promoError);
         promoResult = "promo_failed";
       }
     }
