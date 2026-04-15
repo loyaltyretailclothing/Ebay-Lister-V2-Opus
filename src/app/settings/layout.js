@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 const settingsLinks = [
   { href: "/settings/categories", label: "Categories" },
   { href: "/settings/policies", label: "Policies" },
+  { href: "/settings/ebay", label: "eBay Account" },
 ];
 
 export default function SettingsLayout({ children }) {
