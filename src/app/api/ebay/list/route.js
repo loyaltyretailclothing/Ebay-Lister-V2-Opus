@@ -3,16 +3,15 @@ import { EBAY_BASE_URL } from "@/lib/constants";
 import { NextResponse } from "next/server";
 
 // Map our condition values to eBay Inventory API fields
-// condition = enum string (required for serialization)
-// conditionId = numeric ID override (needed for clothing-specific pre-owned IDs)
-// Map our condition values to eBay condition IDs for clothing categories
+// condition = enum string (passes serialization)
+// conditionId = clothing-specific numeric ID (overrides at publish time)
 const CONDITION_MAP = {
-  NEW_WITH_TAGS:       "1000",
-  NEW_WITHOUT_TAGS:    "1500",
-  NEW_WITH_DEFECTS:    "1750",
-  PRE_OWNED_EXCELLENT: "2990",
-  PRE_OWNED_GOOD:      "3000",
-  PRE_OWNED_FAIR:      "3010",
+  NEW_WITH_TAGS:       { condition: "NEW",              conditionId: "1000" },
+  NEW_WITHOUT_TAGS:    { condition: "NEW_OTHER",        conditionId: "1500" },
+  NEW_WITH_DEFECTS:    { condition: "NEW_WITH_DEFECTS", conditionId: "1750" },
+  PRE_OWNED_EXCELLENT: { condition: "USED_EXCELLENT",   conditionId: "2990" },
+  PRE_OWNED_GOOD:      { condition: "USED_EXCELLENT",   conditionId: "3000" },
+  PRE_OWNED_FAIR:      { condition: "USED_EXCELLENT",   conditionId: "3010" },
 };
 
 async function ebayFetch(path, options, token) {
@@ -122,7 +121,7 @@ export async function POST(request) {
     }
 
     // --- Step 1: Create/Update Inventory Item ---
-    const ebayConditionId = CONDITION_MAP[condition] || "3000";
+    const ebayCondition = CONDITION_MAP[condition] || CONDITION_MAP.PRE_OWNED_GOOD;
 
     // Build item specifics as name-value pairs
     const aspects = {};
@@ -144,7 +143,8 @@ export async function POST(request) {
           quantity: parseInt(quantity) || 1,
         },
       },
-      conditionId: ebayConditionId,
+      condition: ebayCondition.condition,
+      conditionId: ebayCondition.conditionId,
       conditionDescription: condition_description || "",
       product: {
         title,
