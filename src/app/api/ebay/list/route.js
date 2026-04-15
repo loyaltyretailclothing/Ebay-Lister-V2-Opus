@@ -380,8 +380,47 @@ export async function POST(request) {
           if (adRes.ok || adRes.status === 201) {
             promoResult = "promoted";
           } else {
-            console.error("Create ad error:", JSON.stringify(adRes.data, null, 2));
-            promoResult = "promo_failed";
+            // Ad might already exist (e.g. eBay auto-promoted it)
+            const alreadyExists = adRes.data?.errors?.some(
+              (e) => e.errorId === 35036 || e.message?.includes("already exists")
+            );
+
+            if (alreadyExists) {
+              // Find the existing ad and update its bid percentage
+              try {
+                // Search all campaigns for this listing's ad
+                const allCampaigns = campaignsRes.data?.campaigns || [];
+                for (const camp of allCampaigns) {
+                  if (camp.fundingStrategy?.fundingModel !== "COST_PER_SALE") continue;
+                  const adsRes = await ebayFetch(
+                    `/sell/marketing/v1/ad_campaign/${camp.campaignId}/ad?listing_ids=${listingId}`,
+                    { method: "GET" },
+                    token
+                  );
+                  const existingAd = adsRes.data?.ads?.[0];
+                  if (existingAd) {
+                    // Update the bid percentage
+                    const updateRes = await ebayFetch(
+                      `/sell/marketing/v1/ad_campaign/${camp.campaignId}/ad/${existingAd.adId}`,
+                      {
+                        method: "PUT",
+                        body: JSON.stringify({ bidPercentage: adRate }),
+                      },
+                      token
+                    );
+                    promoResult = updateRes.ok || updateRes.status === 204 ? "promoted_updated" : "promo_update_failed";
+                    break;
+                  }
+                }
+                if (!promoResult) promoResult = "promoted_existing";
+              } catch {
+                // Ad exists but we couldn't update — still counts as promoted
+                promoResult = "promoted_existing";
+              }
+            } else {
+              console.error("Create ad error:", JSON.stringify(adRes.data, null, 2));
+              promoResult = "promo_failed";
+            }
           }
         } else {
           promoResult = "no_campaign";
