@@ -217,11 +217,12 @@ export default function Generate() {
       const data = await res.json();
 
       if (data.success) {
-        const promoMsg = data.promoResult === "promoted" ? " | Promoted"
-          : data.promoResult === "promoted_updated" ? " | Promoted (rate updated)"
-          : data.promoResult === "promoted_existing" ? " | Already promoted"
-          : data.promoResult === "promo_failed" ? " | Promotion failed"
-          : data.promoResult === "no_campaign" ? " | No campaign found"
+        const pr = data.promoResult || "";
+        const promoMsg = pr === "promoted" ? " | Promoted"
+          : pr === "promoted_updated" ? " | Promoted (rate updated)"
+          : pr === "promoted_existing" ? " | Already promoted"
+          : pr === "no_campaign" ? " | No campaign found"
+          : pr.startsWith("promo_failed") ? ` | ${pr}`
           : "";
         setSubmitStatus({
           type: "success",

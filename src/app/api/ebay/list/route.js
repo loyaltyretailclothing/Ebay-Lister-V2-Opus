@@ -418,8 +418,9 @@ export async function POST(request) {
                 promoResult = "promoted_existing";
               }
             } else {
+              const adErrMsg = adRes.data?.errors?.map(e => e.message).join("; ") || JSON.stringify(adRes.data);
               console.error("Create ad error:", JSON.stringify(adRes.data, null, 2));
-              promoResult = "promo_failed";
+              promoResult = `promo_failed: ${adErrMsg}`;
             }
           }
         } else {
