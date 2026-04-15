@@ -101,7 +101,7 @@ export default function Generate() {
     lines.push("");
     lines.push("Ships USPS Ground Advantage!");
 
-    return lines.join("\n");
+    return lines.join("<br>");
   }
 
   async function handleAnalyze() {
