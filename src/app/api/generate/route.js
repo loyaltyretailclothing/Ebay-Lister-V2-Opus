@@ -41,7 +41,7 @@ Rules:
 - The observations object should capture EVERYTHING you can identify — these will be used to fill eBay item specifics
 - STYLE NUMBER: If you see a style number, model number, or product code on any tag, capture it in the style_number field. Do NOT capture RN numbers, UPC/barcodes, or care instruction codes — those are not style numbers.
 - NECKLINE: Infer neckline from item type, not just visuals. Hoodies = Crew Neck. Quarter zips = Mock Neck. Polo shirts = Collared. V-neck sweaters = V-Neck. Always fill this field — never leave it null.
-- BUTTON-DOWN SHIRTS: If the size tag shows letter sizing (S, M, L, XL, etc.), it is a casual button-down shirt. If the size tag shows neck sizing (15, 15.5, 16, 16.5, etc.), it is a dress shirt. Use the correct type and category_keywords accordingly.
+- BUTTON-DOWN SHIRTS — THIS IS CRITICAL: The ONLY way to distinguish casual vs dress shirts is the SIZE TAG. Letter sizes (S, M, L, XL, 2XL, 3XL, etc.) = ALWAYS a "Casual Button-Down Shirt", category_keywords must be "mens casual button down shirt". Numeric neck sizes (14.5, 15, 15.5, 16, 16.5, 17, etc.) = ALWAYS a "Dress Shirt", category_keywords must be "mens dress shirt". Do NOT use the shirt's appearance, fabric, or style to decide — ONLY the size format on the tag matters. This rule overrides any other judgment about the shirt type.
 - Return ONLY valid JSON, no markdown or explanation`;
 
 export async function POST(request) {
