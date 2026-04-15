@@ -18,7 +18,31 @@
       "Bash(taskkill //PID 10104 //F)",
       "Bash(node -e ':*)",
       "Bash(npx next:*)",
-      "Bash(git config:*)"
+      "Bash(git config:*)",
+      "Bash(taskkill /PID 15184 /F)",
+      "Bash(kill 15184)",
+      "Bash(powershell.exe -Command \"Stop-Process -Id 15184 -Force -ErrorAction SilentlyContinue; Get-Process -Name node -ErrorAction SilentlyContinue | Stop-Process -Force\")",
+      "Bash(taskkill /PID 25556 /F)",
+      "Bash(taskkill /F /IM node.exe)",
+      "Bash(netstat -ano)",
+      "Bash(powershell -Command \"Get-NetTCPConnection -LocalPort 3000 -ErrorAction SilentlyContinue | Select-Object OwningProcess\")",
+      "Bash(powershell -Command \"Stop-Process -Id 25556 -Force -ErrorAction SilentlyContinue; Start-Sleep -Seconds 2\")",
+      "WebSearch",
+      "Bash(taskkill /PID 36424 /F)",
+      "Bash(powershell -Command \"Stop-Process -Id 36424 -Force\")",
+      "Bash(powershell -Command \"Stop-Process -Id 41560 -Force\")",
+      "Bash(powershell -Command \"Stop-Process -Id 3232 -Force\")",
+      "Bash(powershell -Command \"Stop-Process -Id 3504 -Force\")",
+      "Bash(gh api:*)",
+      "Bash(cat vercel.json)",
+      "Bash(cat .vercel/project.json)",
+      "Bash(npx vercel:*)",
+      "WebFetch(domain:developer.ebay.com)",
+      "Bash(rm src/app/oauth/route.js)",
+      "Bash(rm src/app/api/ebay/auth/route.js)",
+      "Bash(rm src/app/api/ebay/callback/route.js)",
+      "Bash(rm src/app/settings/ebay/page.js)",
+      "Bash(rmdir src/app/api/ebay/auth)"
     ]
   }
 }
