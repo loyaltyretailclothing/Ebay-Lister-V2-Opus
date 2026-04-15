@@ -311,7 +311,7 @@ export async function POST(request) {
     let promoResult = null;
     if (promotedListing && listingId) {
       try {
-        const adRate = String(parseFloat(promoRate) || 5) + ".0";
+        const adRate = (parseFloat(promoRate) || 5).toFixed(1);
 
         // 4a: Find an existing running Promoted Listings Standard campaign
         const campaignsRes = await ebayFetch(
