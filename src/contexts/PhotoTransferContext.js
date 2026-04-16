@@ -5,24 +5,25 @@ import { createContext, useContext, useState, useCallback } from "react";
 const PhotoTransferContext = createContext(null);
 
 export function PhotoTransferProvider({ children }) {
-  const [pendingPhotos, setPendingPhotos] = useState([]);
-  const [transferTarget, setTransferTarget] = useState(null);
+  const [pending, setPending] = useState({ listing: [], ai: [] });
 
   const addToTransfer = useCallback((photos, target) => {
-    setPendingPhotos(photos);
-    setTransferTarget(target);
+    setPending((prev) => ({
+      ...prev,
+      [target]: [...prev[target], ...photos],
+    }));
   }, []);
 
   const consumeTransfer = useCallback(() => {
-    const photos = pendingPhotos;
-    const target = transferTarget;
-    setPendingPhotos([]);
-    setTransferTarget(null);
-    return { photos, target };
-  }, [pendingPhotos, transferTarget]);
+    const current = pending;
+    setPending({ listing: [], ai: [] });
+    return current;
+  }, [pending]);
+
+  const hasPending = pending.listing.length > 0 || pending.ai.length > 0;
 
   return (
-    <PhotoTransferContext.Provider value={{ pendingPhotos, transferTarget, addToTransfer, consumeTransfer }}>
+    <PhotoTransferContext.Provider value={{ pending, hasPending, addToTransfer, consumeTransfer }}>
       {children}
     </PhotoTransferContext.Provider>
   );

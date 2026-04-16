@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import PhotoLibrarySidebar from "@/components/PhotoLibrarySidebar";
 import PhotoZone from "@/components/PhotoZone";
 import ListingForm from "@/components/ListingForm";
@@ -8,8 +8,7 @@ import SoldComps from "@/components/SoldComps";
 import { usePhotoTransfer } from "@/contexts/PhotoTransferContext";
 
 export default function Generate() {
-  const { pendingPhotos, transferTarget, consumeTransfer } = usePhotoTransfer();
-  const transferConsumed = useRef(false);
+  const { hasPending, consumeTransfer } = usePhotoTransfer();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [aiPhotos, setAiPhotos] = useState([]);
   const [listingPhotos, setListingPhotos] = useState([]);
@@ -52,16 +51,16 @@ export default function Generate() {
 
   // Consume photos transferred from Library page
   useEffect(() => {
-    if (pendingPhotos.length > 0 && !transferConsumed.current) {
-      transferConsumed.current = true;
-      const { photos, target } = consumeTransfer();
-      if (target === "listing") {
-        setListingPhotos((prev) => [...prev, ...photos]);
-      } else if (target === "ai") {
-        setAiPhotos((prev) => [...prev, ...photos]);
+    if (hasPending) {
+      const { listing, ai } = consumeTransfer();
+      if (listing.length > 0) {
+        setListingPhotos((prev) => [...prev, ...listing]);
+      }
+      if (ai.length > 0) {
+        setAiPhotos((prev) => [...prev, ...ai]);
       }
     }
-  }, [pendingPhotos, consumeTransfer]);
+  }, [hasPending, consumeTransfer]);
 
   // Parse "32x30" or "32 x 30" format into [waist, inseam] numbers
   function parsePantSize(sizeStr) {

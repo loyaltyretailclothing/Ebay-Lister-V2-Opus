@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { useRouter } from "next/navigation";
 import { FOLDERS } from "@/lib/constants";
 import PhotoGrid from "@/components/PhotoGrid";
 import UploadZone from "@/components/UploadZone";
@@ -9,7 +8,6 @@ import NoteModal from "@/components/NoteModal";
 import { usePhotoTransfer } from "@/contexts/PhotoTransferContext";
 
 export default function LibraryPage() {
-  const router = useRouter();
   const { addToTransfer } = usePhotoTransfer();
   const [activeFolder, setActiveFolder] = useState("All Photos");
   const [photos, setPhotos] = useState([]);
@@ -19,6 +17,9 @@ export default function LibraryPage() {
   const [notePhoto, setNotePhoto] = useState(null);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState("");
+  const [sendingTo, setSendingTo] = useState(null); // "listing" | "ai" | null
+  const [sendProgress, setSendProgress] = useState(0);
+  const [sendDone, setSendDone] = useState(null); // "listing" | "ai" | null
 
   const fetchPhotos = useCallback(async () => {
     setLoading(true);
@@ -122,12 +123,32 @@ export default function LibraryPage() {
   }
 
   function handleSendToZone(target) {
+    if (sendingTo) return; // prevent double-tap
+
     const photoMap = Object.fromEntries(
       photos.map((p) => [p.public_id, p])
     );
     const selectedPhotos = selected.map((id) => photoMap[id]).filter(Boolean);
     addToTransfer(selectedPhotos, target);
-    router.push("/generate");
+
+    // Animate progress bar
+    setSendingTo(target);
+    setSendProgress(0);
+
+    let progress = 0;
+    const interval = setInterval(() => {
+      progress += 5;
+      setSendProgress(progress);
+      if (progress >= 100) {
+        clearInterval(interval);
+        setSendingTo(null);
+        setSendProgress(0);
+        setSendDone(target);
+        setSelected([]);
+        // Clear the checkmark after 1 second
+        setTimeout(() => setSendDone(null), 1000);
+      }
+    }, 50); // 50ms × 20 steps = 1 second
   }
 
   const selectedCount = selected.length;
@@ -272,21 +293,66 @@ export default function LibraryPage() {
       </div>
 
       {/* Send-to-Zone Floating Bar */}
-      {selectedCount > 0 && (
+      {(selectedCount > 0 || sendingTo || sendDone) && (
         <div className="fixed bottom-16 left-0 right-0 z-30 border-t border-zinc-200 bg-white px-4 py-3 md:bottom-0 dark:border-zinc-800 dark:bg-zinc-950">
           <div className="mx-auto flex max-w-lg gap-3">
-            <button
-              onClick={() => handleSendToZone("listing")}
-              className="flex-1 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-blue-700"
-            >
-              Send {selectedCount} to eBay Photos
-            </button>
-            <button
-              onClick={() => handleSendToZone("ai")}
-              className="flex-1 rounded-lg border border-blue-600 px-4 py-2.5 text-sm font-medium text-blue-600 transition-colors hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-950"
-            >
-              Send {selectedCount} to AI Photos
-            </button>
+            {/* eBay Listing Button */}
+            <div className="relative flex-1 overflow-hidden rounded-lg">
+              {sendingTo === "listing" && (
+                <div
+                  className="absolute inset-0 bg-blue-700 transition-none"
+                  style={{ width: `${sendProgress}%` }}
+                />
+              )}
+              <button
+                onClick={() => handleSendToZone("listing")}
+                disabled={!!sendingTo || !!sendDone}
+                className={`relative z-10 w-full rounded-lg px-4 py-2.5 text-sm font-medium transition-colors ${
+                  sendDone === "listing"
+                    ? "bg-green-600 text-white"
+                    : sendingTo === "listing"
+                      ? "bg-blue-600 text-white"
+                      : "bg-blue-600 text-white hover:bg-blue-700"
+                }`}
+              >
+                {sendDone === "listing" ? (
+                  <span className="flex items-center justify-center gap-1.5">
+                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                    </svg>
+                  </span>
+                ) : sendingTo === "listing" ? "" : "eBay Listing"}
+              </button>
+            </div>
+
+            {/* AI Analysis Button */}
+            <div className="relative flex-1 overflow-hidden rounded-lg">
+              {sendingTo === "ai" && (
+                <div
+                  className="absolute inset-0 bg-blue-200 dark:bg-blue-900 transition-none"
+                  style={{ width: `${sendProgress}%` }}
+                />
+              )}
+              <button
+                onClick={() => handleSendToZone("ai")}
+                disabled={!!sendingTo || !!sendDone}
+                className={`relative z-10 w-full rounded-lg border px-4 py-2.5 text-sm font-medium transition-colors ${
+                  sendDone === "ai"
+                    ? "border-green-600 bg-green-600 text-white"
+                    : sendingTo === "ai"
+                      ? "border-blue-600 text-blue-600 dark:text-blue-400"
+                      : "border-blue-600 text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-950"
+                }`}
+              >
+                {sendDone === "ai" ? (
+                  <span className="flex items-center justify-center gap-1.5">
+                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                    </svg>
+                  </span>
+                ) : sendingTo === "ai" ? "" : "AI Analysis"}
+              </button>
+            </div>
           </div>
         </div>
       )}
