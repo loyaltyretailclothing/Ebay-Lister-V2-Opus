@@ -9,9 +9,9 @@ const CONDITION_MAP = {
   NEW_WITH_TAGS:       { condition: "NEW",              conditionId: "1000" },
   NEW_WITHOUT_TAGS:    { condition: "NEW_OTHER",        conditionId: "1500" },
   NEW_WITH_DEFECTS:    { condition: "NEW_WITH_DEFECTS", conditionId: "1750" },
-  PRE_OWNED_EXCELLENT: { condition: "USED_EXCELLENT",   conditionId: "2990" },
-  PRE_OWNED_GOOD:      { condition: "USED_EXCELLENT",   conditionId: "3000" },
-  PRE_OWNED_FAIR:      { condition: "USED_EXCELLENT",   conditionId: "3010" },
+  PRE_OWNED_EXCELLENT: { condition: "PRE_OWNED_EXCELLENT", conditionId: "2990" },
+  PRE_OWNED_GOOD:      { condition: "USED_EXCELLENT",      conditionId: "3000" },
+  PRE_OWNED_FAIR:      { condition: "PRE_OWNED_FAIR",      conditionId: "3010" },
 };
 
 async function ebayFetch(path, options, token) {
