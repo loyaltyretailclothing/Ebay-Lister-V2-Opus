@@ -5,47 +5,51 @@ import PhotoLibrarySidebar from "@/components/PhotoLibrarySidebar";
 import PhotoZone from "@/components/PhotoZone";
 import ListingForm from "@/components/ListingForm";
 import SoldComps from "@/components/SoldComps";
+import SuccessModal from "@/components/SuccessModal";
 import { usePhotoTransfer } from "@/contexts/PhotoTransferContext";
+
+const INITIAL_LISTING = {
+  title: "",
+  categoryId: "",
+  categoryName: "",
+  condition: "",
+  condition_description: "",
+  item_description: "",
+  quantity: 1,
+  bestOffer: true,
+  autoAcceptPrice: "",
+  promotedListing: true,
+  promoRate: 5,
+  priorityListing: false,
+  priorityBudget: 3,
+  weightLbs: "",
+  weightOz: "",
+  dimLength: "",
+  dimWidth: "",
+  dimHeight: "",
+  shippingPolicyId: "",
+  paymentPolicyId: "",
+  returnPolicyId: "",
+  itemSpecifics: {},
+  sku: "",
+  scheduleEnabled: true,
+  scheduledDate: "",
+  scheduledTime: "17:00",
+};
 
 export default function Generate() {
   const { hasPending, consumeTransfer } = usePhotoTransfer();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [aiPhotos, setAiPhotos] = useState([]);
   const [listingPhotos, setListingPhotos] = useState([]);
-  const [listing, setListing] = useState({
-    title: "",
-    categoryId: "",
-    categoryName: "",
-    condition: "",
-    condition_description: "",
-    item_description: "",
-    quantity: 1,
-    bestOffer: true,
-    autoAcceptPrice: "",
-    promotedListing: true,
-    promoRate: 5,
-    priorityListing: false,
-    priorityBudget: 3,
-    weightLbs: "",
-    weightOz: "",
-    dimLength: "",
-    dimWidth: "",
-    dimHeight: "",
-    shippingPolicyId: "",
-    paymentPolicyId: "",
-    returnPolicyId: "",
-    itemSpecifics: {},
-    sku: "",
-    scheduleEnabled: true,
-    scheduledDate: "",
-    scheduledTime: "17:00",
-  });
+  const [listing, setListing] = useState(INITIAL_LISTING);
   const [analyzing, setAnalyzing] = useState(false);
   const [analysisStep, setAnalysisStep] = useState("");
   const [lookupStatus, setVisionStatus] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [submitStatus, setSubmitStatus] = useState(null);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
 
   const canAnalyze = aiPhotos.length > 0 && !analyzing;
 
@@ -244,7 +248,9 @@ export default function Generate() {
           message: `Listed on eBay!${promoMsg} ${data.url}`,
           listingId: data.listingId,
           url: data.url,
+          promoResult: data.promoResult,
         });
+        setShowSuccessModal(true);
       } else {
         setSubmitStatus({
           type: "error",
@@ -259,6 +265,20 @@ export default function Generate() {
       });
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  function handleNewListing() {
+    setShowSuccessModal(false);
+    setListing(INITIAL_LISTING);
+    setAiPhotos([]);
+    setListingPhotos([]);
+    setSubmitStatus(null);
+    setError("");
+    setVisionStatus("");
+    setAnalysisStep("");
+    if (typeof window !== "undefined") {
+      window.scrollTo({ top: 0, behavior: "smooth" });
     }
   }
 
@@ -416,6 +436,16 @@ export default function Generate() {
           </div>
         </div>
       </div>
+
+      {/* Success Modal */}
+      <SuccessModal
+        open={showSuccessModal}
+        onClose={() => setShowSuccessModal(false)}
+        onNewListing={handleNewListing}
+        thumbnailUrl={listingPhotos[0]?.secure_url}
+        listingUrl={submitStatus?.url}
+        promoResult={submitStatus?.promoResult}
+      />
     </div>
   );
 }
