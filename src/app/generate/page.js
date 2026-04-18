@@ -50,6 +50,46 @@ export default function Generate() {
   const [submitting, setSubmitting] = useState(false);
   const [submitStatus, setSubmitStatus] = useState(null);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [draftId, setDraftId] = useState(null);
+  const [loadingDraft, setLoadingDraft] = useState(false);
+  const [savingDraft, setSavingDraft] = useState(false);
+  const [saveDraftStatus, setSaveDraftStatus] = useState(null);
+
+  // Load a draft from ?draft=xxx in the URL
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const id = params.get("draft");
+    if (!id) return;
+
+    let cancelled = false;
+    (async () => {
+      setLoadingDraft(true);
+      setError("");
+      try {
+        const res = await fetch(`/api/drafts/${encodeURIComponent(id)}`, {
+          cache: "no-store",
+        });
+        const data = await res.json();
+        if (cancelled) return;
+        if (data.success && data.draft) {
+          setDraftId(id);
+          setListing({ ...INITIAL_LISTING, ...(data.draft.listing || {}) });
+          setAiPhotos(data.draft.aiPhotos || []);
+          setListingPhotos(data.draft.listingPhotos || []);
+        } else {
+          setError(data.error || "Failed to load draft");
+        }
+      } catch (err) {
+        if (!cancelled) setError("Could not load draft: " + err.message);
+      } finally {
+        if (!cancelled) setLoadingDraft(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const canAnalyze = aiPhotos.length > 0 && !analyzing;
 
@@ -219,6 +259,61 @@ export default function Generate() {
     }
   }
 
+  async function handleSaveDraft() {
+    if (savingDraft) return;
+    setSavingDraft(true);
+    setSaveDraftStatus(null);
+    try {
+      const res = await fetch("/api/drafts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: draftId || undefined,
+          listing,
+          aiPhotos,
+          listingPhotos,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setDraftId(data.id);
+        setSaveDraftStatus({ type: "success", message: "Draft saved" });
+        // Reflect the draft id in the URL without a full reload, so a refresh
+        // still points at this draft.
+        if (typeof window !== "undefined") {
+          const url = new URL(window.location.href);
+          url.searchParams.set("draft", data.id);
+          window.history.replaceState({}, "", url);
+        }
+        setTimeout(() => setSaveDraftStatus(null), 2000);
+      } else {
+        setSaveDraftStatus({
+          type: "error",
+          message: data.error || "Save failed",
+        });
+      }
+    } catch (err) {
+      setSaveDraftStatus({
+        type: "error",
+        message: `Save failed: ${err.message}`,
+      });
+    } finally {
+      setSavingDraft(false);
+    }
+  }
+
+  async function maybeDeleteDraft() {
+    if (!draftId) return;
+    try {
+      await fetch(`/api/drafts/${encodeURIComponent(draftId)}`, {
+        method: "DELETE",
+      });
+    } catch {
+      // Non-fatal — listing already published
+    }
+    setDraftId(null);
+  }
+
   async function handleSubmitListing() {
     setSubmitting(true);
     setSubmitStatus(null);
@@ -251,6 +346,8 @@ export default function Generate() {
           promoResult: data.promoResult,
         });
         setShowSuccessModal(true);
+        // Draft has been published — remove it so it doesn't linger
+        maybeDeleteDraft();
       } else {
         setSubmitStatus({
           type: "error",
@@ -277,7 +374,12 @@ export default function Generate() {
     setError("");
     setVisionStatus("");
     setAnalysisStep("");
+    setDraftId(null);
+    setSaveDraftStatus(null);
     if (typeof window !== "undefined") {
+      const url = new URL(window.location.href);
+      url.searchParams.delete("draft");
+      window.history.replaceState({}, "", url);
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
   }
@@ -350,8 +452,8 @@ export default function Generate() {
             />
           </div>
 
-          {/* Analyze Button */}
-          <div className="mt-6">
+          {/* Analyze + Save Draft Buttons */}
+          <div className="mt-6 flex flex-wrap items-center gap-3">
             <button
               onClick={handleAnalyze}
               disabled={!canAnalyze}
@@ -389,26 +491,52 @@ export default function Generate() {
               )}
             </button>
 
-            {error && (
-              <p className="mt-2 text-sm text-red-600 dark:text-red-400">
-                {error}
-              </p>
+            <button
+              onClick={handleSaveDraft}
+              disabled={savingDraft || loadingDraft}
+              className="rounded-lg border border-zinc-300 px-4 py-2.5 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-100 disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+            >
+              {savingDraft ? "Saving..." : draftId ? "Update Draft" : "Save Draft"}
+            </button>
+
+            {saveDraftStatus && (
+              <span
+                className={`text-xs ${
+                  saveDraftStatus.type === "success"
+                    ? "text-green-600 dark:text-green-400"
+                    : "text-red-600 dark:text-red-400"
+                }`}
+              >
+                {saveDraftStatus.message}
+              </span>
             )}
 
-            {lookupStatus && !analyzing && (
-              <div className={`mt-2 rounded-lg border px-3 py-2 text-xs ${
-                lookupStatus.includes("Found model")
-                  ? "border-green-200 bg-green-50 text-green-700 dark:border-green-800 dark:bg-green-950 dark:text-green-400"
-                  : lookupStatus.includes("error") || lookupStatus.includes("failed")
-                    ? "border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-400"
-                    : "border-zinc-200 bg-zinc-50 text-zinc-600 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-400"
-              }`}>
-                {lookupStatus.split("\n").map((line, i) => (
-                  <p key={i}>{line}</p>
-                ))}
-              </div>
+            {loadingDraft && (
+              <span className="text-xs text-zinc-500 dark:text-zinc-400">
+                Loading draft...
+              </span>
             )}
           </div>
+
+          {error && (
+            <p className="mt-2 text-sm text-red-600 dark:text-red-400">
+              {error}
+            </p>
+          )}
+
+          {lookupStatus && !analyzing && (
+            <div className={`mt-2 rounded-lg border px-3 py-2 text-xs ${
+              lookupStatus.includes("Found model")
+                ? "border-green-200 bg-green-50 text-green-700 dark:border-green-800 dark:bg-green-950 dark:text-green-400"
+                : lookupStatus.includes("error") || lookupStatus.includes("failed")
+                  ? "border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-400"
+                  : "border-zinc-200 bg-zinc-50 text-zinc-600 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-400"
+            }`}>
+              {lookupStatus.split("\n").map((line, i) => (
+                <p key={i}>{line}</p>
+              ))}
+            </div>
+          )}
 
           {/* Listing Form + Sold Comps */}
           <div className="mt-8 space-y-6">
