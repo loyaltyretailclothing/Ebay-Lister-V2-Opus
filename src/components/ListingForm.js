@@ -109,8 +109,11 @@ export default function ListingForm({ listing, onListingChange, onSubmit, submit
             }).catch(() => {});
           }
 
-          // Pass 2: AI fills specifics using observations
-          if (currentListing.observations) {
+          // Pass 2: AI fills specifics — skip if already populated (e.g. loaded from draft)
+          const hasSavedSpecifics =
+            currentListing.itemSpecifics &&
+            Object.keys(currentListing.itemSpecifics).length > 0;
+          if (currentListing.observations && !hasSavedSpecifics) {
             setFillingSpecifics(true);
             try {
               const pass2Res = await fetch("/api/generate/specifics", {
