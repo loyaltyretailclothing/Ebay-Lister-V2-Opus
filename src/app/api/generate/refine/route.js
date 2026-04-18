@@ -1,11 +1,14 @@
 import client from "@/lib/claude";
 import { NextResponse } from "next/server";
+import { TITLE_RULES } from "@/lib/titleRules";
 
 const SYSTEM_PROMPT = `You are an eBay listing assistant. You will receive:
-1. A listing with a style/model number found on the item's tag
-2. Web search results (title, snippet, and URL) for that style number
+1. An existing listing (title, condition, observations) with a style/model number found on the tag
+2. Web search results (title, snippet, URL) for that style number
 
-Your job: extract the MODEL/STYLE NAME from the search results, then update the title and observations.
+Your job has TWO parts:
+
+PART 1 — Extract the STYLE NAME from the search results.
 
 How to extract a style name from a product title:
 - Strip the leading gender/descriptor word(s) — e.g. "Women's", "Men's", "Kids'", "Unisex"
@@ -23,10 +26,14 @@ Examples:
 Decision rules:
 - If 2 or more results agree on the same style name (or a close variant), use it
 - If only generic type words remain after stripping gender + type, return {"updated": false}
-- Title MUST be 75-80 characters — pack in SEO keywords
-- Title structure: [NWT if applicable] Brand | Style Name | Type | Gender | Size | Color | Key Details
-- Add the style name to observations as "model"
-- If updating, return: {"updated": true, "title": "new title", "observations": {merged observations}}
+
+PART 2 — If you found a style name, REBUILD the title from scratch using the rules below. Do NOT just insert the style name into the existing title. Generate a fresh title that follows the formula exactly and packs in tier 2 extras to hit 75-80 characters.
+
+${TITLE_RULES}
+
+Response format:
+- If no style name found: return exactly {"updated": false}
+- If style name found: return {"updated": true, "title": "freshly rebuilt 75-80 char title", "observations": {"model": "the style name"}}
 - Return ONLY valid JSON, no markdown or explanation`;
 
 async function braveSearch(query) {
@@ -104,15 +111,39 @@ export async function POST(request) {
       )
       .join("\n");
 
+    const obs = listing.observations || {};
     const userPrompt = `Here is the current listing:
-Title: ${listing.title}
-Brand: ${brand || "unknown"}
-Style Number: ${styleNumber}
+Current Title: ${listing.title}
+Condition: ${listing.condition || "unknown"}
+Observations: ${JSON.stringify(
+      {
+        brand: obs.brand,
+        type: obs.type,
+        size: obs.size,
+        tag_size: obs.tag_size,
+        measured_size: obs.measured_size,
+        gender: obs.gender,
+        color: obs.color,
+        pattern: obs.pattern,
+        material: obs.material,
+        features: obs.features,
+        closure: obs.closure,
+        neckline: obs.neckline,
+        sleeve_length: obs.sleeve_length,
+        style: obs.style,
+        style_number: obs.style_number,
+      },
+      null,
+      2
+    )}
 
-Here are the web search results for "${brand || ""} ${styleNumber}":
+Here are the web search results for "${query}":
 ${searchText}
 
-Extract the model/product name if found. Update the title and observations, or return {"updated": false}.`;
+Step 1: Extract the style name using the extraction rules.
+Step 2: If found, REBUILD the title from scratch using TITLE_RULES above — do not just patch the existing title. Use observations (brand, type, size, gender, color, features) + the new style name, and pack tier 2 extras to reach 75-80 chars. Respect the NWT-only condition prefix rule and the banned-word list.
+
+If no style name found, return {"updated": false}.`;
 
     const response = await client.messages.create({
       model: "claude-sonnet-4-6",
