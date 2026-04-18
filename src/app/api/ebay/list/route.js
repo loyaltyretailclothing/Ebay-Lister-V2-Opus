@@ -82,6 +82,10 @@ export async function POST(request) {
     if (!price) return NextResponse.json({ success: false, error: "Price is required" }, { status: 400 });
     if (!photos?.length) return NextResponse.json({ success: false, error: "At least one photo is required" }, { status: 400 });
 
+    // Convert plain-text newlines to HTML <br> so eBay renders line breaks
+    // (stored in state as \n for a clean textarea UX)
+    const itemDescriptionHtml = (item_description || "").replace(/\n/g, "<br>");
+
     const token = await getUserToken();
     const itemSku = sku || `LISTING-${Date.now()}`;
 
@@ -148,7 +152,7 @@ export async function POST(request) {
       conditionDescription: condition_description || "",
       product: {
         title,
-        description: item_description || "",
+        description: itemDescriptionHtml,
         aspects,
         imageUrls: photos.map((p) => p.secure_url),
       },
@@ -203,7 +207,7 @@ export async function POST(request) {
       format: listingType || "FIXED_PRICE",
       categoryId,
       merchantLocationKey: locationKey,
-      listingDescription: item_description || "",
+      listingDescription: itemDescriptionHtml,
       pricingSummary: {
         price: {
           value: parseFloat(price).toFixed(2),
