@@ -45,7 +45,7 @@ export default function Generate() {
   const [listing, setListing] = useState(INITIAL_LISTING);
   const [analyzing, setAnalyzing] = useState(false);
   const [analysisStep, setAnalysisStep] = useState("");
-  const [lookupStatus, setVisionStatus] = useState("");
+  const [lookupStatus, setLookupStatus] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [submitStatus, setSubmitStatus] = useState(null);
@@ -166,7 +166,7 @@ export default function Generate() {
   async function handleAnalyze() {
     setAnalyzing(true);
     setError("");
-    setVisionStatus("");
+    setLookupStatus("");
     setAnalysisStep("Analyzing photos...");
     try {
       const res = await fetch("/api/generate", {
@@ -192,16 +192,16 @@ export default function Generate() {
             if (refineData.success && refineData.listing) {
               Object.assign(aiListing, refineData.listing);
               const modelName = refineData.listing.observations?.model;
-              setVisionStatus(
+              setLookupStatus(
                 modelName
                   ? `Style Lookup: Found "${modelName}" from style #${styleNumber}`
                   : `Style Lookup: Searched style #${styleNumber} but no model found`
               );
             } else {
-              setVisionStatus(`Style Lookup: Searched style #${styleNumber} but no model found`);
+              setLookupStatus(`Style Lookup: Searched style #${styleNumber} but no model found`);
             }
           } catch (err) {
-            setVisionStatus(`Style Lookup: Search failed for #${styleNumber}`);
+            setLookupStatus(`Style Lookup: Search failed for #${styleNumber}`);
             console.error("Style lookup failed:", err);
           }
         }
@@ -372,7 +372,7 @@ export default function Generate() {
     setListingPhotos([]);
     setSubmitStatus(null);
     setError("");
-    setVisionStatus("");
+    setLookupStatus("");
     setAnalysisStep("");
     setDraftId(null);
     setSaveDraftStatus(null);
@@ -526,7 +526,7 @@ export default function Generate() {
 
           {lookupStatus && !analyzing && (
             <div className={`mt-2 rounded-lg border px-3 py-2 text-xs ${
-              lookupStatus.includes("Found model")
+              lookupStatus.includes("Found \"")
                 ? "border-green-200 bg-green-50 text-green-700 dark:border-green-800 dark:bg-green-950 dark:text-green-400"
                 : lookupStatus.includes("error") || lookupStatus.includes("failed")
                   ? "border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-400"

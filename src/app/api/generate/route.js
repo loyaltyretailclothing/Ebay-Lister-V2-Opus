@@ -98,34 +98,17 @@ export async function POST(request) {
       text: "Analyze these photos and generate the eBay listing details as JSON. Look at every photo carefully for brand, tags, labels, condition, measurements, and defects.",
     });
 
-    // Run Claude (web search disabled for now to save costs)
-    const messages = [{ role: "user", content }];
     const response = await client.messages.create({
       model: "claude-sonnet-4-6",
       max_tokens: 4000,
       system: SYSTEM_PROMPT,
-      messages,
+      messages: [{ role: "user", content }],
     });
 
     // Extract all text blocks from the final response
     const textBlocks = response.content.filter((b) => b.type === "text");
     const responseText = textBlocks.map((b) => b.text).join("\n");
     let listing;
-    let searchPerformed = false;
-
-    // Check if any web search was performed across all messages
-    for (const msg of messages) {
-      if (msg.role === "assistant" && Array.isArray(msg.content)) {
-        if (msg.content.some((b) => b.type === "web_search_tool_result")) {
-          searchPerformed = true;
-          break;
-        }
-      }
-    }
-    // Also check the final response
-    if (response.content.some((b) => b.type === "web_search_tool_result")) {
-      searchPerformed = true;
-    }
 
     try {
       // Try to parse directly
@@ -145,9 +128,6 @@ export async function POST(request) {
         }
       }
     }
-
-    // Add metadata about whether style search was performed
-    listing._styleSearched = searchPerformed;
 
     return NextResponse.json({ success: true, listing });
   } catch (error) {

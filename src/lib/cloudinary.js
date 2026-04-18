@@ -54,9 +54,3 @@ export async function deletePhotos(publicIds) {
   return results.length === 1 ? results[0] : results;
 }
 
-export async function updatePhotoMetadata(publicId, context) {
-  return cloudinary.uploader.explicit(publicId, {
-    type: "upload",
-    context,
-  });
-}

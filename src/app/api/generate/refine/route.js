@@ -82,23 +82,15 @@ export async function POST(request) {
 
     // Search Brave for brand + style number
     const query = `${brand || ""} ${styleNumber}`.trim();
-    console.log("[refine] Brave query:", JSON.stringify(query), "| brand:", JSON.stringify(brand), "| styleNumber:", JSON.stringify(styleNumber));
 
     let searchResults = [];
     if (process.env.BRAVE_SEARCH_API_KEY) {
       try {
         searchResults = await braveSearch(query);
       } catch (err) {
-        console.error("[refine] Brave Search error:", err);
+        console.error("Brave Search error:", err);
       }
-    } else {
-      console.warn("[refine] BRAVE_SEARCH_API_KEY not set");
     }
-
-    console.log("[refine] Brave returned", searchResults.length, "results:");
-    searchResults.forEach((r, i) => {
-      console.log(`  ${i + 1}. ${r.title} — ${r.url}`);
-    });
 
     if (searchResults.length === 0) {
       return NextResponse.json({ success: true, listing: null });
@@ -153,7 +145,6 @@ If no style name found, return {"updated": false}.`;
     });
 
     const responseText = response.content[0].text;
-    console.log("[refine] Claude response:", responseText);
     let result;
     try {
       result = JSON.parse(responseText);

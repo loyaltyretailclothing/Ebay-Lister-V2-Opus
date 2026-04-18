@@ -87,11 +87,6 @@ export async function getUserToken() {
   return cachedUserToken;
 }
 
-// Backward-compatible helper — defaults to app token
-export async function getAccessToken() {
-  return getAppToken();
-}
-
 export async function ebayRequest(path, options = {}) {
   // Use user token for sell APIs, app token for everything else
   const needsUserToken = path.startsWith("/sell/");

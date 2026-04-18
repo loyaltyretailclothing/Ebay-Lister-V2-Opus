@@ -8,13 +8,10 @@ export default function PhotoZone({
   photos,
   onPhotosChange,
   maxPhotos,
-  visionToggle,
-  onVisionToggle,
 }) {
   const [isDragging, setIsDragging] = useState(false);
   const [dragIndex, setDragIndex] = useState(null);
   const [dropTarget, setDropTarget] = useState(null);
-  const [dragOriginal, setDragOriginal] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState(null);
   const fileInputRef = useRef(null);
@@ -97,7 +94,6 @@ export default function PhotoZone({
       }
       setDragIndex(null);
       setDropTarget(null);
-      setDragOriginal(null);
       return;
     }
 
@@ -139,7 +135,6 @@ export default function PhotoZone({
 
   function handleReorderStart(e, index) {
     setDragIndex(index);
-    setDragOriginal([...photos]);
     droppedInSelf.current = false;
     e.dataTransfer.effectAllowed = "copyMove";
     // Also set library photo data so other zones can accept this photo
@@ -185,28 +180,11 @@ export default function PhotoZone({
             {subtitle}
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          {onVisionToggle !== undefined && (
-            <button
-              onClick={() => onVisionToggle(!visionToggle)}
-              className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${
-                visionToggle
-                  ? "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300"
-                  : "bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400"
-              }`}
-            >
-              <span className={`inline-block h-2 w-2 rounded-full ${
-                visionToggle ? "bg-green-500" : "bg-zinc-400"
-              }`} />
-              Vision {visionToggle ? "ON" : "OFF"}
-            </button>
-          )}
-          {maxPhotos && (
-            <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
-              {photos.length}/{maxPhotos}
-            </span>
-          )}
-        </div>
+        {maxPhotos && (
+          <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
+            {photos.length}/{maxPhotos}
+          </span>
+        )}
       </div>
 
       {photos.length > 0 && (
@@ -239,12 +217,7 @@ export default function PhotoZone({
                     className="h-full w-full object-cover"
                     draggable={false}
                   />
-                  {index === 0 && onVisionToggle !== undefined && visionToggle && (
-                    <span className="absolute top-1 left-1 rounded bg-green-600 px-1.5 py-0.5 text-[10px] font-bold text-white">
-                      VISION
-                    </span>
-                  )}
-                  {index === 0 && onVisionToggle === undefined && (
+                  {index === 0 && (
                     <span className="absolute top-1 left-1 rounded bg-blue-600 px-1.5 py-0.5 text-[10px] font-bold text-white">
                       MAIN
                     </span>
