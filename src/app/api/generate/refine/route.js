@@ -3,18 +3,29 @@ import { NextResponse } from "next/server";
 
 const SYSTEM_PROMPT = `You are an eBay listing assistant. You will receive:
 1. A listing with a style/model number found on the item's tag
-2. Web search results for that style number
+2. Web search results (title, snippet, and URL) for that style number
 
-Your job: extract the MODEL NAME or PRODUCT LINE from the search results, then update the title and observations.
+Your job: extract the MODEL/STYLE NAME from the search results, then update the title and observations.
 
-Rules:
-- Look at the search result titles and snippets for a specific product/model name
-- Only update if you find a clear, specific model/product name (e.g. "Balsama Lava Wash", "Crown Comfort", "Dri-FIT Victory")
-- Do NOT update if the results only show generic terms (e.g. "quarter zip", "polo shirt")
-- Title MUST be 75-80 characters — use as close to 80 as possible, pack in SEO keywords
-- Title structure: [NWT if applicable] Brand | Product Name/Model | Type | Gender | Size | Color | Key Details
-- Add the model name to observations as "model"
-- If no useful model name found, return exactly: {"updated": false}
+How to extract a style name from a product title:
+- Strip the leading gender/descriptor word(s) — e.g. "Women's", "Men's", "Kids'", "Unisex"
+- Strip the trailing item type — e.g. "Shirt", "Jacket", "Polo", "Pants", "Hoodie", "Vest", "Tee"
+- Whatever is left in the middle IS the style name, even if it sounds partly descriptive
+- Style names are often multi-word and can include words like "Print", "Sun Protection", "Lightweight", "Performance" — keep those words; they are part of the name
+- The product URL slug is a strong signal — e.g. "/duluth-womens-soul-survivor-sun-protection-shirt-55207" tells you the style name is "Soul Survivor Sun Protection"
+
+Examples:
+- "Women's Soul Survivor Sun Protection Shirt" → style name: "Soul Survivor Sun Protection"
+- "Patagonia Men's Balsama Lava Wash Jacket" → style name: "Balsama Lava Wash"
+- "Nike Dri-FIT Victory Polo" → style name: "Dri-FIT Victory"
+- "Men's Classic Quarter Zip Pullover" → no specific style name, return {"updated": false}
+
+Decision rules:
+- If 2 or more results agree on the same style name (or a close variant), use it
+- If only generic type words remain after stripping gender + type, return {"updated": false}
+- Title MUST be 75-80 characters — pack in SEO keywords
+- Title structure: [NWT if applicable] Brand | Style Name | Type | Gender | Size | Color | Key Details
+- Add the style name to observations as "model"
 - If updating, return: {"updated": true, "title": "new title", "observations": {merged observations}}
 - Return ONLY valid JSON, no markdown or explanation`;
 
@@ -35,9 +46,10 @@ async function braveSearch(query) {
   }
 
   const data = await res.json();
-  const results = (data.web?.results || []).slice(0, 3).map((r) => ({
+  const results = (data.web?.results || []).slice(0, 5).map((r) => ({
     title: r.title || "",
     snippet: r.description || "",
+    url: r.url || "",
   }));
 
   return results;
@@ -76,7 +88,10 @@ export async function POST(request) {
     }
 
     const searchText = searchResults
-      .map((r, i) => `${i + 1}. ${r.title}\n   ${r.snippet}`)
+      .map(
+        (r, i) =>
+          `${i + 1}. ${r.title}\n   URL: ${r.url}\n   ${r.snippet}`
+      )
       .join("\n");
 
     const userPrompt = `Here is the current listing:
