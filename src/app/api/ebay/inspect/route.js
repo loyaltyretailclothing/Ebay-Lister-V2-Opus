@@ -21,7 +21,13 @@ export async function GET(request) {
     let inventoryItem;
     try {
       inventoryItem = await ebayRequest(
-        `/sell/inventory/v1/inventory_item/${encodeURIComponent(sku)}`
+        `/sell/inventory/v1/inventory_item/${encodeURIComponent(sku)}`,
+        {
+          headers: {
+            "Accept-Language": "en-US",
+            "Content-Language": "en-US",
+          },
+        }
       );
     } catch (err) {
       return NextResponse.json(
