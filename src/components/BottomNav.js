@@ -70,6 +70,11 @@ export default function BottomNav() {
     return () => clearTimeout(timer);
   }, [toast]);
 
+  // Hide entirely on the camera flow — capture and review each have their
+  // own focused bottom controls, and keeping BottomNav around eats the
+  // Create Draft button behind it and adds phantom scroll padding.
+  if (pathname?.startsWith("/camera")) return null;
+
   function handlePlaceholderTap(label) {
     setToast(`${label} — Coming Soon`);
   }

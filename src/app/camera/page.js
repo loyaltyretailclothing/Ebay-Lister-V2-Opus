@@ -128,11 +128,13 @@ export default function CameraPage() {
     return <Camera onDone={handleCameraDone} onCancel={handleCameraCancel} />;
   }
 
-  // Review phase
+  // Review phase — fixed full-screen so it escapes the root layout's
+  // BottomNav padding. Internal flex column: sticky header, scrollable
+  // grid, sticky action bar.
   return (
-    <div className="min-h-screen bg-zinc-950 text-white pb-[max(6rem,env(safe-area-inset-bottom))]">
+    <div className="fixed inset-0 z-40 flex flex-col bg-zinc-950 text-white">
       {/* Header */}
-      <div className="sticky top-0 z-10 flex items-center justify-between border-b border-zinc-800 bg-zinc-950/90 px-4 py-3 backdrop-blur pt-[max(0.75rem,env(safe-area-inset-top))]">
+      <div className="flex flex-shrink-0 items-center justify-between border-b border-zinc-800 bg-zinc-950/90 px-4 py-3 backdrop-blur pt-[max(0.75rem,env(safe-area-inset-top))]">
         <button
           onClick={backToCamera}
           className="text-sm text-zinc-300 hover:text-white"
@@ -147,16 +149,18 @@ export default function CameraPage() {
         </span>
       </div>
 
-      <div className="px-4 py-3">
-        <p className="text-xs text-zinc-400">
-          Tap photos to mark them for AI analysis (use your strongest front /
-          tag / detail shots). All photos go on the listing.
-        </p>
-      </div>
+      {/* Scrollable body */}
+      <div className="flex-1 overflow-y-auto">
+        <div className="px-4 py-3">
+          <p className="text-xs text-zinc-400">
+            Tap photos to mark them for AI analysis (use your strongest front /
+            tag / detail shots). All photos go on the listing.
+          </p>
+        </div>
 
-      {/* Grid */}
-      <div className="grid grid-cols-3 gap-1 px-1 sm:gap-2 sm:px-2">
-        {photos.map((p, i) => {
+        {/* Grid */}
+        <div className="grid grid-cols-3 gap-1 px-1 pb-4 sm:gap-2 sm:px-2">
+          {photos.map((p, i) => {
           const selected = aiSelected.has(i);
           return (
             <div key={i} className="relative aspect-square">
@@ -191,16 +195,18 @@ export default function CameraPage() {
             </div>
           );
         })}
+        </div>
+
+        {error && (
+          <div className="mx-4 mt-4 rounded border border-red-700 bg-red-950/60 px-3 py-2 text-sm text-red-200">
+            {error}
+          </div>
+        )}
       </div>
 
-      {error && (
-        <div className="mx-4 mt-4 rounded border border-red-700 bg-red-950/60 px-3 py-2 text-sm text-red-200">
-          {error}
-        </div>
-      )}
-
-      {/* Bottom action bar */}
-      <div className="fixed inset-x-0 bottom-0 z-20 border-t border-zinc-800 bg-zinc-950/95 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur">
+      {/* Bottom action bar — flex item, not fixed, since the parent is a
+          full-screen flex column. Avoids stacking under anything. */}
+      <div className="flex-shrink-0 border-t border-zinc-800 bg-zinc-950/95 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur">
         <button
           onClick={handleCreateDraft}
           disabled={submitting || photos.length === 0}
