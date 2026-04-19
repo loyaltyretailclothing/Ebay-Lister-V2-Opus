@@ -31,6 +31,7 @@ export default function Camera({ onDone, onCancel }) {
   const [iso, setIso] = useState(400); // when isoMode=manual
   const [showDiag, setShowDiag] = useState(false); // capabilities diagnostic panel
   const [constraintErr, setConstraintErr] = useState(""); // last applyConstraints error
+  const [liveSettings, setLiveSettings] = useState(null); // last track.getSettings() snapshot
 
   // Start / restart the camera stream whenever facingMode changes.
   const startStream = useCallback(async () => {
@@ -156,6 +157,7 @@ export default function Camera({ onDone, onCancel }) {
           await track.applyConstraints({ whiteBalanceMode: "continuous" });
         }
         const s = track.getSettings?.();
+        setLiveSettings(s || null);
         console.log(
           "[Camera] WB applied — mode:", wbMode,
           "temp:", colorTemp,
@@ -433,6 +435,17 @@ export default function Camera({ onDone, onCancel }) {
         </span>
         {constraintErr && <span className="text-red-300">{constraintErr}</span>}
       </div>
+      {/* Live-applied settings readout so we can see what the browser is
+          actually holding vs what the slider says. Useful for diagnosing
+          silent constraint rejections on devices like S25 Ultra. */}
+      {liveSettings && (
+        <div className="px-4 pt-0.5 text-center text-[10px] text-white/50">
+          applied: WB={liveSettings.whiteBalanceMode || "?"} @
+          {" "}{liveSettings.colorTemperature ?? "?"}K · ISO=
+          {liveSettings.iso ?? "?"} · exp=
+          {liveSettings.exposureMode || "?"}
+        </div>
+      )}
       {showDiag && capabilities && (
         <pre className="mx-4 mt-1 max-h-32 overflow-auto rounded bg-black/60 p-2 text-[9px] text-white/80">
           {JSON.stringify(capabilities, null, 2)}
