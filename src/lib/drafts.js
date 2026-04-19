@@ -8,6 +8,9 @@ export function newDraftId() {
 
 // Upload a JSON payload to Cloudinary as a raw resource.
 // public_id becomes `${DRAFTS_FOLDER}/${draftId}`.
+// payload may include a `status` ("processing" | "ready" | "error") and
+// optional `errorMessage`; both are mirrored into the resource context so
+// the drafts list can render state without fetching each JSON blob.
 export async function saveDraft(draftId, payload) {
   const json = JSON.stringify(payload);
   const buffer = Buffer.from(json, "utf8");
@@ -26,6 +29,8 @@ export async function saveDraft(draftId, payload) {
           condition: payload.listing?.condition || "",
           thumbnailUrl: payload.listingPhotos?.[0]?.secure_url || "",
           updatedAt: new Date().toISOString(),
+          status: payload.status || "ready",
+          errorMessage: (payload.errorMessage || "").slice(0, 255),
         },
       },
       (error, result) => {
@@ -60,6 +65,8 @@ export async function listDrafts() {
         condition: ctx.condition || "",
         thumbnailUrl: ctx.thumbnailUrl || "",
         updatedAt: ctx.updatedAt || r.created_at,
+        status: ctx.status || "ready",
+        errorMessage: ctx.errorMessage || "",
         url: r.secure_url,
       };
     })

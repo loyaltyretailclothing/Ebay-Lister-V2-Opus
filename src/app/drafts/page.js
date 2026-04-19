@@ -60,6 +60,15 @@ export default function DraftsPage() {
     fetchDrafts();
   }, [fetchDrafts]);
 
+  // Poll every 5s while any draft is processing, so the list reflects
+  // background progress without a manual refresh.
+  useEffect(() => {
+    const anyProcessing = drafts.some((d) => d.status === "processing");
+    if (!anyProcessing) return;
+    const id = setInterval(fetchDrafts, 5000);
+    return () => clearInterval(id);
+  }, [drafts, fetchDrafts]);
+
   async function handleDelete(id) {
     if (!confirm("Delete this draft? This cannot be undone.")) return;
     setDeleting(id);
@@ -157,14 +166,29 @@ export default function DraftsPage() {
         </div>
       ) : (
         <ul className="mt-6 space-y-3">
-          {drafts.map((draft) => (
+          {drafts.map((draft) => {
+            const isProcessing = draft.status === "processing";
+            const isError = draft.status === "error";
+            const rowClass = isError
+              ? "border-red-300 bg-red-50/40 hover:bg-red-50 dark:border-red-900 dark:bg-red-950/20 dark:hover:bg-red-950/40"
+              : isProcessing
+                ? "border-zinc-200 bg-zinc-50/60 hover:bg-zinc-100 dark:border-zinc-800 dark:bg-zinc-900/50 dark:hover:bg-zinc-800"
+                : "border-zinc-200 bg-white hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:bg-zinc-800";
+            return (
             <li
               key={draft.id}
-              className="flex items-center gap-3 rounded-lg border border-zinc-200 bg-white p-3 transition-colors hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:bg-zinc-800"
+              className={`flex items-center gap-3 rounded-lg border p-3 transition-colors ${
+                isError ? "border-l-4 border-l-red-500" : ""
+              } ${rowClass}`}
             >
               <Link
-                href={`/generate?draft=${encodeURIComponent(draft.id)}`}
-                className="flex flex-1 items-center gap-3 min-w-0"
+                href={isProcessing ? "#" : `/generate?draft=${encodeURIComponent(draft.id)}`}
+                onClick={(e) => {
+                  if (isProcessing) e.preventDefault();
+                }}
+                className={`flex flex-1 items-center gap-3 min-w-0 ${
+                  isProcessing ? "cursor-not-allowed" : ""
+                }`}
               >
                 {/* Thumbnail */}
                 <div className="h-16 w-16 flex-shrink-0 overflow-hidden rounded-md bg-zinc-100 dark:bg-zinc-800">
@@ -199,13 +223,46 @@ export default function DraftsPage() {
 
                 {/* Text */}
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium text-zinc-900 dark:text-zinc-100">
-                    {draft.title || "Untitled"}
-                  </p>
+                  <div className="flex items-center gap-2">
+                    <p className="truncate text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                      {draft.title || "Untitled"}
+                    </p>
+                    {isProcessing && (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-medium text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
+                        <svg
+                          className="h-2.5 w-2.5 animate-spin"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                        >
+                          <circle
+                            className="opacity-25"
+                            cx="12"
+                            cy="12"
+                            r="10"
+                            stroke="currentColor"
+                            strokeWidth="4"
+                          />
+                          <path
+                            className="opacity-75"
+                            fill="currentColor"
+                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                          />
+                        </svg>
+                        Processing
+                      </span>
+                    )}
+                    {isError && (
+                      <span className="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-medium text-red-700 dark:bg-red-900/40 dark:text-red-300">
+                        Error
+                      </span>
+                    )}
+                  </div>
                   <p className="mt-0.5 truncate text-xs text-zinc-500 dark:text-zinc-400">
-                    {[conditionLabel(draft.condition), formatDate(draft.updatedAt)]
-                      .filter(Boolean)
-                      .join(" \u00b7 ")}
+                    {isError && draft.errorMessage
+                      ? draft.errorMessage
+                      : [conditionLabel(draft.condition), formatDate(draft.updatedAt)]
+                          .filter(Boolean)
+                          .join(" \u00b7 ")}
                   </p>
                 </div>
               </Link>
@@ -255,7 +312,8 @@ export default function DraftsPage() {
                 )}
               </button>
             </li>
-          ))}
+            );
+          })}
         </ul>
       )}
     </div>
