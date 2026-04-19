@@ -329,30 +329,28 @@ export default function Camera({ onDone, onCancel }) {
         </button>
       </div>
 
-      {/* Viewfinder with 1:1 square guide overlay. Tap anywhere to focus
-          on that point; driver ignores the constraint if unsupported. */}
-      <div
-        className="relative flex flex-1 items-center justify-center overflow-hidden"
-        onClick={handleViewfinderTap}
-      >
+      {/* Viewfinder — the visible region is a centered 1:1 square that
+          matches exactly what handleCapture crops from the source. Any
+          leftover vertical space above/below stays black, same as native
+          camera apps in 1:1 mode. WYSIWYG. */}
+      <div className="relative flex flex-1 items-center justify-center overflow-hidden">
         {error ? (
           <div className="max-w-sm px-6 text-center text-sm text-red-300">
             {error}
           </div>
         ) : (
-          <>
+          <div
+            className="relative aspect-square w-full max-h-full overflow-hidden"
+            onClick={handleViewfinderTap}
+          >
             <video
               ref={videoRef}
               playsInline
               muted
               autoPlay
-              className="h-full w-full object-cover"
+              className="absolute inset-0 h-full w-full object-cover"
               style={videoScaleStyle}
             />
-            {/* Square 1:1 crop guide centered in the frame */}
-            <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-              <div className="aspect-square w-[min(90vw,90vh)] border-2 border-white/80 shadow-[0_0_0_9999px_rgba(0,0,0,0.35)]" />
-            </div>
             {/* Tap-to-focus indicator — small yellow square, quick fade out */}
             {focusPoint && (
               <div
@@ -369,7 +367,7 @@ export default function Camera({ onDone, onCancel }) {
                 Starting camera…
               </div>
             )}
-          </>
+          </div>
         )}
       </div>
       {/* Keyframes for the tap-to-focus indicator animation */}
