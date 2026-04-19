@@ -6,6 +6,7 @@ import {
   fetchCategorySpecifics,
   fillItemSpecifics,
   refineStyleName,
+  applyDescriptionTemplate,
 } from "@/lib/listingPipeline";
 
 // Pipeline takes ~30-60s (Claude vision + eBay + Claude pass 2 + optional
@@ -99,7 +100,14 @@ export async function POST(request) {
       console.error("Refine step failed:", refineErr);
     }
 
-    // 5. Save the completed draft.
+    // 5. Apply description template — must run LAST so the final title
+    //    (post-refine) is the one that lands in the description body.
+    //    This overwrites condition_description with the static boilerplate
+    //    and builds item_description from the template, keeping camera
+    //    drafts in sync with Generate-page output.
+    Object.assign(listing, applyDescriptionTemplate(listing));
+
+    // 6. Save the completed draft.
     await saveDraft(draftId, {
       id: draftId,
       listing,

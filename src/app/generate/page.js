@@ -7,6 +7,12 @@ import ListingForm from "@/components/ListingForm";
 import SoldComps from "@/components/SoldComps";
 import SuccessModal from "@/components/SuccessModal";
 import { usePhotoTransfer } from "@/contexts/PhotoTransferContext";
+import {
+  checkTwoInchRule,
+  parsePantSize,
+  getConditionBoilerplate,
+  buildDescription,
+} from "@/lib/listingPipeline";
 
 const INITIAL_LISTING = {
   title: "",
@@ -105,63 +111,6 @@ export default function Generate() {
       }
     }
   }, [hasPending, consumeTransfer]);
-
-  // Parse "32x30" or "32 x 30" format into [waist, inseam] numbers
-  function parsePantSize(sizeStr) {
-    if (!sizeStr) return null;
-    const match = sizeStr.match(/(\d+)\s*x\s*(\d+)/i);
-    if (!match) return null;
-    return [parseInt(match[1], 10), parseInt(match[2], 10)];
-  }
-
-  // Check if the 2-inch rule applies for pants
-  function checkTwoInchRule(observations) {
-    const itemType = (observations?.type || "").toLowerCase();
-    const isPants = ["pants", "jeans", "shorts", "trousers", "chinos"].some(
-      (t) => itemType.includes(t)
-    );
-    if (!isPants) return false;
-
-    const tag = parsePantSize(observations?.tag_size);
-    const measured = parsePantSize(observations?.measured_size);
-    if (!tag || !measured) return false;
-
-    const waistDiff = Math.abs(tag[0] - measured[0]);
-    const inseamDiff = Math.abs(tag[1] - measured[1]);
-    return waistDiff >= 2 || inseamDiff >= 2;
-  }
-
-  function getConditionBoilerplate(condition) {
-    const boilerplate =
-      "Please see all photos for condition as all flaws will be shown throughout the photos! Please review the measurements provided in the photos. It is best to compare our listing's measurements to a similar article of clothing in your closet to ensure a proper fit!";
-
-    if (condition === "NEW_WITH_TAGS") return `New With Tags! ${boilerplate}`;
-    if (condition === "NEW_WITHOUT_TAGS") return `New Without Tags! ${boilerplate}`;
-    if (condition === "NEW_WITH_DEFECTS") return `New With Defects! ${boilerplate}`;
-    return `Pre-owned condition! ${boilerplate}`;
-  }
-
-  function buildDescription(title, condition, observations) {
-    const lines = [];
-
-    // Line 1: Title
-    lines.push(title);
-    lines.push("");
-
-    // Pants 2-inch rule: show tag vs measured only when difference is 2+ inches
-    if (checkTwoInchRule(observations)) {
-      lines.push(`Tag - ${observations.tag_size}`);
-      lines.push(`Measures ${observations.measured_size}`);
-      lines.push("");
-    }
-
-    // Condition boilerplate
-    lines.push(getConditionBoilerplate(condition));
-    lines.push("");
-    lines.push("Ships USPS Ground Advantage!");
-
-    return lines.join("\n");
-  }
 
   async function handleAnalyze() {
     setAnalyzing(true);
