@@ -20,6 +20,13 @@ import { useCallback, useEffect, useRef, useState } from "react";
 // Samsung drivers accept the constraint but silently ignore it, so the
 // slider was misleading. Best practice: set your lighting to ~5000K
 // daylight with high-CRI bulbs and let the phone's AWB handle it.
+// Standard ISO stops (1/3-stop increments through 800, then full-stop jumps
+// to 1600 and 3200) — matches what native camera apps expose. Filtered at
+// stream start to whatever range the device actually supports.
+const ISO_PRESETS = [
+  50, 64, 80, 100, 125, 160, 200, 250, 320, 400, 500, 640, 800, 1600, 3200,
+];
+
 export default function Camera({ onDone, onCancel }) {
   const videoRef = useRef(null);
   const streamRef = useRef(null);
@@ -33,7 +40,9 @@ export default function Camera({ onDone, onCancel }) {
   const [zoom, setZoom] = useState(1); // 1 | 2 | 3
   const [capabilities, setCapabilities] = useState(null);
   const [isoMode, setIsoMode] = useState("auto"); // "auto" | "manual"
-  const [iso, setIso] = useState(400);
+  const [isoStops, setIsoStops] = useState([]); // presets clamped to device range
+  const [isoIndex, setIsoIndex] = useState(0); // index into isoStops
+  const iso = isoStops[isoIndex] ?? 400;
   const [shutterMode, setShutterMode] = useState("auto"); // "auto" | "manual"
   const [shutter, setShutter] = useState(100); // exposureTime units (100µs typically)
   const [focusPoint, setFocusPoint] = useState(null); // { x, y } in viewfinder px, for the animated indicator
@@ -78,9 +87,17 @@ export default function Camera({ onDone, onCancel }) {
       // Seed each manual slider at the midpoint of its supported range so
       // the first user tap lands somewhere sensible.
       if (caps.iso) {
-        const min = caps.iso.min ?? 100;
-        const max = caps.iso.max ?? 800;
-        setIso(Math.round((min + max) / 2));
+        const min = caps.iso.min ?? 50;
+        const max = caps.iso.max ?? 3200;
+        const stops = ISO_PRESETS.filter((v) => v >= min && v <= max);
+        // Fallback: if the device's range doesn't overlap any preset, use
+        // raw min/max so the slider still works.
+        const finalStops = stops.length > 0 ? stops : [min, max];
+        setIsoStops(finalStops);
+        setIsoIndex(Math.floor(finalStops.length / 2));
+      } else {
+        setIsoStops([]);
+        setIsoIndex(0);
       }
       if (caps.exposureTime) {
         const min = caps.exposureTime.min ?? 1;
@@ -154,11 +171,8 @@ export default function Camera({ onDone, onCancel }) {
 
   const hasHardwareZoom = !!capabilities?.zoom;
   const hasTorch = !!capabilities?.torch;
-  const hasIso = !!capabilities?.iso;
+  const hasIso = !!capabilities?.iso && isoStops.length > 0;
   const hasShutter = !!capabilities?.exposureTime;
-  const isoMin = capabilities?.iso?.min ?? 100;
-  const isoMax = capabilities?.iso?.max ?? 800;
-  const isoStep = capabilities?.iso?.step || 50;
   const shutterMin = capabilities?.exposureTime?.min ?? 1;
   const shutterMax = capabilities?.exposureTime?.max ?? 1000;
   const shutterStep = capabilities?.exposureTime?.step || 1;
@@ -395,12 +409,12 @@ export default function Camera({ onDone, onCancel }) {
           </button>
           <input
             type="range"
-            min={isoMin}
-            max={isoMax}
-            step={isoStep}
-            value={iso}
+            min={0}
+            max={Math.max(0, isoStops.length - 1)}
+            step={1}
+            value={isoIndex}
             onChange={(e) => {
-              setIso(Number(e.target.value));
+              setIsoIndex(Number(e.target.value));
               setIsoMode("manual");
             }}
             className="flex-1 accent-white"
