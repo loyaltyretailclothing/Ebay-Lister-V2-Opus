@@ -13,6 +13,13 @@ import { useCallback, useEffect, useRef, useState } from "react";
 // Each captured photo is a square 1:1 crop taken from the center of the
 // camera frame, encoded as JPEG. The caller is responsible for uploading
 // those blobs to Cloudinary.
+//
+// Manual controls: ISO and shutter speed (exposureTime). Both only render
+// when the underlying track exposes them (Android Chrome usually does; iOS
+// Safari doesn't). Hardware white balance is intentionally NOT exposed —
+// Samsung drivers accept the constraint but silently ignore it, so the
+// slider was misleading. Best practice: set your lighting to ~5000K
+// daylight with high-CRI bulbs and let the phone's AWB handle it.
 export default function Camera({ onDone, onCancel }) {
   const videoRef = useRef(null);
   const streamRef = useRef(null);
@@ -25,13 +32,10 @@ export default function Camera({ onDone, onCancel }) {
   const [flashOn, setFlashOn] = useState(false); // torch constraint if supported
   const [zoom, setZoom] = useState(1); // 1 | 2 | 3
   const [capabilities, setCapabilities] = useState(null);
-  const [wbMode, setWbMode] = useState("auto"); // "auto" | "manual"
-  const [colorTemp, setColorTemp] = useState(5500); // Kelvin, when wbMode=manual
   const [isoMode, setIsoMode] = useState("auto"); // "auto" | "manual"
-  const [iso, setIso] = useState(400); // when isoMode=manual
-  const [showDiag, setShowDiag] = useState(false); // capabilities diagnostic panel
-  const [constraintErr, setConstraintErr] = useState(""); // last applyConstraints error
-  const [liveSettings, setLiveSettings] = useState(null); // last track.getSettings() snapshot
+  const [iso, setIso] = useState(400);
+  const [shutterMode, setShutterMode] = useState("auto"); // "auto" | "manual"
+  const [shutter, setShutter] = useState(100); // exposureTime units (100µs typically)
 
   // Start / restart the camera stream whenever facingMode changes.
   const startStream = useCallback(async () => {
@@ -59,31 +63,29 @@ export default function Camera({ onDone, onCancel }) {
         await videoRef.current.play().catch(() => {});
       }
 
-      // Detect capabilities (zoom, torch) — Android typically exposes, iOS usually not.
+      // Detect capabilities (zoom, torch, iso, exposureTime) — Android
+      // typically exposes these, iOS usually not.
       const track = stream.getVideoTracks()[0];
       const caps = track.getCapabilities?.() || {};
       setCapabilities(caps);
 
-      // Reset zoom / flash / WB / ISO state on a fresh stream.
+      // Reset all manual controls on a fresh stream.
       setZoom(1);
       setFlashOn(false);
-      setWbMode("auto");
       setIsoMode("auto");
-      setConstraintErr("");
-      // Seed colorTemp / ISO at the midpoint of each supported range so
-      // the first manual tap lands somewhere sensible.
-      if (caps.colorTemperature) {
-        const min = caps.colorTemperature.min ?? 2500;
-        const max = caps.colorTemperature.max ?? 7500;
-        setColorTemp(Math.round((min + max) / 2));
-      }
+      setShutterMode("auto");
+      // Seed each manual slider at the midpoint of its supported range so
+      // the first user tap lands somewhere sensible.
       if (caps.iso) {
         const min = caps.iso.min ?? 100;
         const max = caps.iso.max ?? 800;
         setIso(Math.round((min + max) / 2));
       }
-      // Log for diagnostic / debugging on real devices.
-      console.log("[Camera] capabilities:", caps);
+      if (caps.exposureTime) {
+        const min = caps.exposureTime.min ?? 1;
+        const max = caps.exposureTime.max ?? 1000;
+        setShutter(Math.round((min + max) / 2));
+      }
     } catch (err) {
       console.error("Camera start error:", err);
       setError(
@@ -118,7 +120,6 @@ export default function Camera({ onDone, onCancel }) {
       const target = Math.min(max, Math.max(min, zoom));
       track.applyConstraints({ advanced: [{ zoom: target }] }).catch(() => {});
     }
-    // CSS fallback handled inline on the <video> style.
   }, [zoom]);
 
   // Apply torch/flash constraint when supported.
@@ -131,83 +132,35 @@ export default function Camera({ onDone, onCancel }) {
     }
   }, [flashOn]);
 
-  // Apply white balance. Auto = continuous (let the camera decide),
-  // Manual = lock to the user's chosen colorTemp Kelvin value.
-  //
-  // On Samsung Chrome, sending { whiteBalanceMode, colorTemperature }
-  // together in one advanced block silently loses the temperature — the
-  // auto WB keeps winning. Splitting into two sequential applyConstraints
-  // calls (mode first, then temperature) forces it to stick. Also using
-  // top-level constraints instead of `advanced` so the browser treats
-  // them as required rather than best-effort.
+  // Apply ISO + exposureTime together. exposureMode has to be "manual" for
+  // either one to take effect; flipping back to "continuous" un-locks both.
+  // Both sliders live in the same constraint so toggling one doesn't clobber
+  // the other.
   useEffect(() => {
     const track = streamRef.current?.getVideoTracks?.()[0];
     if (!track) return;
     const caps = track.getCapabilities?.() || {};
-    if (!caps.colorTemperature) return;
-
-    let cancelled = false;
-    (async () => {
-      try {
-        if (wbMode === "manual") {
-          await track.applyConstraints({ whiteBalanceMode: "manual" });
-          if (cancelled) return;
-          await track.applyConstraints({ colorTemperature: colorTemp });
-        } else {
-          await track.applyConstraints({ whiteBalanceMode: "continuous" });
-        }
-        const s = track.getSettings?.();
-        setLiveSettings(s || null);
-        console.log(
-          "[Camera] WB applied — mode:", wbMode,
-          "temp:", colorTemp,
-          "→ settings.colorTemperature:", s?.colorTemperature,
-          "settings.whiteBalanceMode:", s?.whiteBalanceMode
-        );
-      } catch (e) {
-        if (cancelled) return;
-        console.error("[Camera] WB applyConstraints failed:", e);
-        setConstraintErr(`WB: ${e.name || e.message || "rejected"}`);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [wbMode, colorTemp]);
-
-  // Apply ISO. Requires exposureMode=manual on most devices for the ISO
-  // constraint to actually take effect.
-  useEffect(() => {
-    const track = streamRef.current?.getVideoTracks?.()[0];
-    if (!track) return;
-    const caps = track.getCapabilities?.() || {};
-    if (!caps.iso) return;
-    const constraint =
-      isoMode === "manual"
-        ? { exposureMode: "manual", iso: iso }
-        : { exposureMode: "continuous" };
+    const needsManual = isoMode === "manual" || shutterMode === "manual";
+    const constraint = { exposureMode: needsManual ? "manual" : "continuous" };
+    if (isoMode === "manual" && caps.iso) constraint.iso = iso;
+    if (shutterMode === "manual" && caps.exposureTime) {
+      constraint.exposureTime = shutter;
+    }
     track
       .applyConstraints({ advanced: [constraint] })
-      .then(() => {
-        const s = track.getSettings?.();
-        console.log("[Camera] ISO applied:", constraint, "→ settings:", s);
-      })
-      .catch((e) => {
-        console.error("[Camera] ISO applyConstraints failed:", e);
-        setConstraintErr(`ISO: ${e.name || e.message || "rejected"}`);
-      });
-  }, [isoMode, iso]);
+      .catch((e) => console.error("[Camera] exposure applyConstraints:", e));
+  }, [isoMode, iso, shutterMode, shutter]);
 
   const hasHardwareZoom = !!capabilities?.zoom;
   const hasTorch = !!capabilities?.torch;
-  const hasWhiteBalance = !!capabilities?.colorTemperature;
   const hasIso = !!capabilities?.iso;
-  const wbMin = capabilities?.colorTemperature?.min ?? 2500;
-  const wbMax = capabilities?.colorTemperature?.max ?? 7500;
-  const wbStep = capabilities?.colorTemperature?.step || 100;
+  const hasShutter = !!capabilities?.exposureTime;
   const isoMin = capabilities?.iso?.min ?? 100;
   const isoMax = capabilities?.iso?.max ?? 800;
   const isoStep = capabilities?.iso?.step || 50;
+  const shutterMin = capabilities?.exposureTime?.min ?? 1;
+  const shutterMax = capabilities?.exposureTime?.max ?? 1000;
+  const shutterStep = capabilities?.exposureTime?.step || 1;
 
   function handleCapture() {
     const video = videoRef.current;
@@ -360,40 +313,12 @@ export default function Camera({ onDone, onCancel }) {
         )}
       </div>
 
-      {/* Manual controls — White Balance + ISO. Each row hides itself
-          automatically if the device doesn't expose that capability. */}
-      {hasWhiteBalance && (
-        <div className="flex items-center gap-2 px-4 pt-2">
-          <span className="w-12 text-[10px] font-semibold uppercase tracking-wide text-white/70">WB</span>
-          <button
-            onClick={() => setWbMode("auto")}
-            className={`rounded-full px-2 py-0.5 text-[10px] font-semibold backdrop-blur ${
-              wbMode === "auto" ? "bg-white text-black" : "bg-black/40 text-white"
-            }`}
-          >
-            Auto
-          </button>
-          <input
-            type="range"
-            min={wbMin}
-            max={wbMax}
-            step={wbStep}
-            value={colorTemp}
-            onChange={(e) => {
-              setColorTemp(Number(e.target.value));
-              setWbMode("manual");
-            }}
-            className="flex-1 accent-white"
-            aria-label="White balance color temperature"
-          />
-          <span className="w-12 text-right text-[10px] font-medium tabular-nums">
-            {wbMode === "manual" ? `${colorTemp}K` : "Auto"}
-          </span>
-        </div>
-      )}
+      {/* Manual controls — ISO + Shutter. Each row hides if the device
+          doesn't expose that capability. Touching a slider flips its mode
+          to manual; Auto button resets to continuous exposure. */}
       {hasIso && (
-        <div className="flex items-center gap-2 px-4 pt-1">
-          <span className="w-12 text-[10px] font-semibold uppercase tracking-wide text-white/70">ISO</span>
+        <div className="flex items-center gap-2 px-4 pt-2">
+          <span className="w-14 text-[10px] font-semibold uppercase tracking-wide text-white/70">ISO</span>
           <button
             onClick={() => setIsoMode("auto")}
             className={`rounded-full px-2 py-0.5 text-[10px] font-semibold backdrop-blur ${
@@ -420,36 +345,34 @@ export default function Camera({ onDone, onCancel }) {
           </span>
         </div>
       )}
-      {/* Diagnostic chip — tap to expand the caps object so we can see
-          which manual controls the device actually exposed. */}
-      <div className="flex items-center justify-center gap-2 px-4 pt-1 text-[10px] text-white/60">
-        <button
-          onClick={() => setShowDiag((v) => !v)}
-          className="rounded-full bg-black/30 px-2 py-0.5"
-        >
-          {showDiag ? "Hide caps" : "Caps"}
-        </button>
-        <span>
-          Zoom {hasHardwareZoom ? "✓" : "✗"} · Flash {hasTorch ? "✓" : "✗"} ·
-          WB {hasWhiteBalance ? "✓" : "✗"} · ISO {hasIso ? "✓" : "✗"}
-        </span>
-        {constraintErr && <span className="text-red-300">{constraintErr}</span>}
-      </div>
-      {/* Live-applied settings readout so we can see what the browser is
-          actually holding vs what the slider says. Useful for diagnosing
-          silent constraint rejections on devices like S25 Ultra. */}
-      {liveSettings && (
-        <div className="px-4 pt-0.5 text-center text-[10px] text-white/50">
-          applied: WB={liveSettings.whiteBalanceMode || "?"} @
-          {" "}{liveSettings.colorTemperature ?? "?"}K · ISO=
-          {liveSettings.iso ?? "?"} · exp=
-          {liveSettings.exposureMode || "?"}
+      {hasShutter && (
+        <div className="flex items-center gap-2 px-4 pt-1">
+          <span className="w-14 text-[10px] font-semibold uppercase tracking-wide text-white/70">Shutter</span>
+          <button
+            onClick={() => setShutterMode("auto")}
+            className={`rounded-full px-2 py-0.5 text-[10px] font-semibold backdrop-blur ${
+              shutterMode === "auto" ? "bg-white text-black" : "bg-black/40 text-white"
+            }`}
+          >
+            Auto
+          </button>
+          <input
+            type="range"
+            min={shutterMin}
+            max={shutterMax}
+            step={shutterStep}
+            value={shutter}
+            onChange={(e) => {
+              setShutter(Number(e.target.value));
+              setShutterMode("manual");
+            }}
+            className="flex-1 accent-white"
+            aria-label="Shutter speed"
+          />
+          <span className="w-12 text-right text-[10px] font-medium tabular-nums">
+            {shutterMode === "manual" ? shutter : "Auto"}
+          </span>
         </div>
-      )}
-      {showDiag && capabilities && (
-        <pre className="mx-4 mt-1 max-h-32 overflow-auto rounded bg-black/60 p-2 text-[9px] text-white/80">
-          {JSON.stringify(capabilities, null, 2)}
-        </pre>
       )}
 
       {/* Zoom chips */}
