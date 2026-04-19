@@ -42,7 +42,15 @@
       "Bash(rm src/app/api/ebay/auth/route.js)",
       "Bash(rm src/app/api/ebay/callback/route.js)",
       "Bash(rm src/app/settings/ebay/page.js)",
-      "Bash(rmdir src/app/api/ebay/auth)"
+      "Bash(rmdir src/app/api/ebay/auth)",
+      "Bash(git add:*)",
+      "Bash(git commit -m ':*)",
+      "Bash(git push:*)",
+      "Bash(taskkill /PID 7148 /F)",
+      "Bash(taskkill /PID 21404 /F)",
+      "Bash(cmd.exe /c \"taskkill /PID 21404 /F\")",
+      "Bash(powershell.exe -Command \"Stop-Process -Id 21404 -Force\")",
+      "Bash(curl -s https://ebay-lister-v2-opus.vercel.app/api/drafts)"
     ]
   }
 }

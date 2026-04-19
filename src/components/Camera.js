@@ -46,6 +46,7 @@ export default function Camera({ onDone, onCancel }) {
   const [shutterMode, setShutterMode] = useState("auto"); // "auto" | "manual"
   const [shutter, setShutter] = useState(100); // exposureTime units (100µs typically)
   const [focusPoint, setFocusPoint] = useState(null); // { x, y } in viewfinder px, for the animated indicator
+  const [diag, setDiag] = useState(null); // live track.getSettings() readout for lens-switch debugging
 
   // Start / restart the camera stream whenever facingMode changes.
   const startStream = useCallback(async () => {
@@ -214,6 +215,27 @@ export default function Camera({ onDone, onCancel }) {
       .catch((err) => console.error("[Camera] focus applyConstraints:", err));
   }
 
+  // DIAGNOSTIC — poll track.getSettings() every 500ms so we can see if the
+  // driver silently swaps physical cameras between captures. The S25 Ultra
+  // exposes ultrawide/main/tele; a deviceId or focalLength change mid-session
+  // is the smoking gun. Remove once the lens-switch bug is root-caused.
+  useEffect(() => {
+    const id = setInterval(() => {
+      const track = streamRef.current?.getVideoTracks?.()[0];
+      if (!track) return;
+      const s = track.getSettings?.() || {};
+      setDiag({
+        w: s.width,
+        h: s.height,
+        focal: s.focalLength,
+        zoom: s.zoom,
+        deviceId: s.deviceId ? s.deviceId.slice(0, 6) : null,
+        groupId: s.groupId ? s.groupId.slice(0, 6) : null,
+      });
+    }, 500);
+    return () => clearInterval(id);
+  }, []);
+
   // Clear the focus indicator after it's been visible for ~900ms.
   useEffect(() => {
     if (!focusPoint) return;
@@ -379,6 +401,16 @@ export default function Camera({ onDone, onCancel }) {
             {starting && (
               <div className="absolute inset-0 flex items-center justify-center bg-black/50 text-sm">
                 Starting camera…
+              </div>
+            )}
+            {/* DIAGNOSTIC readout — remove once lens-switch bug is solved. */}
+            {diag && (
+              <div className="pointer-events-none absolute left-1 top-1 rounded bg-black/60 px-1.5 py-0.5 font-mono text-[10px] leading-tight text-lime-300">
+                {diag.w}×{diag.h}
+                {diag.focal != null && ` · f:${diag.focal}`}
+                {diag.zoom != null && ` · z:${diag.zoom}`}
+                {diag.deviceId && ` · d:${diag.deviceId}`}
+                {diag.groupId && ` · g:${diag.groupId}`}
               </div>
             )}
           </div>
