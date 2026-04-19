@@ -32,7 +32,11 @@ export default function Camera({ onDone, onCancel }) {
   const streamRef = useRef(null);
   const canvasRef = useRef(null);
   const thumbStripRef = useRef(null);
-  const shutterAudioRef = useRef(null);
+  // Web Audio refs — HTMLAudioElement.play() has a 50-200ms warmup delay on
+  // mobile even with preload. Web Audio plays a pre-decoded buffer with
+  // essentially zero latency, which is what you want for a shutter sound.
+  const audioCtxRef = useRef(null);
+  const shutterBufferRef = useRef(null);
 
   const [photos, setPhotos] = useState([]); // [{ blob, url }]
   const [error, setError] = useState("");
@@ -216,6 +220,30 @@ export default function Camera({ onDone, onCancel }) {
       .catch((err) => console.error("[Camera] focus applyConstraints:", err));
   }
 
+  // Preload the shutter sound into a Web Audio buffer on mount. Decoded
+  // once, then replayed with zero latency on each capture via a fresh
+  // AudioBufferSourceNode.
+  useEffect(() => {
+    let cancelled = false;
+    const Ctx = typeof window !== "undefined"
+      ? window.AudioContext || window.webkitAudioContext
+      : null;
+    if (!Ctx) return;
+    const ctx = new Ctx();
+    audioCtxRef.current = ctx;
+    fetch("/sounds/shutter.wav")
+      .then((r) => r.arrayBuffer())
+      .then((buf) => ctx.decodeAudioData(buf))
+      .then((decoded) => {
+        if (!cancelled) shutterBufferRef.current = decoded;
+      })
+      .catch((e) => console.error("[Camera] shutter decode failed:", e));
+    return () => {
+      cancelled = true;
+      ctx.close().catch(() => {});
+    };
+  }, []);
+
   // Auto-scroll the thumbnail strip to the end whenever a new photo is added,
   // so the latest capture is always visible without manual scrolling.
   useEffect(() => {
@@ -236,13 +264,18 @@ export default function Camera({ onDone, onCancel }) {
     if (!video || !video.videoWidth) return;
 
     // Play shutter sound as early as possible so the audible feedback lines
-    // up with the button tap, not the canvas encode. Reset currentTime so
-    // rapid consecutive captures each play the sound (default Audio won't
-    // re-play until the previous finishes).
-    const audio = shutterAudioRef.current;
-    if (audio) {
-      audio.currentTime = 0;
-      audio.play().catch(() => {});
+    // up with the button tap, not the canvas encode. Uses Web Audio for
+    // near-zero latency (HTMLAudio has a 50-200ms warmup on mobile).
+    const audioCtx = audioCtxRef.current;
+    const buf = shutterBufferRef.current;
+    if (audioCtx && buf) {
+      // iOS/Chrome may suspend the context until a user gesture — capture
+      // is a tap, so resume() is safe here. resume() is a no-op if running.
+      if (audioCtx.state === "suspended") audioCtx.resume().catch(() => {});
+      const src = audioCtx.createBufferSource();
+      src.buffer = buf;
+      src.connect(audioCtx.destination);
+      src.start(0);
     }
 
     // Hard-crop to 1:1 from the center of the frame. eBay recommends square
@@ -331,14 +364,6 @@ export default function Camera({ onDone, onCancel }) {
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-black text-white">
-      {/* Shutter sound — preloaded so the first capture has zero delay. */}
-      <audio
-        ref={shutterAudioRef}
-        src="/sounds/shutter.wav"
-        preload="auto"
-        playsInline
-      />
-
       {/* Top bar: close + flash */}
       <div className="flex items-center justify-between px-4 pt-[max(1rem,env(safe-area-inset-top))]">
         <button
