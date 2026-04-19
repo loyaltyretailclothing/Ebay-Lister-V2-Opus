@@ -132,25 +132,45 @@ export default function Camera({ onDone, onCancel }) {
 
   // Apply white balance. Auto = continuous (let the camera decide),
   // Manual = lock to the user's chosen colorTemp Kelvin value.
+  //
+  // On Samsung Chrome, sending { whiteBalanceMode, colorTemperature }
+  // together in one advanced block silently loses the temperature — the
+  // auto WB keeps winning. Splitting into two sequential applyConstraints
+  // calls (mode first, then temperature) forces it to stick. Also using
+  // top-level constraints instead of `advanced` so the browser treats
+  // them as required rather than best-effort.
   useEffect(() => {
     const track = streamRef.current?.getVideoTracks?.()[0];
     if (!track) return;
     const caps = track.getCapabilities?.() || {};
     if (!caps.colorTemperature) return;
-    const constraint =
-      wbMode === "manual"
-        ? { whiteBalanceMode: "manual", colorTemperature: colorTemp }
-        : { whiteBalanceMode: "continuous" };
-    track
-      .applyConstraints({ advanced: [constraint] })
-      .then(() => {
+
+    let cancelled = false;
+    (async () => {
+      try {
+        if (wbMode === "manual") {
+          await track.applyConstraints({ whiteBalanceMode: "manual" });
+          if (cancelled) return;
+          await track.applyConstraints({ colorTemperature: colorTemp });
+        } else {
+          await track.applyConstraints({ whiteBalanceMode: "continuous" });
+        }
         const s = track.getSettings?.();
-        console.log("[Camera] WB applied:", constraint, "→ settings:", s);
-      })
-      .catch((e) => {
+        console.log(
+          "[Camera] WB applied — mode:", wbMode,
+          "temp:", colorTemp,
+          "→ settings.colorTemperature:", s?.colorTemperature,
+          "settings.whiteBalanceMode:", s?.whiteBalanceMode
+        );
+      } catch (e) {
+        if (cancelled) return;
         console.error("[Camera] WB applyConstraints failed:", e);
         setConstraintErr(`WB: ${e.name || e.message || "rejected"}`);
-      });
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [wbMode, colorTemp]);
 
   // Apply ISO. Requires exposureMode=manual on most devices for the ISO
