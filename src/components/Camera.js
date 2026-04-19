@@ -36,6 +36,7 @@ export default function Camera({ onDone, onCancel }) {
   const [iso, setIso] = useState(400);
   const [shutterMode, setShutterMode] = useState("auto"); // "auto" | "manual"
   const [shutter, setShutter] = useState(100); // exposureTime units (100µs typically)
+  const [focusPoint, setFocusPoint] = useState(null); // { x, y } in viewfinder px, for the animated indicator
 
   // Start / restart the camera stream whenever facingMode changes.
   const startStream = useCallback(async () => {
@@ -162,6 +163,50 @@ export default function Camera({ onDone, onCancel }) {
   const shutterMax = capabilities?.exposureTime?.max ?? 1000;
   const shutterStep = capabilities?.exposureTime?.step || 1;
 
+  // Tap-to-focus handler. Called on the viewfinder area. Computes the tap
+  // location as normalized [0,1] coords and sends pointsOfInterest +
+  // focusMode=single-shot to the track. Also sets a short-lived focusPoint
+  // state so the UI can render a yellow square confirmation at that spot.
+  function handleViewfinderTap(e) {
+    const track = streamRef.current?.getVideoTracks?.()[0];
+    if (!track || !videoRef.current) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    // Prefer touch coordinates on mobile (changedTouches fires on touchend).
+    const pointer = e.changedTouches?.[0] || e;
+    const localX = pointer.clientX - rect.left;
+    const localY = pointer.clientY - rect.top;
+    const normX = Math.max(0, Math.min(1, localX / rect.width));
+    const normY = Math.max(0, Math.min(1, localY / rect.height));
+
+    // Animated indicator.
+    setFocusPoint({ x: localX, y: localY, at: Date.now() });
+
+    const caps = track.getCapabilities?.() || {};
+    // Driver has to support at least one of these for a tap to mean
+    // anything — most Android Chrome does, iOS Safari doesn't.
+    if (!caps.pointsOfInterest && !caps.focusMode) return;
+
+    const constraints = [];
+    if (caps.focusMode?.includes?.("single-shot")) {
+      constraints.push({ focusMode: "single-shot" });
+    } else if (caps.focusMode?.includes?.("manual")) {
+      constraints.push({ focusMode: "manual" });
+    }
+    if (caps.pointsOfInterest) {
+      constraints.push({ pointsOfInterest: [{ x: normX, y: normY }] });
+    }
+    track
+      .applyConstraints({ advanced: constraints })
+      .catch((err) => console.error("[Camera] focus applyConstraints:", err));
+  }
+
+  // Clear the focus indicator after it's been visible for ~900ms.
+  useEffect(() => {
+    if (!focusPoint) return;
+    const timer = setTimeout(() => setFocusPoint(null), 900);
+    return () => clearTimeout(timer);
+  }, [focusPoint]);
+
   function handleCapture() {
     const video = videoRef.current;
     if (!video || !video.videoWidth) return;
@@ -284,8 +329,12 @@ export default function Camera({ onDone, onCancel }) {
         </button>
       </div>
 
-      {/* Viewfinder with 1:1 square guide overlay */}
-      <div className="relative flex flex-1 items-center justify-center overflow-hidden">
+      {/* Viewfinder with 1:1 square guide overlay. Tap anywhere to focus
+          on that point; driver ignores the constraint if unsupported. */}
+      <div
+        className="relative flex flex-1 items-center justify-center overflow-hidden"
+        onClick={handleViewfinderTap}
+      >
         {error ? (
           <div className="max-w-sm px-6 text-center text-sm text-red-300">
             {error}
@@ -304,6 +353,17 @@ export default function Camera({ onDone, onCancel }) {
             <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
               <div className="aspect-square w-[min(90vw,90vh)] border-2 border-white/80 shadow-[0_0_0_9999px_rgba(0,0,0,0.35)]" />
             </div>
+            {/* Tap-to-focus indicator — small yellow square, quick fade out */}
+            {focusPoint && (
+              <div
+                className="pointer-events-none absolute h-16 w-16 -translate-x-1/2 -translate-y-1/2 rounded-md border-2 border-yellow-300 shadow-[0_0_0_1px_rgba(0,0,0,0.4)] transition-transform duration-300"
+                style={{
+                  left: focusPoint.x,
+                  top: focusPoint.y,
+                  animation: "focusPulse 900ms ease-out forwards",
+                }}
+              />
+            )}
             {starting && (
               <div className="absolute inset-0 flex items-center justify-center bg-black/50 text-sm">
                 Starting camera…
@@ -312,6 +372,14 @@ export default function Camera({ onDone, onCancel }) {
           </>
         )}
       </div>
+      {/* Keyframes for the tap-to-focus indicator animation */}
+      <style jsx>{`
+        @keyframes focusPulse {
+          0% { transform: translate(-50%, -50%) scale(1.4); opacity: 0; }
+          20% { opacity: 1; }
+          100% { transform: translate(-50%, -50%) scale(1); opacity: 0.8; }
+        }
+      `}</style>
 
       {/* Manual controls — ISO + Shutter. Each row hides if the device
           doesn't expose that capability. Touching a slider flips its mode
