@@ -72,8 +72,6 @@ export async function POST(request) {
       dimHeight,
       promotedListing,
       promoRate,
-      priorityListing,
-      priorityBudget,
     } = body;
 
     // Validation
@@ -98,8 +96,10 @@ export async function POST(request) {
       token
     );
 
-    if (!locationCheck.ok) {
-      // Location doesn't exist — create it
+    // Only create when eBay explicitly says "not found" (404). On 401/500/etc
+    // the GET is ambiguous — bailing out here beats blindly POSTing a fresh
+    // location body that will fail with a confusing "already exists" error.
+    if (locationCheck.status === 404) {
       const createBody = {
         location: {
           address: {
@@ -113,15 +113,18 @@ export async function POST(request) {
         name: "Warehouse 47904",
         locationTypes: ["WAREHOUSE"],
       };
-      console.log("Creating location:", JSON.stringify(createBody, null, 2));
       const locationRes = await ebayFetch(
         `/sell/inventory/v1/location/${locationKey}`,
         { method: "POST", body: JSON.stringify(createBody) },
         token
       );
-      console.log("Location create response:", locationRes.status, JSON.stringify(locationRes.data, null, 2));
-    } else {
-      console.log("Location already exists:", JSON.stringify(locationCheck.data, null, 2));
+      if (!locationRes.ok) {
+        console.error("Location create failed:", locationRes.status, locationRes.data);
+      }
+    } else if (!locationCheck.ok) {
+      // Non-404 failure — log and push on; the POST steps below will surface
+      // any real auth/config problem with a useful error message.
+      console.error("Location check failed:", locationCheck.status, locationCheck.data);
     }
 
     // --- Step 1: Create/Update Inventory Item ---
@@ -189,7 +192,6 @@ export async function POST(request) {
 
     if (!inventoryRes.ok) {
       console.error("eBay inventory error:", JSON.stringify(inventoryRes.data, null, 2));
-      console.error("Inventory payload sent:", JSON.stringify(inventoryItem, null, 2));
       const errors = inventoryRes.data?.errors || [];
       const errMsg = errors.length > 0
         ? errors.map((e) => `${e.message}${e.longMessage ? ` — ${e.longMessage}` : ""}${e.parameters ? ` (${JSON.stringify(e.parameters)})` : ""}`).join("; ")
@@ -219,7 +221,6 @@ export async function POST(request) {
 
     // Add best offer settings
     if (bestOffer) {
-      offer.pricingSummary.minimumAdvertisedPrice = undefined;
       offer.listingPolicies.bestOfferTerms = {
         bestOfferEnabled: true,
       };

@@ -73,7 +73,18 @@ export async function POST(request) {
       );
     }
 
-    // 3. Category + specifics (best-effort — continue without if this fails).
+    // 3. Brave refine (best-effort) — runs BEFORE specifics so Pass 2 sees
+    //    the final refined title. The SPECIFICS prompt uses the title to
+    //    decide which SEO keywords to push into the Theme field; running
+    //    refine first keeps this flow in lockstep with the Generate page.
+    try {
+      const refined = await refineStyleName(listing);
+      if (refined) Object.assign(listing, refined);
+    } catch (refineErr) {
+      console.error("Refine step failed:", refineErr);
+    }
+
+    // 4. Category + specifics (best-effort — continue without if this fails).
     try {
       const cat = await lookupCategory(listing.category_keywords);
       if (cat) {
@@ -90,14 +101,6 @@ export async function POST(request) {
     } catch (catErr) {
       console.error("Category/specifics step failed:", catErr);
       // Don't fail the whole draft — user can fix the category manually.
-    }
-
-    // 4. Brave refine (best-effort).
-    try {
-      const refined = await refineStyleName(listing);
-      if (refined) Object.assign(listing, refined);
-    } catch (refineErr) {
-      console.error("Refine step failed:", refineErr);
     }
 
     // 5. Apply description template — must run LAST so the final title

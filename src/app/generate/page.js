@@ -7,12 +7,7 @@ import ListingForm from "@/components/ListingForm";
 import SoldComps from "@/components/SoldComps";
 import SuccessModal from "@/components/SuccessModal";
 import { usePhotoTransfer } from "@/contexts/PhotoTransferContext";
-import {
-  checkTwoInchRule,
-  parsePantSize,
-  getConditionBoilerplate,
-  buildDescription,
-} from "@/lib/listingPipeline";
+import { applyDescriptionTemplate } from "@/lib/listingPipeline";
 
 const INITIAL_LISTING = {
   title: "",
@@ -26,8 +21,6 @@ const INITIAL_LISTING = {
   autoAcceptPrice: "",
   promotedListing: true,
   promoRate: 5,
-  priorityListing: false,
-  priorityBudget: 3,
   weightLbs: "",
   weightOz: "",
   dimLength: "",
@@ -155,40 +148,15 @@ export default function Generate() {
           }
         }
 
-        if (aiListing.title && aiListing.title.length > 80) {
-          aiListing.title = aiListing.title.substring(0, 80);
-        }
-
-        // Pants 2-inch rule: add asterisk to measured size in title
-        if (checkTwoInchRule(aiListing.observations)) {
-          const measured = aiListing.observations.measured_size;
-          const measuredParsed = parsePantSize(measured);
-          if (measuredParsed) {
-            const sizeStr = `${measuredParsed[0]}x${measuredParsed[1]}`;
-            // Add asterisk after the measured size in the title
-            if (aiListing.title.includes(sizeStr)) {
-              aiListing.title = aiListing.title.replace(sizeStr, sizeStr + "*");
-              // Re-truncate if asterisk pushed past 80
-              if (aiListing.title.length > 80) {
-                aiListing.title = aiListing.title.substring(0, 80);
-              }
-            }
-          }
-        }
-
-        // Build description from template
-        aiListing.item_description = buildDescription(
-          aiListing.title,
-          aiListing.condition,
-          aiListing.observations
-        );
-
-        // Set condition description to static boilerplate (not AI-generated)
-        aiListing.condition_description = getConditionBoilerplate(aiListing.condition);
+        // Apply all description-template rules (80-char truncate, 2-inch
+        // asterisk, build item_description, overwrite condition_description
+        // with boilerplate). Shared with /api/drafts/process so both flows
+        // produce identical drafts.
+        const finalListing = applyDescriptionTemplate(aiListing);
 
         setListing((prev) => ({
           ...prev,
-          ...aiListing,
+          ...finalListing,
           itemSpecifics: {},
         }));
       } else {

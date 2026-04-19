@@ -163,11 +163,12 @@ export default function ListingForm({ listing, onListingChange, onSubmit, submit
     fetchSpecifics();
   }, [listing?.categoryId]);
 
-  // Auto-fill default policies when settings load or listing is created
+  // Auto-fill default policies once the policies config loads. Runs only
+  // when the defaults themselves change — NOT on every title keystroke, which
+  // previously re-overwrote a field the user had manually cleared.
   const defaultShipping = policies.defaultShipping || "";
   const defaultPayment = policies.defaultPayment || "";
   const defaultReturn = policies.defaultReturn || "";
-  const listingTitle = listing?.title || "";
   useEffect(() => {
     if (!listing) return;
     if (!defaultShipping && !defaultPayment && !defaultReturn) return;
@@ -184,7 +185,8 @@ export default function ListingForm({ listing, onListingChange, onSubmit, submit
     if (Object.keys(updates).length > 0) {
       onListingChange({ ...listing, ...updates });
     }
-  }, [defaultShipping, defaultPayment, defaultReturn, listingTitle]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [defaultShipping, defaultPayment, defaultReturn]);
 
   function handleChange(field, value) {
     onListingChange({ ...listing, [field]: value });
@@ -866,51 +868,6 @@ export default function ListingForm({ listing, onListingChange, onSubmit, submit
           </div>
         )}
 
-        {/* Priority Promotion */}
-        <div className="mt-4 flex items-center justify-between">
-          <div>
-            <p className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-              Priority
-            </p>
-            <p className="text-xs text-zinc-400">
-              Pay per click, daily budget
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={() =>
-              handleChange("priorityListing", !listing.priorityListing)
-            }
-            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-              listing.priorityListing
-                ? "bg-blue-600"
-                : "bg-zinc-300 dark:bg-zinc-600"
-            }`}
-          >
-            <span
-              className={`inline-block h-4 w-4 rounded-full bg-white transition-transform ${
-                listing.priorityListing ? "translate-x-6" : "translate-x-1"
-              }`}
-            />
-          </button>
-        </div>
-        {listing.priorityListing && (
-          <div className="mt-2 flex items-center gap-2">
-            <label className="text-sm text-zinc-500">Daily budget</label>
-            <span className="text-sm text-zinc-500">$</span>
-            <input
-              type="number"
-              step="1"
-              min="3"
-              value={listing.priorityBudget || DEFAULTS.PRIORITY_BUDGET}
-              onChange={(e) =>
-                handleChange("priorityBudget", parseFloat(e.target.value))
-              }
-              className="w-20 rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-sm text-zinc-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
-            />
-            <span className="text-sm text-zinc-500">/day</span>
-          </div>
-        )}
       </div>
 
       {/* 11. Submit */}

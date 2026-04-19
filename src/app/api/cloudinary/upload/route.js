@@ -1,11 +1,7 @@
 import { uploadPhoto } from "@/lib/cloudinary";
 import { NextResponse } from "next/server";
 
-export const config = {
-  api: { bodyParser: false },
-};
-
-// Allow up to 50MB per batch (5 phone photos at ~8MB each)
+// Allow the full ~60s window for multi-photo uploads on slow mobile networks.
 export const maxDuration = 60;
 
 export async function POST(request) {

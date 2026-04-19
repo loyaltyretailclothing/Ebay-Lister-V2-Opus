@@ -32,17 +32,6 @@ export async function uploadPhoto(fileBuffer, options = {}) {
   });
 }
 
-export async function listPhotos(folder = "ebay-listings") {
-  const result = await cloudinary.api.resources({
-    type: "upload",
-    prefix: folder,
-    max_results: 500,
-    context: true,
-    metadata: true,
-  });
-  return result.resources;
-}
-
 export async function deletePhotos(publicIds) {
   // Cloudinary limits to 100 per request — batch if needed
   const results = [];

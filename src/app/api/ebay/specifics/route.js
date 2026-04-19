@@ -1,7 +1,10 @@
-import { ebayRequest, getUserToken } from "@/lib/ebay";
-import { EBAY_BASE_URL } from "@/lib/constants";
 import { NextResponse } from "next/server";
+import { fetchCategorySpecifics } from "@/lib/listingPipeline";
 
+// GET /api/ebay/specifics?categoryId=...
+//
+// Thin wrapper — Sell Metadata → Taxonomy fallback logic lives in
+// listingPipeline.js's fetchCategorySpecifics, reused by the camera flow.
 export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url);
@@ -14,49 +17,7 @@ export async function GET(request) {
       );
     }
 
-    let specifics;
-
-    try {
-      // Try Sell Metadata API first (user token — has accurate maxValues)
-      const token = await getUserToken();
-      const res = await fetch(
-        `${EBAY_BASE_URL}/sell/metadata/v1/marketplace/EBAY_US/get_item_aspects_for_category?category_id=${categoryId}`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            Accept: "application/json",
-          },
-        }
-      );
-
-      if (!res.ok) throw new Error("Sell Metadata API failed");
-
-      const data = await res.json();
-      specifics = (data.aspects || []).map((aspect) => ({
-        name: aspect.localizedAspectName,
-        localizedName: aspect.localizedAspectName,
-        required: aspect.aspectConstraint?.aspectRequired || false,
-        dataType: aspect.aspectConstraint?.aspectDataType || "STRING",
-        mode: aspect.aspectConstraint?.aspectMode || "FREE_TEXT",
-        values: (aspect.aspectValues || []).map((v) => v.localizedValue),
-        maxValues: aspect.aspectConstraint?.aspectMaxValues || 1,
-      }));
-    } catch {
-      // Fallback to Taxonomy API (app token)
-      const data = await ebayRequest(
-        `/commerce/taxonomy/v1/category_tree/0/get_item_aspects_for_category?category_id=${categoryId}`
-      );
-      specifics = (data.aspects || []).map((aspect) => ({
-        name: aspect.localizedAspectName,
-        localizedName: aspect.localizedAspectName,
-        required: aspect.aspectConstraint?.aspectRequired || false,
-        dataType: aspect.aspectConstraint?.aspectDataType || "STRING",
-        mode: aspect.aspectConstraint?.aspectMode || "FREE_TEXT",
-        values: (aspect.aspectValues || []).map((v) => v.localizedValue),
-        maxValues: aspect.aspectConstraint?.aspectMaxValues || 1,
-      }));
-    }
-
+    const specifics = await fetchCategorySpecifics(categoryId);
     return NextResponse.json({ success: true, specifics });
   } catch (error) {
     console.error("Item specifics error:", error);
