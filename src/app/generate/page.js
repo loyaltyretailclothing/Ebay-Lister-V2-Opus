@@ -7,7 +7,7 @@ import ListingForm from "@/components/ListingForm";
 import SoldComps from "@/components/SoldComps";
 import SuccessModal from "@/components/SuccessModal";
 import { usePhotoTransfer } from "@/contexts/PhotoTransferContext";
-import { applyDescriptionTemplate } from "@/lib/listingPipeline";
+import { applyDescriptionTemplate } from "@/lib/descriptionTemplate";
 
 const INITIAL_LISTING = {
   title: "",
