@@ -25,6 +25,7 @@ export default function CameraPage() {
   const [photos, setPhotos] = useState([]); // [{ blob, url }]
   const [aiSelected, setAiSelected] = useState(new Set()); // indices selected for AI
   const [submitting, setSubmitting] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(null); // { done, total }
   const [error, setError] = useState("");
 
   function handleCameraDone(captured) {
@@ -79,27 +80,46 @@ export default function CameraPage() {
     if (photos.length === 0) return;
     setSubmitting(true);
     setError("");
+    setUploadProgress({ done: 0, total: photos.length });
     try {
-      // 1. Upload every photo to Cloudinary (All Photos library folder).
-      const formData = new FormData();
-      photos.forEach((p, i) => {
-        const file = new File([p.blob], `camera-${Date.now()}-${i}.jpg`, {
+      // 1. Upload photos to Cloudinary one at a time. Vercel caps request
+      //    bodies at ~4.5MB, so batching multiple full-res photos in a
+      //    single FormData blows past that and comes back as plain-text
+      //    "Request Entity Too Large". Sequential uploads sidestep the cap
+      //    and give us real-time progress for the UI.
+      const ts = Date.now();
+      const listingPhotos = [];
+      for (let i = 0; i < photos.length; i++) {
+        const p = photos[i];
+        const formData = new FormData();
+        const file = new File([p.blob], `camera-${ts}-${i}.jpg`, {
           type: "image/jpeg",
         });
         formData.append("files", file);
-      });
-      formData.append("folder", "All Photos");
+        formData.append("folder", "All Photos");
 
-      const uploadRes = await fetch("/api/cloudinary/upload", {
-        method: "POST",
-        body: formData,
-      });
-      const uploadData = await uploadRes.json();
-      if (!uploadData.success) {
-        throw new Error(uploadData.error || "Upload failed");
+        const uploadRes = await fetch("/api/cloudinary/upload", {
+          method: "POST",
+          body: formData,
+        });
+        // Parse defensively — Vercel returns plain text on body-too-large.
+        const raw = await uploadRes.text();
+        let data;
+        try {
+          data = JSON.parse(raw);
+        } catch {
+          throw new Error(
+            uploadRes.status === 413
+              ? `Photo ${i + 1} too large — retry or reduce capture resolution`
+              : `Upload failed (${uploadRes.status}): ${raw.slice(0, 80)}`
+          );
+        }
+        if (!data.success || !data.photos?.[0]) {
+          throw new Error(data.error || `Upload failed on photo ${i + 1}`);
+        }
+        listingPhotos.push(data.photos[0]);
+        setUploadProgress({ done: i + 1, total: photos.length });
       }
-
-      const listingPhotos = uploadData.photos;
       const aiPhotoIndices = [...aiSelected].sort((a, b) => a - b);
 
       // 2. Fire-and-forget the background pipeline. We don't await the
@@ -121,6 +141,7 @@ export default function CameraPage() {
       console.error("Create draft error:", err);
       setError(err.message || "Something went wrong");
       setSubmitting(false);
+      setUploadProgress(null);
     }
   }
 
@@ -213,7 +234,9 @@ export default function CameraPage() {
           className="w-full rounded-full bg-blue-600 py-3 text-sm font-semibold text-white hover:bg-blue-700 disabled:bg-zinc-700 disabled:text-zinc-400"
         >
           {submitting
-            ? "Uploading…"
+            ? uploadProgress
+              ? `Uploading ${uploadProgress.done}/${uploadProgress.total}…`
+              : "Uploading…"
             : `Create Draft (${photos.length} photo${photos.length === 1 ? "" : "s"}, ${aiSelected.size} AI)`}
         </button>
       </div>
