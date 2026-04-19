@@ -31,6 +31,7 @@ export default function Camera({ onDone, onCancel }) {
   const videoRef = useRef(null);
   const streamRef = useRef(null);
   const canvasRef = useRef(null);
+  const thumbStripRef = useRef(null);
 
   const [photos, setPhotos] = useState([]); // [{ blob, url }]
   const [error, setError] = useState("");
@@ -46,7 +47,6 @@ export default function Camera({ onDone, onCancel }) {
   const [shutterMode, setShutterMode] = useState("auto"); // "auto" | "manual"
   const [shutter, setShutter] = useState(100); // exposureTime units (100µs typically)
   const [focusPoint, setFocusPoint] = useState(null); // { x, y } in viewfinder px, for the animated indicator
-  const [diag, setDiag] = useState(null); // live track.getSettings() readout for lens-switch debugging
 
   // Start / restart the camera stream whenever facingMode changes.
   const startStream = useCallback(async () => {
@@ -215,26 +215,13 @@ export default function Camera({ onDone, onCancel }) {
       .catch((err) => console.error("[Camera] focus applyConstraints:", err));
   }
 
-  // DIAGNOSTIC — poll track.getSettings() every 500ms so we can see if the
-  // driver silently swaps physical cameras between captures. The S25 Ultra
-  // exposes ultrawide/main/tele; a deviceId or focalLength change mid-session
-  // is the smoking gun. Remove once the lens-switch bug is root-caused.
+  // Auto-scroll the thumbnail strip to the end whenever a new photo is added,
+  // so the latest capture is always visible without manual scrolling.
   useEffect(() => {
-    const id = setInterval(() => {
-      const track = streamRef.current?.getVideoTracks?.()[0];
-      if (!track) return;
-      const s = track.getSettings?.() || {};
-      setDiag({
-        w: s.width,
-        h: s.height,
-        focal: s.focalLength,
-        zoom: s.zoom,
-        deviceId: s.deviceId ? s.deviceId.slice(0, 6) : null,
-        groupId: s.groupId ? s.groupId.slice(0, 6) : null,
-      });
-    }, 500);
-    return () => clearInterval(id);
-  }, []);
+    const el = thumbStripRef.current;
+    if (!el) return;
+    el.scrollTo({ left: el.scrollWidth, behavior: "smooth" });
+  }, [photos.length]);
 
   // Clear the focus indicator after it's been visible for ~900ms.
   useEffect(() => {
@@ -403,16 +390,6 @@ export default function Camera({ onDone, onCancel }) {
                 Starting camera…
               </div>
             )}
-            {/* DIAGNOSTIC readout — remove once lens-switch bug is solved. */}
-            {diag && (
-              <div className="pointer-events-none absolute left-1 top-1 rounded bg-black/60 px-1.5 py-0.5 font-mono text-[10px] leading-tight text-lime-300">
-                {diag.w}×{diag.h}
-                {diag.focal != null && ` · f:${diag.focal}`}
-                {diag.zoom != null && ` · z:${diag.zoom}`}
-                {diag.deviceId && ` · d:${diag.deviceId}`}
-                {diag.groupId && ` · g:${diag.groupId}`}
-              </div>
-            )}
           </div>
         )}
       </div>
@@ -502,11 +479,16 @@ export default function Camera({ onDone, onCancel }) {
         ))}
       </div>
 
-      {/* Thumbnail strip */}
-      {photos.length > 0 && (
-        <div className="px-4 py-2">
-          <div className="flex gap-2 overflow-x-auto">
-            {photos.map((p, i) => (
+      {/* Thumbnail strip — always rendered (even when empty) so the
+          viewfinder above doesn't resize the moment the first photo is
+          taken. That resize was causing users to re-aim the phone between
+          shots and get a perspective shift. */}
+      <div className="px-4 py-2">
+        <div
+          ref={thumbStripRef}
+          className="flex h-16 gap-2 overflow-x-auto"
+        >
+          {photos.map((p, i) => (
               <div key={i} className="relative h-16 w-16 flex-shrink-0 overflow-hidden rounded-md border border-white/30">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={p.url} alt="" className="h-full w-full object-cover" />
@@ -520,10 +502,9 @@ export default function Camera({ onDone, onCancel }) {
                   </svg>
                 </button>
               </div>
-            ))}
-          </div>
+          ))}
         </div>
-      )}
+      </div>
 
       {/* Bottom controls: flip camera / shutter / done */}
       <div className="flex items-center justify-between px-6 pb-[max(1rem,env(safe-area-inset-bottom))] pt-2">
