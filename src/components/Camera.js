@@ -32,6 +32,7 @@ export default function Camera({ onDone, onCancel }) {
   const streamRef = useRef(null);
   const canvasRef = useRef(null);
   const thumbStripRef = useRef(null);
+  const shutterAudioRef = useRef(null);
 
   const [photos, setPhotos] = useState([]); // [{ blob, url }]
   const [error, setError] = useState("");
@@ -234,6 +235,16 @@ export default function Camera({ onDone, onCancel }) {
     const video = videoRef.current;
     if (!video || !video.videoWidth) return;
 
+    // Play shutter sound as early as possible so the audible feedback lines
+    // up with the button tap, not the canvas encode. Reset currentTime so
+    // rapid consecutive captures each play the sound (default Audio won't
+    // re-play until the previous finishes).
+    const audio = shutterAudioRef.current;
+    if (audio) {
+      audio.currentTime = 0;
+      audio.play().catch(() => {});
+    }
+
     // Hard-crop to 1:1 from the center of the frame. eBay recommends square
     // photos at 1600x1600 — we capture at that resolution when possible.
     const srcW = video.videoWidth;
@@ -320,6 +331,14 @@ export default function Camera({ onDone, onCancel }) {
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-black text-white">
+      {/* Shutter sound — preloaded so the first capture has zero delay. */}
+      <audio
+        ref={shutterAudioRef}
+        src="/sounds/shutter.wav"
+        preload="auto"
+        playsInline
+      />
+
       {/* Top bar: close + flash */}
       <div className="flex items-center justify-between px-4 pt-[max(1rem,env(safe-area-inset-top))]">
         <button
