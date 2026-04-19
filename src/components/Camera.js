@@ -25,6 +25,8 @@ export default function Camera({ onDone, onCancel }) {
   const [flashOn, setFlashOn] = useState(false); // torch constraint if supported
   const [zoom, setZoom] = useState(1); // 1 | 2 | 3
   const [capabilities, setCapabilities] = useState(null);
+  const [wbMode, setWbMode] = useState("auto"); // "auto" | "manual"
+  const [colorTemp, setColorTemp] = useState(5500); // Kelvin, when wbMode=manual
 
   // Start / restart the camera stream whenever facingMode changes.
   const startStream = useCallback(async () => {
@@ -57,9 +59,17 @@ export default function Camera({ onDone, onCancel }) {
       const caps = track.getCapabilities?.() || {};
       setCapabilities(caps);
 
-      // Reset zoom / flash state on a fresh stream.
+      // Reset zoom / flash / WB state on a fresh stream.
       setZoom(1);
       setFlashOn(false);
+      setWbMode("auto");
+      // Seed colorTemp at the midpoint of the device's supported range so
+      // the first manual tap lands somewhere sensible (daylight-ish).
+      if (caps.colorTemperature) {
+        const min = caps.colorTemperature.min ?? 2500;
+        const max = caps.colorTemperature.max ?? 7500;
+        setColorTemp(Math.round((min + max) / 2));
+      }
     } catch (err) {
       console.error("Camera start error:", err);
       setError(
@@ -107,8 +117,34 @@ export default function Camera({ onDone, onCancel }) {
     }
   }, [flashOn]);
 
+  // Apply white balance. Auto = continuous (let the camera decide),
+  // Manual = lock to the user's chosen colorTemp Kelvin value.
+  useEffect(() => {
+    const track = streamRef.current?.getVideoTracks?.()[0];
+    if (!track) return;
+    const caps = track.getCapabilities?.() || {};
+    if (!caps.colorTemperature) return;
+    if (wbMode === "manual") {
+      track
+        .applyConstraints({
+          advanced: [
+            { whiteBalanceMode: "manual", colorTemperature: colorTemp },
+          ],
+        })
+        .catch(() => {});
+    } else {
+      track
+        .applyConstraints({ advanced: [{ whiteBalanceMode: "continuous" }] })
+        .catch(() => {});
+    }
+  }, [wbMode, colorTemp]);
+
   const hasHardwareZoom = !!capabilities?.zoom;
   const hasTorch = !!capabilities?.torch;
+  const hasWhiteBalance = !!capabilities?.colorTemperature;
+  const wbMin = capabilities?.colorTemperature?.min ?? 2500;
+  const wbMax = capabilities?.colorTemperature?.max ?? 7500;
+  const wbStep = capabilities?.colorTemperature?.step || 100;
 
   function handleCapture() {
     const video = videoRef.current;
@@ -260,6 +296,38 @@ export default function Camera({ onDone, onCancel }) {
           </>
         )}
       </div>
+
+      {/* White balance slider (Android only — hidden if device doesn't expose colorTemperature) */}
+      {hasWhiteBalance && (
+        <div className="flex items-center gap-3 px-4 pt-2">
+          <button
+            onClick={() => setWbMode("auto")}
+            className={`rounded-full px-3 py-1 text-xs font-semibold backdrop-blur ${
+              wbMode === "auto"
+                ? "bg-white text-black"
+                : "bg-black/40 text-white hover:bg-black/60"
+            }`}
+          >
+            Auto
+          </button>
+          <input
+            type="range"
+            min={wbMin}
+            max={wbMax}
+            step={wbStep}
+            value={colorTemp}
+            onChange={(e) => {
+              setColorTemp(Number(e.target.value));
+              setWbMode("manual");
+            }}
+            className="flex-1 accent-white"
+            aria-label="White balance color temperature"
+          />
+          <span className="w-14 text-right text-xs font-medium tabular-nums">
+            {wbMode === "manual" ? `${colorTemp}K` : "Auto"}
+          </span>
+        </div>
+      )}
 
       {/* Zoom chips */}
       <div className="flex items-center justify-center gap-2 px-4 py-2">
