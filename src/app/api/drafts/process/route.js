@@ -62,6 +62,16 @@ export async function POST(request) {
     const analysisPhotos = aiPhotos.length > 0 ? aiPhotos : listingPhotos.slice(0, 3);
     const listing = await analyzeListing(analysisPhotos, notes);
 
+    // Empty title = Claude couldn't make sense of the photos (wrong subject,
+    // blurry, bad lighting, etc.). Technically the pipeline "succeeded" but
+    // there's nothing to list, so surface it as an error row instead of a
+    // silent "Untitled" draft the user has to open to realize was useless.
+    if (!listing?.title || !listing.title.trim()) {
+      throw new Error(
+        "AI couldn't identify the item — retry with clearer photos of clothing/items."
+      );
+    }
+
     // 3. Category + specifics (best-effort — continue without if this fails).
     try {
       const cat = await lookupCategory(listing.category_keywords);
