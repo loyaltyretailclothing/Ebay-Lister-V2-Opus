@@ -27,6 +27,10 @@ export default function Camera({ onDone, onCancel }) {
   const [capabilities, setCapabilities] = useState(null);
   const [wbMode, setWbMode] = useState("auto"); // "auto" | "manual"
   const [colorTemp, setColorTemp] = useState(5500); // Kelvin, when wbMode=manual
+  const [isoMode, setIsoMode] = useState("auto"); // "auto" | "manual"
+  const [iso, setIso] = useState(400); // when isoMode=manual
+  const [showDiag, setShowDiag] = useState(false); // capabilities diagnostic panel
+  const [constraintErr, setConstraintErr] = useState(""); // last applyConstraints error
 
   // Start / restart the camera stream whenever facingMode changes.
   const startStream = useCallback(async () => {
@@ -59,17 +63,26 @@ export default function Camera({ onDone, onCancel }) {
       const caps = track.getCapabilities?.() || {};
       setCapabilities(caps);
 
-      // Reset zoom / flash / WB state on a fresh stream.
+      // Reset zoom / flash / WB / ISO state on a fresh stream.
       setZoom(1);
       setFlashOn(false);
       setWbMode("auto");
-      // Seed colorTemp at the midpoint of the device's supported range so
-      // the first manual tap lands somewhere sensible (daylight-ish).
+      setIsoMode("auto");
+      setConstraintErr("");
+      // Seed colorTemp / ISO at the midpoint of each supported range so
+      // the first manual tap lands somewhere sensible.
       if (caps.colorTemperature) {
         const min = caps.colorTemperature.min ?? 2500;
         const max = caps.colorTemperature.max ?? 7500;
         setColorTemp(Math.round((min + max) / 2));
       }
+      if (caps.iso) {
+        const min = caps.iso.min ?? 100;
+        const max = caps.iso.max ?? 800;
+        setIso(Math.round((min + max) / 2));
+      }
+      // Log for diagnostic / debugging on real devices.
+      console.log("[Camera] capabilities:", caps);
     } catch (err) {
       console.error("Camera start error:", err);
       setError(
@@ -124,27 +137,55 @@ export default function Camera({ onDone, onCancel }) {
     if (!track) return;
     const caps = track.getCapabilities?.() || {};
     if (!caps.colorTemperature) return;
-    if (wbMode === "manual") {
-      track
-        .applyConstraints({
-          advanced: [
-            { whiteBalanceMode: "manual", colorTemperature: colorTemp },
-          ],
-        })
-        .catch(() => {});
-    } else {
-      track
-        .applyConstraints({ advanced: [{ whiteBalanceMode: "continuous" }] })
-        .catch(() => {});
-    }
+    const constraint =
+      wbMode === "manual"
+        ? { whiteBalanceMode: "manual", colorTemperature: colorTemp }
+        : { whiteBalanceMode: "continuous" };
+    track
+      .applyConstraints({ advanced: [constraint] })
+      .then(() => {
+        const s = track.getSettings?.();
+        console.log("[Camera] WB applied:", constraint, "→ settings:", s);
+      })
+      .catch((e) => {
+        console.error("[Camera] WB applyConstraints failed:", e);
+        setConstraintErr(`WB: ${e.name || e.message || "rejected"}`);
+      });
   }, [wbMode, colorTemp]);
+
+  // Apply ISO. Requires exposureMode=manual on most devices for the ISO
+  // constraint to actually take effect.
+  useEffect(() => {
+    const track = streamRef.current?.getVideoTracks?.()[0];
+    if (!track) return;
+    const caps = track.getCapabilities?.() || {};
+    if (!caps.iso) return;
+    const constraint =
+      isoMode === "manual"
+        ? { exposureMode: "manual", iso: iso }
+        : { exposureMode: "continuous" };
+    track
+      .applyConstraints({ advanced: [constraint] })
+      .then(() => {
+        const s = track.getSettings?.();
+        console.log("[Camera] ISO applied:", constraint, "→ settings:", s);
+      })
+      .catch((e) => {
+        console.error("[Camera] ISO applyConstraints failed:", e);
+        setConstraintErr(`ISO: ${e.name || e.message || "rejected"}`);
+      });
+  }, [isoMode, iso]);
 
   const hasHardwareZoom = !!capabilities?.zoom;
   const hasTorch = !!capabilities?.torch;
   const hasWhiteBalance = !!capabilities?.colorTemperature;
+  const hasIso = !!capabilities?.iso;
   const wbMin = capabilities?.colorTemperature?.min ?? 2500;
   const wbMax = capabilities?.colorTemperature?.max ?? 7500;
   const wbStep = capabilities?.colorTemperature?.step || 100;
+  const isoMin = capabilities?.iso?.min ?? 100;
+  const isoMax = capabilities?.iso?.max ?? 800;
+  const isoStep = capabilities?.iso?.step || 50;
 
   function handleCapture() {
     const video = videoRef.current;
@@ -297,15 +338,15 @@ export default function Camera({ onDone, onCancel }) {
         )}
       </div>
 
-      {/* White balance slider (Android only — hidden if device doesn't expose colorTemperature) */}
+      {/* Manual controls — White Balance + ISO. Each row hides itself
+          automatically if the device doesn't expose that capability. */}
       {hasWhiteBalance && (
-        <div className="flex items-center gap-3 px-4 pt-2">
+        <div className="flex items-center gap-2 px-4 pt-2">
+          <span className="w-12 text-[10px] font-semibold uppercase tracking-wide text-white/70">WB</span>
           <button
             onClick={() => setWbMode("auto")}
-            className={`rounded-full px-3 py-1 text-xs font-semibold backdrop-blur ${
-              wbMode === "auto"
-                ? "bg-white text-black"
-                : "bg-black/40 text-white hover:bg-black/60"
+            className={`rounded-full px-2 py-0.5 text-[10px] font-semibold backdrop-blur ${
+              wbMode === "auto" ? "bg-white text-black" : "bg-black/40 text-white"
             }`}
           >
             Auto
@@ -323,10 +364,59 @@ export default function Camera({ onDone, onCancel }) {
             className="flex-1 accent-white"
             aria-label="White balance color temperature"
           />
-          <span className="w-14 text-right text-xs font-medium tabular-nums">
+          <span className="w-12 text-right text-[10px] font-medium tabular-nums">
             {wbMode === "manual" ? `${colorTemp}K` : "Auto"}
           </span>
         </div>
+      )}
+      {hasIso && (
+        <div className="flex items-center gap-2 px-4 pt-1">
+          <span className="w-12 text-[10px] font-semibold uppercase tracking-wide text-white/70">ISO</span>
+          <button
+            onClick={() => setIsoMode("auto")}
+            className={`rounded-full px-2 py-0.5 text-[10px] font-semibold backdrop-blur ${
+              isoMode === "auto" ? "bg-white text-black" : "bg-black/40 text-white"
+            }`}
+          >
+            Auto
+          </button>
+          <input
+            type="range"
+            min={isoMin}
+            max={isoMax}
+            step={isoStep}
+            value={iso}
+            onChange={(e) => {
+              setIso(Number(e.target.value));
+              setIsoMode("manual");
+            }}
+            className="flex-1 accent-white"
+            aria-label="ISO"
+          />
+          <span className="w-12 text-right text-[10px] font-medium tabular-nums">
+            {isoMode === "manual" ? iso : "Auto"}
+          </span>
+        </div>
+      )}
+      {/* Diagnostic chip — tap to expand the caps object so we can see
+          which manual controls the device actually exposed. */}
+      <div className="flex items-center justify-center gap-2 px-4 pt-1 text-[10px] text-white/60">
+        <button
+          onClick={() => setShowDiag((v) => !v)}
+          className="rounded-full bg-black/30 px-2 py-0.5"
+        >
+          {showDiag ? "Hide caps" : "Caps"}
+        </button>
+        <span>
+          Zoom {hasHardwareZoom ? "✓" : "✗"} · Flash {hasTorch ? "✓" : "✗"} ·
+          WB {hasWhiteBalance ? "✓" : "✗"} · ISO {hasIso ? "✓" : "✗"}
+        </span>
+        {constraintErr && <span className="text-red-300">{constraintErr}</span>}
+      </div>
+      {showDiag && capabilities && (
+        <pre className="mx-4 mt-1 max-h-32 overflow-auto rounded bg-black/60 p-2 text-[9px] text-white/80">
+          {JSON.stringify(capabilities, null, 2)}
+        </pre>
       )}
 
       {/* Zoom chips */}
