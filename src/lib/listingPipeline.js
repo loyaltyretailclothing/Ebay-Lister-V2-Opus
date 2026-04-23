@@ -24,9 +24,9 @@ You must return a JSON object with these fields:
   "category_keywords": "2-3 keywords to search eBay categories (e.g. 'mens dress shirt')",
   "condition": "One of: NEW_WITH_TAGS, NEW_WITHOUT_TAGS, NEW_WITH_DEFECTS, PRE_OWNED_EXCELLENT, PRE_OWNED_GOOD, PRE_OWNED_FAIR",
   "condition_description": "For pre-owned items, describe the condition in detail including any flaws. For NWT or NWOT, leave as empty string.",
-  "suggested_search_terms": "Keywords to search eBay for sold comps (e.g. 'Nike Dri-Fit mens polo shirt large blue')",
   "observations": {
     "brand": "The brand name exactly as shown",
+    "style_name": "The specific product line or model name (e.g. 'Tech Fleece', 'Retro-X', 'Detroit Jacket', 'Crown Comfort', 'Soul Survivor Sun Protection'). Apply the SAME rules as the title's [Style Name] slot — skip fabric technologies (Dri-FIT, HeatGear, ClimaCool, Omni-Wick), marketing adjectives alone (Pro, Elite, Premium, Performance), and style codes/SKUs. Must match the [Style Name] slot in the title. null if no confident style name exists.",
     "color": "Primary color(s)",
     "size": "Size as shown on tag or measured",
     "measured_size": "Measured size if visible, otherwise null",
@@ -264,7 +264,7 @@ ${TITLE_RULES}
 
 Response format:
 - If no style name found: return exactly {"updated": false}
-- If style name found: return {"updated": true, "title": "freshly rebuilt 75-80 char title", "observations": {"model": "the style name"}}
+- If style name found: return {"updated": true, "title": "freshly rebuilt 75-80 char title", "observations": {"style_name": "the style name"}}
 - Return ONLY valid JSON, no markdown or explanation`;
 
 async function braveSearch(query) {

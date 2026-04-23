@@ -1,10 +1,25 @@
 import { ebayRequest } from "@/lib/ebay";
 import { NextResponse } from "next/server";
 
+// Strict 1-to-1 mapping from our internal condition enum to eBay condition IDs.
+// Mirrors CONDITION_MAP in /api/ebay/list so comps use the same IDs we list
+// against. If the caller doesn't supply a condition (or sends an unknown
+// value), fall back to the full set so the feature still works.
+const COMPS_CONDITION_IDS = {
+  NEW_WITH_TAGS: "1000",
+  NEW_WITHOUT_TAGS: "1500",
+  NEW_WITH_DEFECTS: "1750",
+  PRE_OWNED_EXCELLENT: "2990",
+  PRE_OWNED_GOOD: "3000",
+  PRE_OWNED_FAIR: "3010",
+};
+const DEFAULT_CONDITION_IDS = "1000|1500|1750|2990|3000|3010";
+
 export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url);
     const query = searchParams.get("q");
+    const condition = searchParams.get("condition");
 
     if (!query) {
       return NextResponse.json(
@@ -13,9 +28,13 @@ export async function GET(request) {
       );
     }
 
-    // Search for sold/completed items
+    const conditionIds =
+      COMPS_CONDITION_IDS[condition] || DEFAULT_CONDITION_IDS;
+
+    // Search for comparable items — filtered to the same condition as the
+    // listing being created so apples-to-apples pricing.
     const data = await ebayRequest(
-      `/buy/browse/v1/item_summary/search?q=${encodeURIComponent(query)}&filter=buyingOptions:{FIXED_PRICE},conditionIds:{1000|1500|1750|2000|2500|3000},priceCurrency:USD&sort=-price&limit=10`,
+      `/buy/browse/v1/item_summary/search?q=${encodeURIComponent(query)}&filter=buyingOptions:{FIXED_PRICE},conditionIds:{${conditionIds}},priceCurrency:USD&sort=-price&limit=10`,
       {
         headers: {
           "X-EBAY-C-MARKETPLACE-ID": "EBAY_US",

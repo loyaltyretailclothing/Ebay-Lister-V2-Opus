@@ -133,11 +133,11 @@ export default function Generate() {
             const refineData = await refineRes.json();
             if (refineData.success && refineData.listing) {
               Object.assign(aiListing, refineData.listing);
-              const modelName = refineData.listing.observations?.model;
+              const styleName = refineData.listing.observations?.style_name;
               setLookupStatus(
-                modelName
-                  ? `Style Lookup: Found "${modelName}" from style #${styleNumber}`
-                  : `Style Lookup: Searched style #${styleNumber} but no model found`
+                styleName
+                  ? `Style Lookup: Found "${styleName}" from style #${styleNumber}`
+                  : `Style Lookup: Searched style #${styleNumber} but no style name found`
               );
             } else {
               setLookupStatus(`Style Lookup: Searched style #${styleNumber} but no model found`);
@@ -472,9 +472,10 @@ export default function Generate() {
               </div>
             </div>
 
-            {listing.suggested_search_terms && (
+            {listing.observations?.brand && (
               <SoldComps
-                searchTerms={listing.suggested_search_terms}
+                observations={listing.observations}
+                condition={listing.condition}
                 onPriceSelect={handlePriceSelect}
               />
             )}

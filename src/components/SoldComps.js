@@ -1,12 +1,32 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 
-export default function SoldComps({ searchTerms, onPriceSelect }) {
+// Build the eBay comps query from structured observations. Follows the title
+// formula but strips NWT prefix, color, and Tier 2 extras. observations.size
+// already reflects the 2-inch rule (measured size) when applicable, so pants
+// comps search on the measured size automatically.
+function buildSearchTerms(observations) {
+  if (!observations) return "";
+  return [
+    observations.brand,
+    observations.style_name,
+    observations.type,
+    observations.gender,
+    observations.size,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .trim();
+}
+
+export default function SoldComps({ observations, condition, onPriceSelect }) {
   const [items, setItems] = useState([]);
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  const searchTerms = useMemo(() => buildSearchTerms(observations), [observations]);
 
   useEffect(() => {
     if (!searchTerms) return;
@@ -15,9 +35,9 @@ export default function SoldComps({ searchTerms, onPriceSelect }) {
       setLoading(true);
       setError("");
       try {
-        const res = await fetch(
-          `/api/ebay/comps?q=${encodeURIComponent(searchTerms)}`
-        );
+        const params = new URLSearchParams({ q: searchTerms });
+        if (condition) params.set("condition", condition);
+        const res = await fetch(`/api/ebay/comps?${params.toString()}`);
         const data = await res.json();
         if (data.success) {
           setItems(data.items);
@@ -33,7 +53,7 @@ export default function SoldComps({ searchTerms, onPriceSelect }) {
     }
 
     fetchComps();
-  }, [searchTerms]);
+  }, [searchTerms, condition]);
 
   if (!searchTerms) return null;
 
