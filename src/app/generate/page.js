@@ -147,30 +147,60 @@ export default function Generate() {
   }
 
   function handleEbaySearch() {
-    // Extract Brand + Style Name + Item Type from the TITLE verbatim —
-    // preserves the title's exact casing and characters (e.g. "Peter Millar"
-    // not the raw "PETER MILLAR" from observations, "Button Down" not
-    // "button-down"). Title format:
-    //   [NWT] Brand [Style Name] Item Type Gender Size Color [Tier 2]
-    // So we strip the optional NWT prefix and cut at the gender word. We
-    // match the LAST gender occurrence so brands that contain a gender
-    // token (e.g. "Mens Wearhouse") still extract correctly.
+    // Extract Brand + Style Name + Item Type from the TITLE verbatim,
+    // dropping size, gender, color, and tier 2 extras. We work off the
+    // displayed title (not raw observations) so the casing and word spacing
+    // match what the user sees ("Peter Millar" not "PETER MILLAR",
+    // "Button Down" not "button-down").
+    //
+    // Two strategies, in order:
+    //   1. Type-anchor — find observations.type in the title using
+    //      flexible matching (case-insensitive, treats spaces and dashes
+    //      interchangeably) and cut everything after the type ends. Works
+    //      regardless of whether the title is in the new (Gender then
+    //      Size) or old (Size then Gender) format.
+    //   2. Stop-word fallback — cut at the first occurrence of a gender
+    //      word OR a size pattern, whichever appears first. Used when
+    //      observations.type doesn't match the title (e.g. user edited
+    //      the title heavily).
     const title = listing.title?.trim();
     if (!title) return;
 
-    let query = title.replace(/^NWT\s+/i, "");
-    const genderRegex = /\b(Mens|Womens|Boys|Girls|Unisex)\b/gi;
-    let lastMatch = null;
-    let m;
-    while ((m = genderRegex.exec(query)) !== null) {
-      lastMatch = m;
-    }
-    if (lastMatch) {
-      query = query.substring(0, lastMatch.index).trim();
+    let working = title.replace(/^NWT\s+/i, "");
+    let cutDone = false;
+
+    const type = listing.observations?.type;
+    if (type) {
+      const typeWords = type
+        .toLowerCase()
+        .split(/[\s-]+/)
+        .filter(Boolean)
+        .map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+      if (typeWords.length) {
+        const typePattern = new RegExp(
+          `\\b${typeWords.join("[\\s-]+")}\\b`,
+          "i"
+        );
+        const typeMatch = working.match(typePattern);
+        if (typeMatch) {
+          const endOfType = typeMatch.index + typeMatch[0].length;
+          working = working.substring(0, endOfType).trim();
+          cutDone = true;
+        }
+      }
     }
 
-    if (!query) return;
-    const url = `https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent(query)}`;
+    if (!cutDone) {
+      const stopRegex =
+        /\b(?:Mens|Womens|Boys|Girls|Unisex|XS|XXS|S|M|L|XL|XXL|XXXL|2XL|3XL|4XL|5XL|6XL|7XL|Small|Medium|Large|X-Small|X-Large|XX-Large|XXX-Large|\d{2}x\d{2}\*?)\b/i;
+      const stopMatch = working.match(stopRegex);
+      if (stopMatch) {
+        working = working.substring(0, stopMatch.index).trim();
+      }
+    }
+
+    if (!working) return;
+    const url = `https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent(working)}`;
     window.open(url, "_blank", "noopener,noreferrer");
   }
 
