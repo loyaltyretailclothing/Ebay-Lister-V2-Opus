@@ -147,12 +147,28 @@ export default function Generate() {
   }
 
   function handleEbaySearch() {
-    const obs = listing.observations;
-    if (!obs?.brand) return;
-    const query = [obs.brand, obs.style_name, obs.type]
-      .filter(Boolean)
-      .join(" ")
-      .trim();
+    // Extract Brand + Style Name + Item Type from the TITLE verbatim —
+    // preserves the title's exact casing and characters (e.g. "Peter Millar"
+    // not the raw "PETER MILLAR" from observations, "Button Down" not
+    // "button-down"). Title format:
+    //   [NWT] Brand [Style Name] Item Type Gender Size Color [Tier 2]
+    // So we strip the optional NWT prefix and cut at the gender word. We
+    // match the LAST gender occurrence so brands that contain a gender
+    // token (e.g. "Mens Wearhouse") still extract correctly.
+    const title = listing.title?.trim();
+    if (!title) return;
+
+    let query = title.replace(/^NWT\s+/i, "");
+    const genderRegex = /\b(Mens|Womens|Boys|Girls|Unisex)\b/gi;
+    let lastMatch = null;
+    let m;
+    while ((m = genderRegex.exec(query)) !== null) {
+      lastMatch = m;
+    }
+    if (lastMatch) {
+      query = query.substring(0, lastMatch.index).trim();
+    }
+
     if (!query) return;
     const url = `https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent(query)}`;
     window.open(url, "_blank", "noopener,noreferrer");
@@ -442,15 +458,15 @@ export default function Generate() {
 
             <button
               onClick={handleEbaySearch}
-              disabled={!listing.observations?.brand}
+              disabled={!listing.title?.trim()}
               aria-label="eBay Search"
               title={
-                !listing.observations?.brand
+                !listing.title?.trim()
                   ? "Run AI analysis first"
-                  : "eBay Search — search active listings using brand + style + type"
+                  : "eBay Search — search active listings using the title"
               }
               className={`flex items-center justify-center rounded-lg border border-zinc-300 bg-white px-4 py-2 transition-colors dark:border-zinc-700 dark:bg-zinc-900 ${
-                !listing.observations?.brand
+                !listing.title?.trim()
                   ? "cursor-not-allowed opacity-50"
                   : "cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800"
               }`}
