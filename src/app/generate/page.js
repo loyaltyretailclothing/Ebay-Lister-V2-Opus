@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import PhotoLibrarySidebar from "@/components/PhotoLibrarySidebar";
 import PhotoZone from "@/components/PhotoZone";
 import ListingForm from "@/components/ListingForm";
@@ -53,6 +53,12 @@ export default function Generate() {
   const [loadingDraft, setLoadingDraft] = useState(false);
   const [savingDraft, setSavingDraft] = useState(false);
   const [saveDraftStatus, setSaveDraftStatus] = useState(null);
+  // Research mode: 'google' = waiting for the user to pick a photo to send to
+  // Google Lens. null = idle. eBay Search runs immediately and never enters
+  // a mode, so it's not represented here.
+  const [researchMode, setResearchMode] = useState(null);
+  const googleButtonRef = useRef(null);
+  const ebayZoneWrapperRef = useRef(null);
 
   // Load a draft from ?draft=xxx in the URL
   useEffect(() => {
@@ -104,6 +110,53 @@ export default function Generate() {
       }
     }
   }, [hasPending, consumeTransfer]);
+
+  // Cancel Google pick mode when clicking outside the eBay listing photos
+  // zone or the Google button itself. Mousedown rather than click so the
+  // ring/highlight clears before the click handler on whatever was clicked
+  // runs.
+  useEffect(() => {
+    if (researchMode !== "google") return;
+    function handleOutside(e) {
+      if (ebayZoneWrapperRef.current?.contains(e.target)) return;
+      if (googleButtonRef.current?.contains(e.target)) return;
+      setResearchMode(null);
+    }
+    document.addEventListener("mousedown", handleOutside);
+    return () => document.removeEventListener("mousedown", handleOutside);
+  }, [researchMode]);
+
+  // If the listing photos zone empties out while Google mode is active,
+  // there's nothing to pick — auto-cancel.
+  useEffect(() => {
+    if (researchMode === "google" && listingPhotos.length === 0) {
+      setResearchMode(null);
+    }
+  }, [researchMode, listingPhotos.length]);
+
+  function handleToggleGoogleMode() {
+    if (listingPhotos.length === 0) return;
+    setResearchMode((prev) => (prev === "google" ? null : "google"));
+  }
+
+  function handlePickPhotoForGoogle(photo) {
+    if (!photo?.secure_url) return;
+    const url = `https://lens.google.com/uploadbyurl?url=${encodeURIComponent(photo.secure_url)}`;
+    window.open(url, "_blank", "noopener,noreferrer");
+    setResearchMode(null);
+  }
+
+  function handleEbaySearch() {
+    const obs = listing.observations;
+    if (!obs?.brand) return;
+    const query = [obs.brand, obs.style_name, obs.type]
+      .filter(Boolean)
+      .join(" ")
+      .trim();
+    if (!query) return;
+    const url = `https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent(query)}`;
+    window.open(url, "_blank", "noopener,noreferrer");
+  }
 
   async function handleAnalyze() {
     setAnalyzing(true);
@@ -351,14 +404,78 @@ export default function Generate() {
             </span>
           </p>
 
+          {/* Research buttons — Google reverse image search + eBay search.
+              Always visible; disabled state stays in place rather than
+              hiding so the layout doesn't shift. */}
+          <div className="mt-3 flex items-center gap-2">
+            <button
+              ref={googleButtonRef}
+              onClick={handleToggleGoogleMode}
+              disabled={listingPhotos.length === 0}
+              aria-label="Google Image Search"
+              title={
+                listingPhotos.length === 0
+                  ? "Add eBay listing photos first"
+                  : researchMode === "google"
+                    ? "Click a photo to search, or click again to cancel"
+                    : "Google Image Search — click then pick a photo"
+              }
+              className={`flex items-center justify-center rounded-lg border bg-white px-4 py-2 transition-all dark:bg-zinc-900 ${
+                researchMode === "google"
+                  ? "border-blue-500 ring-2 ring-blue-400 ring-offset-2 dark:border-blue-400 dark:ring-blue-500 dark:ring-offset-zinc-950"
+                  : "border-zinc-300 hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-800"
+              } ${
+                listingPhotos.length === 0
+                  ? "cursor-not-allowed opacity-50"
+                  : "cursor-pointer"
+              }`}
+            >
+              <span className="text-base font-medium leading-none tracking-tight">
+                <span style={{ color: "#4285F4" }}>G</span>
+                <span style={{ color: "#EA4335" }}>o</span>
+                <span style={{ color: "#FBBC05" }}>o</span>
+                <span style={{ color: "#4285F4" }}>g</span>
+                <span style={{ color: "#34A853" }}>l</span>
+                <span style={{ color: "#EA4335" }}>e</span>
+              </span>
+            </button>
+
+            <button
+              onClick={handleEbaySearch}
+              disabled={!listing.observations?.brand}
+              aria-label="eBay Search"
+              title={
+                !listing.observations?.brand
+                  ? "Run AI analysis first"
+                  : "eBay Search — search active listings using brand + style + type"
+              }
+              className={`flex items-center justify-center rounded-lg border border-zinc-300 bg-white px-4 py-2 transition-colors dark:border-zinc-700 dark:bg-zinc-900 ${
+                !listing.observations?.brand
+                  ? "cursor-not-allowed opacity-50"
+                  : "cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800"
+              }`}
+            >
+              <span className="text-base font-bold italic leading-none">
+                <span style={{ color: "#E53238" }}>e</span>
+                <span style={{ color: "#0064D2" }}>b</span>
+                <span style={{ color: "#F5AF02" }}>a</span>
+                <span style={{ color: "#86B817" }}>y</span>
+              </span>
+            </button>
+          </div>
+
           {/* Photo Zones — stacked vertically */}
           <div className="mt-6 space-y-6">
-            <PhotoZone
-              title="eBay Listing Photos"
-              subtitle="Full quality photos for the listing (first = main image)"
-              photos={listingPhotos}
-              onPhotosChange={setListingPhotos}
-            />
+            <div ref={ebayZoneWrapperRef}>
+              <PhotoZone
+                title="eBay Listing Photos"
+                subtitle="Full quality photos for the listing (first = main image)"
+                photos={listingPhotos}
+                onPhotosChange={setListingPhotos}
+                pickMode={researchMode === "google"}
+                onPickPhoto={handlePickPhotoForGoogle}
+              />
+            </div>
 
             <PhotoZone
               title="AI Analysis Photos"

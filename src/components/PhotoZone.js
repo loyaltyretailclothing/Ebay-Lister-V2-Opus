@@ -8,6 +8,8 @@ export default function PhotoZone({
   photos,
   onPhotosChange,
   maxPhotos,
+  pickMode = false,
+  onPickPhoto,
 }) {
   const [isDragging, setIsDragging] = useState(false);
   const [dragIndex, setDragIndex] = useState(null);
@@ -166,9 +168,11 @@ export default function PhotoZone({
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
       className={`rounded-xl border-2 bg-white p-5 transition-colors dark:bg-zinc-900 ${
-        isDragging
-          ? "border-blue-500 bg-blue-50/50 dark:bg-blue-950/10"
-          : "border-zinc-200 dark:border-zinc-800"
+        pickMode
+          ? "border-amber-400 bg-amber-50/40 dark:border-amber-500 dark:bg-amber-950/20"
+          : isDragging
+            ? "border-blue-500 bg-blue-50/50 dark:bg-blue-950/10"
+            : "border-zinc-200 dark:border-zinc-800"
       }`}
     >
       <div className="flex items-start justify-between">
@@ -198,17 +202,20 @@ export default function PhotoZone({
               return (
                 <div
                   key={photo.public_id + "-" + index}
-                  draggable
-                  onDoubleClick={() => setLightboxIndex(index)}
-                  onDragStart={(e) => handleReorderStart(e, index)}
-                  onDragOver={(e) => handleReorderOver(e, index)}
-                  onDragEnd={handleReorderEnd}
-                  className={`group relative h-24 w-24 flex-shrink-0 cursor-grab overflow-hidden rounded-lg border-2 transition-all ${
-                    dragIndex === index
-                      ? "border-blue-500 opacity-50"
-                      : dropTarget === index && dragIndex !== null
-                        ? "border-blue-500 ring-2 ring-blue-300"
-                        : "border-transparent"
+                  draggable={!pickMode}
+                  onClick={pickMode ? () => onPickPhoto?.(photo) : undefined}
+                  onDoubleClick={pickMode ? undefined : () => setLightboxIndex(index)}
+                  onDragStart={pickMode ? undefined : (e) => handleReorderStart(e, index)}
+                  onDragOver={pickMode ? undefined : (e) => handleReorderOver(e, index)}
+                  onDragEnd={pickMode ? undefined : handleReorderEnd}
+                  className={`group relative h-24 w-24 flex-shrink-0 overflow-hidden rounded-lg border-2 transition-all ${
+                    pickMode
+                      ? "border-amber-500 hover:border-amber-600 dark:border-amber-400 dark:hover:border-amber-300"
+                      : dragIndex === index
+                        ? "cursor-grab border-blue-500 opacity-50"
+                        : dropTarget === index && dragIndex !== null
+                          ? "cursor-grab border-blue-500 ring-2 ring-blue-300"
+                          : "cursor-grab border-transparent"
                   }`}
                 >
                   <img
