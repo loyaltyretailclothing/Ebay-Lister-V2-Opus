@@ -13,6 +13,8 @@ export default function LibraryPage() {
   const [photos, setPhotos] = useState([]);
   const [selected, setSelected] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [nextCursor, setNextCursor] = useState(null);
   const [showUpload, setShowUpload] = useState(false);
   const [notePhoto, setNotePhoto] = useState(null);
   const [deleting, setDeleting] = useState(false);
@@ -31,18 +33,48 @@ export default function LibraryPage() {
       const data = await res.json();
       if (data.success) {
         setPhotos(data.photos);
+        setNextCursor(data.next_cursor || null);
       } else {
         setPhotos([]);
+        setNextCursor(null);
         setError(data.error || "Failed to load photos");
       }
     } catch (err) {
       console.error("Failed to fetch photos:", err);
       setPhotos([]);
+      setNextCursor(null);
       setError("Could not connect to photo service");
     } finally {
       setLoading(false);
     }
   }, [activeFolder]);
+
+  // Fetch the next page of older photos and append to the list. Cursor
+  // pagination — Cloudinary returns a new cursor each call until exhausted.
+  const fetchMorePhotos = useCallback(async () => {
+    if (!nextCursor || loadingMore) return;
+    setLoadingMore(true);
+    setError("");
+    try {
+      const res = await fetch(
+        `/api/cloudinary/list?folder=${encodeURIComponent(
+          activeFolder
+        )}&next_cursor=${encodeURIComponent(nextCursor)}`
+      );
+      const data = await res.json();
+      if (data.success) {
+        setPhotos((prev) => [...prev, ...data.photos]);
+        setNextCursor(data.next_cursor || null);
+      } else {
+        setError(data.error || "Failed to load more photos");
+      }
+    } catch (err) {
+      console.error("Failed to fetch more photos:", err);
+      setError("Could not connect to photo service");
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [activeFolder, nextCursor, loadingMore]);
 
   useEffect(() => {
     fetchPhotos();
@@ -275,20 +307,33 @@ export default function LibraryPage() {
             </svg>
           </div>
         ) : (
-          <PhotoGrid
-            photos={photos}
-            selected={selected}
-            onSelect={setSelected}
-            onToggle={(id) =>
-              setSelected((prev) =>
-                prev.includes(id)
-                  ? prev.filter((s) => s !== id)
-                  : [...prev, id]
-              )
-            }
-            draggable
-            tapToToggle
-          />
+          <>
+            <PhotoGrid
+              photos={photos}
+              selected={selected}
+              onSelect={setSelected}
+              onToggle={(id) =>
+                setSelected((prev) =>
+                  prev.includes(id)
+                    ? prev.filter((s) => s !== id)
+                    : [...prev, id]
+                )
+              }
+              draggable
+              tapToToggle
+            />
+            {nextCursor && (
+              <div className="mt-4 flex justify-center">
+                <button
+                  onClick={fetchMorePhotos}
+                  disabled={loadingMore}
+                  className="rounded-lg border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                >
+                  {loadingMore ? "Loading..." : "Load older photos"}
+                </button>
+              </div>
+            )}
+          </>
         )}
       </div>
 
