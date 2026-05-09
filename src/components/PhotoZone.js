@@ -156,7 +156,6 @@ export default function PhotoZone({
     // If dropped outside this zone, order stays as-is (no restore needed since we don't reorder during drag)
     setDragIndex(null);
     setDropTarget(null);
-    setDragOriginal(null);
     droppedInSelf.current = false;
   }
 
