@@ -163,30 +163,49 @@ export default function ListingForm({ listing, onListingChange, onSubmit, submit
     fetchSpecifics();
   }, [listing?.categoryId]);
 
-  // Auto-fill default policies once the policies config loads. Runs only
-  // when the defaults themselves change — NOT on every title keystroke, which
-  // previously re-overwrote a field the user had manually cleared.
+  // Auto-fill policies once the policies config loads. Order of preference:
+  //   1. User's manually picked value (never overwritten)
+  //   2. Saved default (starred in /settings/policies)
+  //   3. The only available option (when a list has exactly one policy —
+  //      nothing to "choose between," so just pick it)
+  // Effect runs only when the resolved target IDs change, NOT on every
+  // title keystroke, so a field the user manually cleared stays cleared.
   const defaultShipping = policies.defaultShipping || "";
   const defaultPayment = policies.defaultPayment || "";
   const defaultReturn = policies.defaultReturn || "";
+  const onlyShipping =
+    Array.isArray(policies.shipping) && policies.shipping.length === 1
+      ? policies.shipping[0].id
+      : "";
+  const onlyPayment =
+    Array.isArray(policies.payment) && policies.payment.length === 1
+      ? policies.payment[0].id
+      : "";
+  const onlyReturn =
+    Array.isArray(policies.return) && policies.return.length === 1
+      ? policies.return[0].id
+      : "";
+  const targetShipping = defaultShipping || onlyShipping;
+  const targetPayment = defaultPayment || onlyPayment;
+  const targetReturn = defaultReturn || onlyReturn;
   useEffect(() => {
     if (!listing) return;
-    if (!defaultShipping && !defaultPayment && !defaultReturn) return;
+    if (!targetShipping && !targetPayment && !targetReturn) return;
     const updates = {};
-    if (!listing.shippingPolicyId && defaultShipping) {
-      updates.shippingPolicyId = defaultShipping;
+    if (!listing.shippingPolicyId && targetShipping) {
+      updates.shippingPolicyId = targetShipping;
     }
-    if (!listing.paymentPolicyId && defaultPayment) {
-      updates.paymentPolicyId = defaultPayment;
+    if (!listing.paymentPolicyId && targetPayment) {
+      updates.paymentPolicyId = targetPayment;
     }
-    if (!listing.returnPolicyId && defaultReturn) {
-      updates.returnPolicyId = defaultReturn;
+    if (!listing.returnPolicyId && targetReturn) {
+      updates.returnPolicyId = targetReturn;
     }
     if (Object.keys(updates).length > 0) {
       onListingChange({ ...listing, ...updates });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [defaultShipping, defaultPayment, defaultReturn]);
+  }, [targetShipping, targetPayment, targetReturn]);
 
   function handleChange(field, value) {
     onListingChange({ ...listing, [field]: value });
