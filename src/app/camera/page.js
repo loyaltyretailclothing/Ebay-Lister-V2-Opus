@@ -4,53 +4,6 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Camera from "@/components/Camera";
 
-// Convert the slider value (-50 = warmer, +50 = cooler) to per-channel
-// gains. Symmetric so 0 is a true no-op. Pulled out so the live preview
-// (SVG feColorMatrix) and the upload-time Canvas correction use identical
-// math — what you see is what gets saved.
-function temperatureGains(t) {
-  const factor = Math.max(-1, Math.min(1, t / 50));
-  // Negative t (warm) boosts red, dims blue. Positive t (cool) does the
-  // reverse. 0.25 max swing keeps the corrections within a believable
-  // range — beyond that JPEGs start looking unnaturally tinted.
-  return {
-    r: 1 - 0.25 * factor,
-    g: 1, // green stays — this is a temperature shift, not a tint shift
-    b: 1 + 0.25 * factor,
-  };
-}
-
-// Apply the color shift to a JPEG blob via Canvas. Returns a new blob.
-// Used at upload time so Cloudinary stores the corrected pixels (not the
-// original camera output). For t === 0 we short-circuit to the original
-// blob so we don't burn CPU on a no-op.
-async function applyTemperatureToBlob(blob, t) {
-  if (t === 0) return blob;
-  const { r, g, b } = temperatureGains(t);
-
-  const bitmap = await createImageBitmap(blob);
-  const canvas = document.createElement("canvas");
-  canvas.width = bitmap.width;
-  canvas.height = bitmap.height;
-  const ctx = canvas.getContext("2d");
-  ctx.drawImage(bitmap, 0, 0);
-  bitmap.close?.();
-
-  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-  const data = imageData.data;
-  for (let i = 0; i < data.length; i += 4) {
-    data[i] = Math.min(255, Math.round(data[i] * r));
-    data[i + 1] = Math.min(255, Math.round(data[i + 1] * g));
-    data[i + 2] = Math.min(255, Math.round(data[i + 2] * b));
-    // alpha (i+3) untouched
-  }
-  ctx.putImageData(imageData, 0, 0);
-
-  return new Promise((resolve) => {
-    canvas.toBlob((b) => resolve(b || blob), "image/jpeg", 0.9);
-  });
-}
-
 // /camera
 //
 // Two phases:
@@ -74,12 +27,6 @@ export default function CameraPage() {
   const [submitting, setSubmitting] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(null); // { done, total }
   const [error, setError] = useState("");
-  // Color temperature correction applied to all photos. -50 = warmer
-  // (boost red, dim blue), +50 = cooler (boost blue, dim red), 0 = no
-  // change. Same value applies to every photo in the batch so the
-  // listing has consistent color regardless of how AWB drifted between
-  // individual captures.
-  const [temperature, setTemperature] = useState(0);
 
   function handleCameraDone(captured) {
     setPhotos(captured);
@@ -144,14 +91,8 @@ export default function CameraPage() {
       const listingPhotos = [];
       for (let i = 0; i < photos.length; i++) {
         const p = photos[i];
-        // Apply the color temperature correction to the blob before
-        // upload. For temperature === 0 this is a fast no-op that returns
-        // the original blob unchanged. For non-zero values, runs the JPEG
-        // through Canvas with the per-channel gains from
-        // temperatureGains() above.
-        const correctedBlob = await applyTemperatureToBlob(p.blob, temperature);
         const formData = new FormData();
-        const file = new File([correctedBlob], `camera-${ts}-${i}.jpg`, {
+        const file = new File([p.blob], `camera-${ts}-${i}.jpg`, {
           type: "image/jpeg",
         });
         formData.append("files", file);
@@ -229,24 +170,6 @@ export default function CameraPage() {
         </span>
       </div>
 
-      {/* SVG filter for live color temperature preview. Applied via
-          CSS filter: url(#temperatureFilter) on the grid images. Updates
-          instantly as the slider moves — no Canvas roundtrip. The actual
-          upload-time correction uses identical gains via
-          applyTemperatureToBlob() so what you see is what gets saved. */}
-      <svg width="0" height="0" className="absolute" aria-hidden="true">
-        <filter id="temperatureFilter" colorInterpolationFilters="sRGB">
-          <feColorMatrix
-            type="matrix"
-            values={(() => {
-              const { r, g, b } = temperatureGains(temperature);
-              // 4×5 matrix: per-channel multiply, no offset.
-              return `${r} 0 0 0 0  0 ${g} 0 0 0  0 0 ${b} 0 0  0 0 0 1 0`;
-            })()}
-          />
-        </filter>
-      </svg>
-
       {/* Scrollable body */}
       <div className="flex-1 overflow-y-auto">
         <div className="px-4 py-3">
@@ -256,45 +179,8 @@ export default function CameraPage() {
           </p>
         </div>
 
-        {/* Color temperature slider — live preview via SVG filter; the
-            same correction is applied to the actual JPEG blobs at upload
-            time so Cloudinary stores the corrected pixels. */}
-        <div className="border-y border-zinc-800 bg-zinc-900/50 px-4 py-3">
-          <div className="flex items-center gap-3">
-            <span className="text-[10px] font-semibold uppercase tracking-wider text-amber-400">
-              Warmer
-            </span>
-            <input
-              type="range"
-              min={-50}
-              max={50}
-              step={1}
-              value={temperature}
-              onChange={(e) => setTemperature(Number(e.target.value))}
-              className="flex-1 accent-blue-500"
-              aria-label="Color temperature"
-            />
-            <span className="text-[10px] font-semibold uppercase tracking-wider text-blue-400">
-              Cooler
-            </span>
-          </div>
-          <div className="mt-1 flex items-center justify-between">
-            <button
-              onClick={() => setTemperature(0)}
-              className="text-[10px] text-zinc-400 hover:text-white disabled:opacity-50"
-              disabled={temperature === 0}
-            >
-              Reset
-            </button>
-            <span className="text-[10px] font-mono text-zinc-300 tabular-nums">
-              {temperature > 0 ? `+${temperature}` : temperature}
-            </span>
-            <span className="w-10" />
-          </div>
-        </div>
-
         {/* Grid */}
-        <div className="grid grid-cols-3 gap-1 px-1 pb-4 pt-3 sm:gap-2 sm:px-2">
+        <div className="grid grid-cols-3 gap-1 px-1 pb-4 sm:gap-2 sm:px-2">
           {photos.map((p, i) => {
           const selected = aiSelected.has(i);
           return (
@@ -306,17 +192,7 @@ export default function CameraPage() {
                 }`}
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={p.url}
-                  alt=""
-                  className="h-full w-full object-cover"
-                  style={{
-                    filter:
-                      temperature !== 0
-                        ? "url(#temperatureFilter)"
-                        : undefined,
-                  }}
-                />
+                <img src={p.url} alt="" className="h-full w-full object-cover" />
                 {selected && (
                   <div className="absolute left-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-blue-500 text-white shadow">
                     <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3}>
