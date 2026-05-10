@@ -83,6 +83,14 @@ export default function Camera({ onDone, onCancel }) {
       // typically exposes these, iOS usually not.
       const track = stream.getVideoTracks()[0];
       const caps = track.getCapabilities?.() || {};
+      // DIAGNOSTIC — log everything the device exposes so we can see whether
+      // whiteBalanceMode / colorTemperature are present. Remove once WB
+      // strategy is decided.
+      console.log("[Camera] full capabilities:", JSON.stringify(caps, null, 2));
+      console.log("[Camera] WB-relevant keys:", {
+        whiteBalanceMode: caps.whiteBalanceMode,
+        colorTemperature: caps.colorTemperature,
+      });
       setCapabilities(caps);
 
       // Reset all manual controls on a fresh stream.
@@ -182,6 +190,20 @@ export default function Camera({ onDone, onCancel }) {
   const shutterMin = capabilities?.exposureTime?.min ?? 1;
   const shutterMax = capabilities?.exposureTime?.max ?? 1000;
   const shutterStep = capabilities?.exposureTime?.step || 1;
+
+  // DIAGNOSTIC — short summary of WB-related capabilities for on-screen
+  // display while we figure out white balance strategy. Remove later.
+  const wbModeList = Array.isArray(capabilities?.whiteBalanceMode)
+    ? capabilities.whiteBalanceMode.join(",")
+    : capabilities?.whiteBalanceMode || null;
+  const wbTempRange = capabilities?.colorTemperature
+    ? `${capabilities.colorTemperature.min ?? "?"}-${
+        capabilities.colorTemperature.max ?? "?"
+      }`
+    : null;
+  const wbDiagnostic = capabilities
+    ? `WB: ${wbModeList || "—"}  |  Temp: ${wbTempRange || "—"}`
+    : "WB: (no capabilities yet)";
 
   // Tap-to-focus handler. Called on the viewfinder area. Computes the tap
   // location as normalized [0,1] coords and sends pointsOfInterest +
@@ -394,6 +416,12 @@ export default function Camera({ onDone, onCancel }) {
             <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
           </svg>
         </button>
+      </div>
+
+      {/* DIAGNOSTIC — temporary WB capability readout for figuring out white
+          balance strategy. Remove once the question is answered. */}
+      <div className="px-4 pt-1 text-center text-[10px] font-mono text-yellow-300/80">
+        {wbDiagnostic}
       </div>
 
       {/* Viewfinder — the visible region is a centered 1:1 square that
