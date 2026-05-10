@@ -14,12 +14,12 @@ import { useCallback, useEffect, useRef, useState } from "react";
 // camera frame, encoded as JPEG. The caller is responsible for uploading
 // those blobs to Cloudinary.
 //
-// Manual controls: ISO and shutter speed (exposureTime). Both only render
-// when the underlying track exposes them (Android Chrome usually does; iOS
-// Safari doesn't). Hardware white balance is intentionally NOT exposed —
-// Samsung drivers accept the constraint but silently ignore it, so the
-// slider was misleading. Best practice: set your lighting to ~5000K
-// daylight with high-CRI bulbs and let the phone's AWB handle it.
+// Manual controls: ISO, shutter speed (exposureTime), and white balance
+// (colorTemperature). All three only render when the underlying track
+// exposes them (Android Chrome typically does; iOS Safari usually doesn't).
+// Touching a slider flips its mode to manual; the Auto button resets that
+// control to continuous so the camera handles it again. The three modes
+// are independent — locking WB doesn't affect ISO/shutter and vice versa.
 // Standard ISO stops (1/3-stop increments through 800, then full-stop jumps
 // to 1600 and 3200) — matches what native camera apps expose. Filtered at
 // stream start to whatever range the device actually supports.
@@ -51,6 +51,8 @@ export default function Camera({ onDone, onCancel }) {
   const iso = isoStops[isoIndex] ?? 400;
   const [shutterMode, setShutterMode] = useState("auto"); // "auto" | "manual"
   const [shutter, setShutter] = useState(100); // exposureTime units (100µs typically)
+  const [wbMode, setWbMode] = useState("auto"); // "auto" | "manual"
+  const [wbTemp, setWbTemp] = useState(5000); // colorTemperature in Kelvin
   const [focusPoint, setFocusPoint] = useState(null); // { x, y } in viewfinder px, for the animated indicator
 
   // Start / restart the camera stream whenever facingMode changes.
@@ -79,18 +81,10 @@ export default function Camera({ onDone, onCancel }) {
         await videoRef.current.play().catch(() => {});
       }
 
-      // Detect capabilities (zoom, torch, iso, exposureTime) — Android
-      // typically exposes these, iOS usually not.
+      // Detect capabilities (zoom, torch, iso, exposureTime, whiteBalance)
+      // — Android Chrome typically exposes these, iOS Safari usually not.
       const track = stream.getVideoTracks()[0];
       const caps = track.getCapabilities?.() || {};
-      // DIAGNOSTIC — log everything the device exposes so we can see whether
-      // whiteBalanceMode / colorTemperature are present. Remove once WB
-      // strategy is decided.
-      console.log("[Camera] full capabilities:", JSON.stringify(caps, null, 2));
-      console.log("[Camera] WB-relevant keys:", {
-        whiteBalanceMode: caps.whiteBalanceMode,
-        colorTemperature: caps.colorTemperature,
-      });
       setCapabilities(caps);
 
       // Reset all manual controls on a fresh stream.
@@ -98,6 +92,7 @@ export default function Camera({ onDone, onCancel }) {
       setFlashOn(false);
       setIsoMode("auto");
       setShutterMode("auto");
+      setWbMode("auto");
       // Seed each manual slider at the midpoint of its supported range so
       // the first user tap lands somewhere sensible.
       if (caps.iso) {
@@ -117,6 +112,11 @@ export default function Camera({ onDone, onCancel }) {
         const min = caps.exposureTime.min ?? 1;
         const max = caps.exposureTime.max ?? 1000;
         setShutter(Math.round((min + max) / 2));
+      }
+      if (caps.colorTemperature) {
+        const min = caps.colorTemperature.min ?? 2850;
+        const max = caps.colorTemperature.max ?? 7000;
+        setWbTemp(Math.round((min + max) / 2));
       }
     } catch (err) {
       console.error("Camera start error:", err);
@@ -183,6 +183,26 @@ export default function Camera({ onDone, onCancel }) {
       .catch((e) => console.error("[Camera] exposure applyConstraints:", e));
   }, [isoMode, iso, shutterMode, shutter]);
 
+  // Apply white balance. whiteBalanceMode=continuous lets the camera AWB
+  // recalibrate scene-by-scene (which is exactly what causes color drift
+  // when you move closer/farther). Switching to manual + colorTemperature
+  // freezes the camera at a chosen Kelvin value across all shots.
+  useEffect(() => {
+    const track = streamRef.current?.getVideoTracks?.()[0];
+    if (!track) return;
+    const caps = track.getCapabilities?.() || {};
+    if (!caps.whiteBalanceMode) return;
+    const constraint = {
+      whiteBalanceMode: wbMode === "manual" ? "manual" : "continuous",
+    };
+    if (wbMode === "manual" && caps.colorTemperature) {
+      constraint.colorTemperature = wbTemp;
+    }
+    track
+      .applyConstraints({ advanced: [constraint] })
+      .catch((e) => console.error("[Camera] wb applyConstraints:", e));
+  }, [wbMode, wbTemp]);
+
   const hasHardwareZoom = !!capabilities?.zoom;
   const hasTorch = !!capabilities?.torch;
   const hasIso = !!capabilities?.iso && isoStops.length > 0;
@@ -190,20 +210,13 @@ export default function Camera({ onDone, onCancel }) {
   const shutterMin = capabilities?.exposureTime?.min ?? 1;
   const shutterMax = capabilities?.exposureTime?.max ?? 1000;
   const shutterStep = capabilities?.exposureTime?.step || 1;
-
-  // DIAGNOSTIC — short summary of WB-related capabilities for on-screen
-  // display while we figure out white balance strategy. Remove later.
-  const wbModeList = Array.isArray(capabilities?.whiteBalanceMode)
-    ? capabilities.whiteBalanceMode.join(",")
-    : capabilities?.whiteBalanceMode || null;
-  const wbTempRange = capabilities?.colorTemperature
-    ? `${capabilities.colorTemperature.min ?? "?"}-${
-        capabilities.colorTemperature.max ?? "?"
-      }`
-    : null;
-  const wbDiagnostic = capabilities
-    ? `WB: ${wbModeList || "—"}  |  Temp: ${wbTempRange || "—"}`
-    : "WB: (no capabilities yet)";
+  const hasWb =
+    !!capabilities?.whiteBalanceMode && !!capabilities?.colorTemperature;
+  const wbMin = capabilities?.colorTemperature?.min ?? 2850;
+  const wbMax = capabilities?.colorTemperature?.max ?? 7000;
+  // Some drivers report a step (often 100K). Fall back to 100 for nice
+  // round numbers if not exposed — slider still spans the full range.
+  const wbStep = capabilities?.colorTemperature?.step || 100;
 
   // Tap-to-focus handler. Called on the viewfinder area. Computes the tap
   // location as normalized [0,1] coords and sends pointsOfInterest +
@@ -418,12 +431,6 @@ export default function Camera({ onDone, onCancel }) {
         </button>
       </div>
 
-      {/* DIAGNOSTIC — temporary WB capability readout for figuring out white
-          balance strategy. Remove once the question is answered. */}
-      <div className="px-4 pt-1 text-center text-[10px] font-mono text-yellow-300/80">
-        {wbDiagnostic}
-      </div>
-
       {/* Viewfinder — the visible region is a centered 1:1 square that
           matches exactly what handleCapture crops from the source. Any
           leftover vertical space above/below stays black, same as native
@@ -532,6 +539,35 @@ export default function Camera({ onDone, onCancel }) {
           />
           <span className="w-12 text-right text-[10px] font-medium tabular-nums">
             {shutterMode === "manual" ? shutter : "Auto"}
+          </span>
+        </div>
+      )}
+      {hasWb && (
+        <div className="flex items-center gap-2 px-4 pt-1">
+          <span className="w-14 text-[10px] font-semibold uppercase tracking-wide text-white/70">WB</span>
+          <button
+            onClick={() => setWbMode("auto")}
+            className={`rounded-full px-2 py-0.5 text-[10px] font-semibold backdrop-blur ${
+              wbMode === "auto" ? "bg-white text-black" : "bg-black/40 text-white"
+            }`}
+          >
+            Auto
+          </button>
+          <input
+            type="range"
+            min={wbMin}
+            max={wbMax}
+            step={wbStep}
+            value={wbTemp}
+            onChange={(e) => {
+              setWbTemp(Number(e.target.value));
+              setWbMode("manual");
+            }}
+            className="flex-1 accent-white"
+            aria-label="White balance"
+          />
+          <span className="w-12 text-right text-[10px] font-medium tabular-nums">
+            {wbMode === "manual" ? `${wbTemp}K` : "Auto"}
           </span>
         </div>
       )}
