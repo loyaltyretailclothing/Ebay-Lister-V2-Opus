@@ -196,30 +196,51 @@ export default function Camera({ onDone, onCancel }) {
       .catch((e) => console.error("[Camera] exposure applyConstraints:", e));
   }, [isoMode, iso, shutterMode, shutter]);
 
-  // Apply white balance. whiteBalanceMode=continuous lets the camera AWB
-  // recalibrate scene-by-scene (which is exactly what causes color drift
-  // when you move closer/farther). Switching to manual + colorTemperature
-  // freezes the camera at a chosen Kelvin value across all shots.
+  // Apply white balance in TWO sequential applyConstraints calls — mode
+  // first, then colorTemperature. Combining them in one call worked on
+  // some devices but on Samsung Android Chrome the driver wouldn't honor
+  // the colorTemperature change unless the whiteBalanceMode transition
+  // was processed separately first. The await between calls lets the
+  // driver settle before we feed it the next constraint.
   //
-  // Note on Android Chrome (Samsung): the driver accepts the constraint
-  // but snaps colorTemperature to a small set of internal values rather
-  // than honoring arbitrary Kelvin requests. The WB_PRESETS list above
-  // exists because of this — the buttons map to the values the driver
-  // actually produces, so what you tap is what you get.
+  // Tap-Auto-then-preset behavior reported by the user implied the
+  // driver was only applying on a mode transition; this split makes the
+  // mode transition explicit and standalone.
   useEffect(() => {
-    const track = streamRef.current?.getVideoTracks?.()[0];
-    if (!track) return;
-    const caps = track.getCapabilities?.() || {};
-    if (!caps.whiteBalanceMode) return;
-    const constraint = {
-      whiteBalanceMode: wbMode === "manual" ? "manual" : "continuous",
-    };
-    if (wbMode === "manual" && caps.colorTemperature) {
-      constraint.colorTemperature = wbTemp;
+    let cancelled = false;
+    async function applyWb() {
+      const track = streamRef.current?.getVideoTracks?.()[0];
+      if (!track) return;
+      const caps = track.getCapabilities?.() || {};
+      if (!caps.whiteBalanceMode) return;
+
+      try {
+        // Step 1 — set the mode. Driver handles the transition cleanly
+        // when this is the only thing in the constraint.
+        await track.applyConstraints({
+          advanced: [
+            {
+              whiteBalanceMode: wbMode === "manual" ? "manual" : "continuous",
+            },
+          ],
+        });
+        if (cancelled) return;
+
+        // Step 2 — only if we're in manual, apply the desired Kelvin.
+        // The driver should now be in manual mode and ready to honor it.
+        if (wbMode === "manual" && caps.colorTemperature) {
+          await track.applyConstraints({
+            advanced: [{ colorTemperature: wbTemp }],
+          });
+        }
+      } catch (e) {
+        console.error("[Camera] wb applyConstraints:", e);
+      }
     }
-    track
-      .applyConstraints({ advanced: [constraint] })
-      .catch((e) => console.error("[Camera] wb applyConstraints:", e));
+    applyWb();
+    return () => {
+      cancelled = true;
+    };
   }, [wbMode, wbTemp]);
 
   const hasHardwareZoom = !!capabilities?.zoom;
