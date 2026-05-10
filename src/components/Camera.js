@@ -53,6 +53,9 @@ export default function Camera({ onDone, onCancel }) {
   const [shutter, setShutter] = useState(100); // exposureTime units (100µs typically)
   const [wbMode, setWbMode] = useState("auto"); // "auto" | "manual"
   const [wbTemp, setWbTemp] = useState(5000); // colorTemperature in Kelvin
+  // Actual camera-reported state right after applyConstraints — used to
+  // diagnose drivers that accept the constraint but silently ignore it.
+  const [wbActual, setWbActual] = useState({ mode: null, temp: null });
   const [focusPoint, setFocusPoint] = useState(null); // { x, y } in viewfinder px, for the animated indicator
 
   // Start / restart the camera stream whenever facingMode changes.
@@ -187,6 +190,11 @@ export default function Camera({ onDone, onCancel }) {
   // recalibrate scene-by-scene (which is exactly what causes color drift
   // when you move closer/farther). Switching to manual + colorTemperature
   // freezes the camera at a chosen Kelvin value across all shots.
+  //
+  // After the apply settles, read getSettings() back and store it in
+  // wbActual so the UI can show whether the driver actually accepted the
+  // constraint vs silently ignored it (a known issue on some Android
+  // drivers — capability is advertised, but applyConstraints is a no-op).
   useEffect(() => {
     const track = streamRef.current?.getVideoTracks?.()[0];
     if (!track) return;
@@ -200,7 +208,21 @@ export default function Camera({ onDone, onCancel }) {
     }
     track
       .applyConstraints({ advanced: [constraint] })
-      .catch((e) => console.error("[Camera] wb applyConstraints:", e));
+      .then(() => {
+        const settings = track.getSettings?.() || {};
+        setWbActual({
+          mode: settings.whiteBalanceMode ?? null,
+          temp: settings.colorTemperature ?? null,
+        });
+        console.log("[Camera] WB requested:", constraint, "actual:", {
+          mode: settings.whiteBalanceMode,
+          temp: settings.colorTemperature,
+        });
+      })
+      .catch((e) => {
+        console.error("[Camera] wb applyConstraints rejected:", e);
+        setWbActual({ mode: "REJECTED", temp: null });
+      });
   }, [wbMode, wbTemp]);
 
   const hasHardwareZoom = !!capabilities?.zoom;
@@ -543,33 +565,47 @@ export default function Camera({ onDone, onCancel }) {
         </div>
       )}
       {hasWb && (
-        <div className="flex items-center gap-2 px-4 pt-1">
-          <span className="w-14 text-[10px] font-semibold uppercase tracking-wide text-white/70">WB</span>
-          <button
-            onClick={() => setWbMode("auto")}
-            className={`rounded-full px-2 py-0.5 text-[10px] font-semibold backdrop-blur ${
-              wbMode === "auto" ? "bg-white text-black" : "bg-black/40 text-white"
-            }`}
-          >
-            Auto
-          </button>
-          <input
-            type="range"
-            min={wbMin}
-            max={wbMax}
-            step={wbStep}
-            value={wbTemp}
-            onChange={(e) => {
-              setWbTemp(Number(e.target.value));
-              setWbMode("manual");
-            }}
-            className="flex-1 accent-white"
-            aria-label="White balance"
-          />
-          <span className="w-12 text-right text-[10px] font-medium tabular-nums">
-            {wbMode === "manual" ? `${wbTemp}K` : "Auto"}
-          </span>
-        </div>
+        <>
+          <div className="flex items-center gap-2 px-4 pt-1">
+            <span className="w-14 text-[10px] font-semibold uppercase tracking-wide text-white/70">WB</span>
+            <button
+              onClick={() => setWbMode("auto")}
+              className={`rounded-full px-2 py-0.5 text-[10px] font-semibold backdrop-blur ${
+                wbMode === "auto" ? "bg-white text-black" : "bg-black/40 text-white"
+              }`}
+            >
+              Auto
+            </button>
+            <input
+              type="range"
+              min={wbMin}
+              max={wbMax}
+              step={wbStep}
+              value={wbTemp}
+              onChange={(e) => {
+                setWbTemp(Number(e.target.value));
+                setWbMode("manual");
+              }}
+              className="flex-1 accent-white"
+              aria-label="White balance"
+            />
+            <span className="w-12 text-right text-[10px] font-medium tabular-nums">
+              {wbMode === "manual" ? `${wbTemp}K` : "Auto"}
+            </span>
+          </div>
+          {/* DIAGNOSTIC — show what the camera ACTUALLY reports after we
+              apply the constraint. If "got" matches "want", the driver
+              accepted it (visual change should be visible). If "got" stays
+              the same regardless of slider movement, the driver is
+              silently ignoring the constraint and we need to switch to
+              post-capture color correction. Remove later. */}
+          <div className="px-4 pt-0.5 text-center text-[10px] font-mono text-yellow-300/80">
+            want: {wbMode === "manual" ? `${wbTemp}K manual` : "auto"}
+            {"  |  got: "}
+            {wbActual.temp != null ? `${wbActual.temp}K` : "—"}
+            {wbActual.mode ? ` ${wbActual.mode}` : ""}
+          </div>
+        </>
       )}
 
       {/* Zoom chips */}
