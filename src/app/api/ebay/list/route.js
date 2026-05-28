@@ -1,4 +1,4 @@
-import { getUserToken } from "@/lib/ebay";
+import { getUserToken, uploadPhotosToEps } from "@/lib/ebay";
 import { EBAY_BASE_URL } from "@/lib/constants";
 import { NextResponse } from "next/server";
 
@@ -87,6 +87,26 @@ export async function POST(request) {
     const token = await getUserToken();
     const itemSku = sku || `LISTING-${Date.now()}`;
 
+    // --- Step 0: Upload photos to eBay's EPS via the Media API ---
+    // Hand eBay back its own URLs in the Inventory API call so revisions
+    // and re-ingestion don't depend on the Cloudinary source URLs staying
+    // alive. Fails the whole publish cleanly if any photo upload fails
+    // (rather than leaving a partially-uploaded state); user can retry.
+    let epsImageUrls;
+    try {
+      epsImageUrls = await uploadPhotosToEps(photos.map((p) => p.secure_url));
+    } catch (err) {
+      console.error("EPS upload failed:", err);
+      return NextResponse.json(
+        {
+          success: false,
+          error: `Photo upload to eBay failed: ${err.message}`,
+          step: "eps_upload",
+        },
+        { status: 400 }
+      );
+    }
+
     // --- Step 0: Ensure inventory location exists ---
     const locationKey = "warehouse-47904";
     // Try to delete any old bad location, then create fresh
@@ -157,7 +177,10 @@ export async function POST(request) {
         title,
         description: itemDescriptionHtml,
         aspects,
-        imageUrls: photos.map((p) => p.secure_url),
+        // EPS URLs (i.ebayimg.com) from Step 0, not the original Cloudinary
+        // URLs. eBay now owns/hosts these and they stay valid across
+        // revisions for the life of the listing.
+        imageUrls: epsImageUrls,
       },
     };
 
