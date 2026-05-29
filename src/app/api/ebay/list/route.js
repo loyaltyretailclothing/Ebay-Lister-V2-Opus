@@ -378,10 +378,46 @@ export async function POST(request) {
 
     if (!publishRes.ok) {
       console.error("eBay publish error:", JSON.stringify(publishRes.data, null, 2));
+
+      // Clean up the offer we just created so this failed publish doesn't
+      // leave an orphan UNPUBLISHED offer that "burns" the SKU. Without
+      // this cleanup, the user can't retry with the same SKU even after
+      // fixing the underlying issue — eBay's seller hub UI doesn't show
+      // unpublished offers, so the SKU appears unused but POST /offer
+      // would fail with "already exists" on the next attempt.
+      //
+      // Best-effort: if the cleanup itself fails, we log and surface a
+      // hint, but we still return the ORIGINAL publish error (not the
+      // cleanup error) so the user sees the actionable cause.
+      let cleanupOk = false;
+      try {
+        const cleanupRes = await ebayFetch(
+          `/sell/inventory/v1/offer/${offerId}`,
+          { method: "DELETE" },
+          token
+        );
+        cleanupOk = cleanupRes.ok;
+        if (!cleanupOk) {
+          console.error(
+            `Orphan offer cleanup failed for ${offerId} (status ${cleanupRes.status}):`,
+            JSON.stringify(cleanupRes.data, null, 2)
+          );
+        }
+      } catch (cleanupErr) {
+        console.error(
+          `Orphan offer cleanup threw for ${offerId}:`,
+          cleanupErr
+        );
+      }
+
+      const cleanupNote = cleanupOk
+        ? " The orphan offer was cleaned up — you can retry with the same SKU once the issue is fixed."
+        : " (Cleanup of the orphan offer failed — you may need a new SKU on retry; use /api/ebay/sku-inspect to confirm.)";
+
       return NextResponse.json(
         {
           success: false,
-          error: `Publish failed: ${formatEbayErrors(publishRes.data)}`,
+          error: `Publish failed: ${formatEbayErrors(publishRes.data)}.${cleanupNote}`,
           step: "publish",
         },
         { status: 400 }
