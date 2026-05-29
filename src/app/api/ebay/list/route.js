@@ -41,6 +41,34 @@ async function ebayFetch(path, options, token) {
   return { ok: res.ok, status: res.status, data };
 }
 
+// Format the full eBay error envelope into a single useful string instead
+// of dropping errorId/longMessage/parameters on the floor. Captures every
+// field eBay surfaces so future failures are debuggable from the response
+// alone — no need to dig through Vercel logs.
+function formatEbayErrors(data) {
+  const errors = data?.errors;
+  if (!Array.isArray(errors) || errors.length === 0) {
+    return JSON.stringify(data).slice(0, 500);
+  }
+  return errors
+    .map((e) => {
+      const parts = [];
+      if (e.errorId) parts.push(`#${e.errorId}`);
+      if (e.message) parts.push(e.message);
+      if (e.longMessage && e.longMessage !== e.message) {
+        parts.push(`(${e.longMessage})`);
+      }
+      if (Array.isArray(e.parameters) && e.parameters.length > 0) {
+        const paramStr = e.parameters
+          .map((p) => `${p.name}=${p.value}`)
+          .join(", ");
+        parts.push(`[${paramStr}]`);
+      }
+      return parts.join(" ");
+    })
+    .join("; ");
+}
+
 export async function POST(request) {
   try {
     const body = await request.json();
@@ -215,12 +243,12 @@ export async function POST(request) {
 
     if (!inventoryRes.ok) {
       console.error("eBay inventory error:", JSON.stringify(inventoryRes.data, null, 2));
-      const errors = inventoryRes.data?.errors || [];
-      const errMsg = errors.length > 0
-        ? errors.map((e) => `${e.message}${e.longMessage ? ` — ${e.longMessage}` : ""}${e.parameters ? ` (${JSON.stringify(e.parameters)})` : ""}`).join("; ")
-        : JSON.stringify(inventoryRes.data);
       return NextResponse.json(
-        { success: false, error: `Inventory item failed: ${errMsg}`, step: "inventory" },
+        {
+          success: false,
+          error: `Inventory item failed: ${formatEbayErrors(inventoryRes.data)}`,
+          step: "inventory",
+        },
         { status: 400 }
       );
     }
@@ -287,33 +315,58 @@ export async function POST(request) {
 
     let offerId = offerRes.data?.offerId;
 
-    // If offer already exists for this SKU, fetch the existing offer ID
     if (!offerRes.ok) {
+      // SKU collision: an offer already exists on eBay for this SKU.
+      // We DO NOT silently reuse it — orphan unpublished offers from a
+      // previous failed publish carry stale settings, which causes
+      // confusing publish failures (e.g. "Best Offer Auto Accept Price
+      // entered has an invalid value" when the user never entered one).
+      // Surface a clear, actionable error instead.
       const alreadyExists = offerRes.data?.errors?.some(
         (e) => e.errorId === 25002 || e.message?.includes("already exists")
       );
 
       if (alreadyExists) {
-        // Look up existing offers for this SKU — prefer one with a location
-        const existingRes = await ebayFetch(
-          `/sell/inventory/v1/offer?sku=${encodeURIComponent(itemSku)}`,
-          { method: "GET" },
-          token
-        );
-        const offers = existingRes.data?.offers || [];
-        const withLocation = offers.find((o) => o.merchantLocationKey);
-        offerId = withLocation?.offerId || offers[0]?.offerId;
-      }
-
-      if (!offerId) {
-        const errMsg = offerRes.data?.errors
-          ? offerRes.data.errors.map((e) => e.message).join("; ")
-          : JSON.stringify(offerRes.data);
+        // Best-effort: look up the existing offer's status so the error
+        // message can tell the user whether it's live or orphaned.
+        let existingDetail = "";
+        try {
+          const existingRes = await ebayFetch(
+            `/sell/inventory/v1/offer?sku=${encodeURIComponent(itemSku)}`,
+            { method: "GET" },
+            token
+          );
+          const existingOffers = existingRes.data?.offers || [];
+          if (existingOffers.length > 0) {
+            const summaries = existingOffers.map((o) => {
+              const status = o.status || "UNKNOWN";
+              const listingId = o.listing?.listingId;
+              return listingId ? `${status} (listing ${listingId})` : status;
+            });
+            existingDetail = ` Existing offer(s): ${summaries.join(", ")}.`;
+          }
+        } catch {
+          // Swallow — we still surface a useful error below.
+        }
         return NextResponse.json(
-          { success: false, error: `Create offer failed: ${errMsg}`, step: "offer" },
+          {
+            success: false,
+            error: `SKU "${itemSku}" is already in use on your eBay account.${existingDetail} Choose a different SKU (or leave the SKU field blank to auto-generate one) and try again. Use /api/ebay/sku-inspect?sku=${encodeURIComponent(itemSku)} to inspect what's on eBay's side.`,
+            step: "offer",
+          },
           { status: 400 }
         );
       }
+
+      // Some other offer-creation failure.
+      return NextResponse.json(
+        {
+          success: false,
+          error: `Create offer failed: ${formatEbayErrors(offerRes.data)}`,
+          step: "offer",
+        },
+        { status: 400 }
+      );
     }
 
     // --- Step 3: Publish Offer ---
@@ -324,11 +377,13 @@ export async function POST(request) {
     );
 
     if (!publishRes.ok) {
-      const errMsg = publishRes.data?.errors
-        ? publishRes.data.errors.map((e) => e.message).join("; ")
-        : JSON.stringify(publishRes.data);
+      console.error("eBay publish error:", JSON.stringify(publishRes.data, null, 2));
       return NextResponse.json(
-        { success: false, error: `Publish failed: ${errMsg}`, step: "publish" },
+        {
+          success: false,
+          error: `Publish failed: ${formatEbayErrors(publishRes.data)}`,
+          step: "publish",
+        },
         { status: 400 }
       );
     }
