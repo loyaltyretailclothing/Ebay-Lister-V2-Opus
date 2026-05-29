@@ -316,57 +316,131 @@ export async function POST(request) {
     let offerId = offerRes.data?.offerId;
 
     if (!offerRes.ok) {
-      // SKU collision: an offer already exists on eBay for this SKU.
-      // We DO NOT silently reuse it — orphan unpublished offers from a
-      // previous failed publish carry stale settings, which causes
-      // confusing publish failures (e.g. "Best Offer Auto Accept Price
-      // entered has an invalid value" when the user never entered one).
-      // Surface a clear, actionable error instead.
       const alreadyExists = offerRes.data?.errors?.some(
         (e) => e.errorId === 25002 || e.message?.includes("already exists")
       );
 
       if (alreadyExists) {
-        // Best-effort: look up the existing offer's status so the error
-        // message can tell the user whether it's live or orphaned.
-        let existingDetail = "";
+        // Auto-reclaim flow. Look up every existing offer for this SKU
+        // and split them by status:
+        //   - PUBLISHED: a live listing exists for this SKU. We REFUSE
+        //     to touch it (could clobber a real listing) and surface a
+        //     clear error so the user picks a different SKU or ends the
+        //     existing listing first.
+        //   - UNPUBLISHED: orphan(s) from a previous failed publish.
+        //     Safe to delete — they're invisible in the seller hub UI
+        //     and aren't tied to any live data. We delete them, then
+        //     retry the POST /offer call so the user's current form
+        //     settings drive the new offer (not the stale orphan).
+        let existingOffers = [];
         try {
           const existingRes = await ebayFetch(
             `/sell/inventory/v1/offer?sku=${encodeURIComponent(itemSku)}`,
             { method: "GET" },
             token
           );
-          const existingOffers = existingRes.data?.offers || [];
-          if (existingOffers.length > 0) {
-            const summaries = existingOffers.map((o) => {
-              const status = o.status || "UNKNOWN";
-              const listingId = o.listing?.listingId;
-              return listingId ? `${status} (listing ${listingId})` : status;
-            });
-            existingDetail = ` Existing offer(s): ${summaries.join(", ")}.`;
-          }
+          existingOffers = existingRes.data?.offers || [];
         } catch {
-          // Swallow — we still surface a useful error below.
+          // best-effort — fall through; we'll surface a generic error below
         }
+
+        const publishedOffers = existingOffers.filter(
+          (o) => o.status === "PUBLISHED"
+        );
+        if (publishedOffers.length > 0) {
+          const summaries = publishedOffers.map((o) => {
+            const listingId = o.listing?.listingId;
+            return listingId ? `PUBLISHED (listing ${listingId})` : "PUBLISHED";
+          });
+          return NextResponse.json(
+            {
+              success: false,
+              error: `SKU "${itemSku}" is in use by a live listing on your eBay account. Existing offer(s): ${summaries.join(", ")}. Choose a different SKU (or end the existing listing on eBay first) and try again.`,
+              step: "offer",
+            },
+            { status: 400 }
+          );
+        }
+
+        const unpublishedOffers = existingOffers.filter(
+          (o) => o.status === "UNPUBLISHED" || !o.status
+        );
+        if (unpublishedOffers.length === 0) {
+          // eBay said "already exists" but we couldn't see anything.
+          // Rare — could be a race or an offer in a status we don't
+          // handle. Surface a clear error so the user can investigate.
+          return NextResponse.json(
+            {
+              success: false,
+              error: `SKU "${itemSku}" is already in use but we couldn't enumerate existing offers. Use /api/ebay/sku-inspect?sku=${encodeURIComponent(itemSku)} to investigate, or use a different SKU.`,
+              step: "offer",
+            },
+            { status: 400 }
+          );
+        }
+
+        // Delete the orphan(s).
+        const failedDeletes = [];
+        for (const o of unpublishedOffers) {
+          try {
+            const deleteRes = await ebayFetch(
+              `/sell/inventory/v1/offer/${o.offerId}`,
+              { method: "DELETE" },
+              token
+            );
+            if (!deleteRes.ok) {
+              failedDeletes.push(o.offerId);
+              console.error(
+                `Orphan delete failed for ${o.offerId} (status ${deleteRes.status}):`,
+                JSON.stringify(deleteRes.data, null, 2)
+              );
+            }
+          } catch (e) {
+            failedDeletes.push(o.offerId);
+            console.error(`Orphan delete threw for ${o.offerId}:`, e);
+          }
+        }
+        if (failedDeletes.length > 0) {
+          return NextResponse.json(
+            {
+              success: false,
+              error: `SKU "${itemSku}" had orphan offer(s) but cleanup failed for: ${failedDeletes.join(", ")}. Use a different SKU and try again, or investigate via /api/ebay/sku-inspect?sku=${encodeURIComponent(itemSku)}.`,
+              step: "offer",
+            },
+            { status: 400 }
+          );
+        }
+
+        // Retry POST /offer — orphan(s) are gone, this should now succeed
+        // and we fall through to Step 3 publish naturally.
+        offerRes = await ebayFetch(
+          "/sell/inventory/v1/offer",
+          { method: "POST", body: JSON.stringify(offer) },
+          token
+        );
+        offerId = offerRes.data?.offerId;
+
+        if (!offerRes.ok) {
+          return NextResponse.json(
+            {
+              success: false,
+              error: `Create offer failed after orphan cleanup: ${formatEbayErrors(offerRes.data)}`,
+              step: "offer",
+            },
+            { status: 400 }
+          );
+        }
+      } else {
+        // Some other offer-creation failure (not an "already exists").
         return NextResponse.json(
           {
             success: false,
-            error: `SKU "${itemSku}" is already in use on your eBay account.${existingDetail} Choose a different SKU (or leave the SKU field blank to auto-generate one) and try again. Use /api/ebay/sku-inspect?sku=${encodeURIComponent(itemSku)} to inspect what's on eBay's side.`,
+            error: `Create offer failed: ${formatEbayErrors(offerRes.data)}`,
             step: "offer",
           },
           { status: 400 }
         );
       }
-
-      // Some other offer-creation failure.
-      return NextResponse.json(
-        {
-          success: false,
-          error: `Create offer failed: ${formatEbayErrors(offerRes.data)}`,
-          step: "offer",
-        },
-        { status: 400 }
-      );
     }
 
     // --- Step 3: Publish Offer ---
