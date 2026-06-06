@@ -31,6 +31,8 @@ export async function POST(request) {
   const draftId = newDraftId();
   let listingPhotos = [];
   let aiPhotos = [];
+  let aiNote = "";
+  let draftNote = "";
 
   try {
     const body = await request.json();
@@ -39,7 +41,12 @@ export async function POST(request) {
     aiPhotos = aiIndices
       .map((i) => listingPhotos[i])
       .filter(Boolean);
-    const notes = body.notes || "";
+    // aiNote is the hint fed to Claude during analysis; draftNote is the
+    // internal note that the AI never sees. Both get attached to the saved
+    // listing so they persist and show up when the draft is opened. Accept
+    // legacy `notes` as a fallback for the aiNote.
+    aiNote = body.aiNote || body.notes || "";
+    draftNote = body.draftNote || "";
 
     if (listingPhotos.length === 0) {
       return NextResponse.json(
@@ -52,16 +59,16 @@ export async function POST(request) {
     //    the moment the client fires this request.
     await saveDraft(draftId, {
       id: draftId,
-      listing: {},
+      listing: { aiNote, draftNote },
       aiPhotos,
       listingPhotos,
       status: "processing",
       savedAt: new Date().toISOString(),
     });
 
-    // 2. Run the full pipeline.
+    // 2. Run the full pipeline. aiNote is the user's hint for Claude.
     const analysisPhotos = aiPhotos.length > 0 ? aiPhotos : listingPhotos.slice(0, 3);
-    const listing = await analyzeListing(analysisPhotos, notes);
+    const listing = await analyzeListing(analysisPhotos, aiNote);
 
     // Empty title = Claude couldn't make sense of the photos (wrong subject,
     // blurry, bad lighting, etc.). Technically the pipeline "succeeded" but
@@ -110,6 +117,12 @@ export async function POST(request) {
     //    drafts in sync with Generate-page output.
     Object.assign(listing, applyDescriptionTemplate(listing));
 
+    // Attach the notes so they persist on the draft. aiNote is kept for
+    // reference/re-analysis; draftNote is the internal reviewer note. The
+    // publish route ignores unknown fields, so neither reaches eBay.
+    listing.aiNote = aiNote;
+    listing.draftNote = draftNote;
+
     // 6. Save the completed draft.
     await saveDraft(draftId, {
       id: draftId,
@@ -128,7 +141,7 @@ export async function POST(request) {
     try {
       await saveDraft(draftId, {
         id: draftId,
-        listing: {},
+        listing: { aiNote, draftNote },
         aiPhotos,
         listingPhotos,
         status: "error",

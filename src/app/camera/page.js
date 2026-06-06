@@ -27,6 +27,29 @@ export default function CameraPage() {
   const [submitting, setSubmitting] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(null); // { done, total }
   const [error, setError] = useState("");
+  // Notes: aiNote is read by Claude during analysis, draftNote is internal
+  // only (never sent to the AI or eBay). noteModal tracks which note's
+  // editor is open ("ai" | "draft" | null); noteDraft holds the in-progress
+  // text so a Cancel (red X) can discard without touching the saved value.
+  const [aiNote, setAiNote] = useState("");
+  const [draftNote, setDraftNote] = useState("");
+  const [noteModal, setNoteModal] = useState(null);
+  const [noteDraft, setNoteDraft] = useState("");
+
+  function openNoteModal(which) {
+    setNoteDraft(which === "ai" ? aiNote : draftNote);
+    setNoteModal(which);
+  }
+  function saveNoteModal() {
+    if (noteModal === "ai") setAiNote(noteDraft);
+    else if (noteModal === "draft") setDraftNote(noteDraft);
+    setNoteModal(null);
+    setNoteDraft("");
+  }
+  function cancelNoteModal() {
+    setNoteModal(null);
+    setNoteDraft("");
+  }
 
   function handleCameraDone(captured) {
     setPhotos(captured);
@@ -128,7 +151,12 @@ export default function CameraPage() {
       fetch("/api/drafts/process", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ listingPhotos, aiPhotoIndices }),
+        body: JSON.stringify({
+          listingPhotos,
+          aiPhotoIndices,
+          aiNote,
+          draftNote,
+        }),
       }).catch((err) => {
         // Logged only — the server still writes an error draft on its side.
         console.error("Background process kickoff failed:", err);
@@ -228,6 +256,32 @@ export default function CameraPage() {
       {/* Bottom action bar — flex item, not fixed, since the parent is a
           full-screen flex column. Avoids stacking under anything. */}
       <div className="flex-shrink-0 border-t border-zinc-800 bg-zinc-950/95 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur">
+        {/* Note buttons — tap to open the editor. A check appears once the
+            note has text; the button stays tappable so you can edit it. */}
+        <div className="mb-3 flex gap-3">
+          <button
+            onClick={() => openNoteModal("ai")}
+            className="flex flex-1 items-center justify-center gap-1.5 rounded-full bg-blue-600 py-2.5 text-sm font-semibold text-white hover:bg-blue-700"
+          >
+            {aiNote.trim() && (
+              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+              </svg>
+            )}
+            AI Note
+          </button>
+          <button
+            onClick={() => openNoteModal("draft")}
+            className="flex flex-1 items-center justify-center gap-1.5 rounded-full bg-blue-600 py-2.5 text-sm font-semibold text-white hover:bg-blue-700"
+          >
+            {draftNote.trim() && (
+              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+              </svg>
+            )}
+            Draft Note
+          </button>
+        </div>
         <button
           onClick={handleCreateDraft}
           disabled={submitting || photos.length === 0}
@@ -240,6 +294,62 @@ export default function CameraPage() {
             : `Create Draft (${photos.length} photo${photos.length === 1 ? "" : "s"}, ${aiSelected.size} AI)`}
         </button>
       </div>
+
+      {/* Note editor modal — opened by the AI Note / Draft Note buttons.
+          Green check saves, red X discards. noteDraft holds the in-progress
+          text so cancel reverts cleanly. */}
+      {noteModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 p-4 sm:items-center"
+          onClick={cancelNoteModal}
+        >
+          <div
+            className="w-full max-w-md rounded-2xl bg-zinc-900 p-5 ring-1 ring-zinc-700"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="text-base font-semibold text-white">
+              {noteModal === "ai" ? "AI Note" : "Draft Note"}
+            </h2>
+            <p className="mt-0.5 text-xs text-zinc-400">
+              {noteModal === "ai"
+                ? "A hint for the AI — read when the listing is analyzed."
+                : "Internal only — never seen by the AI or eBay."}
+            </p>
+            <textarea
+              autoFocus
+              value={noteDraft}
+              onChange={(e) => setNoteDraft(e.target.value)}
+              rows={4}
+              placeholder={
+                noteModal === "ai"
+                  ? "e.g. tag says 32 but it measures 30 — use the measured size"
+                  : "e.g. Shannon — double-check the stain on photo 4"
+              }
+              className="mt-3 w-full resize-y rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-white placeholder-zinc-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            />
+            <div className="mt-4 flex items-center justify-end gap-3">
+              <button
+                onClick={cancelNoteModal}
+                aria-label="Cancel"
+                className="flex h-11 w-11 items-center justify-center rounded-full bg-red-600 text-white hover:bg-red-700"
+              >
+                <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+              <button
+                onClick={saveNoteModal}
+                aria-label="Save"
+                className="flex h-11 w-11 items-center justify-center rounded-full bg-green-600 text-white hover:bg-green-700"
+              >
+                <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

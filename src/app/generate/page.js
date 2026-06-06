@@ -34,6 +34,12 @@ const INITIAL_LISTING = {
   scheduleEnabled: true,
   scheduledDate: "",
   scheduledTime: "17:00",
+  // aiNote — read by Claude during analysis (a hint to help it get the item
+  // right). draftNote — internal note for whoever finalizes the draft; the
+  // AI never sees it and it never reaches eBay. Both ride on the listing so
+  // they persist through draft save/load and survive re-analysis.
+  aiNote: "",
+  draftNote: "",
 };
 
 export default function Generate() {
@@ -213,7 +219,7 @@ export default function Generate() {
       const res = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ photos: aiPhotos }),
+        body: JSON.stringify({ photos: aiPhotos, notes: listing.aiNote }),
       });
       const data = await res.json();
       if (data.success) {
@@ -449,6 +455,54 @@ export default function Generate() {
               details.
             </span>
           </p>
+
+          {/* Notes — side by side. AI Note is read by Claude on Analyze;
+              Draft Note is internal-only (never sent to the AI or eBay).
+              Each box turns red when it has text. */}
+          <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+                AI Note
+              </label>
+              <p className="mt-0.5 text-[11px] text-zinc-400 dark:text-zinc-500">
+                A hint for the AI — read when you Analyze.
+              </p>
+              <textarea
+                value={listing.aiNote || ""}
+                onChange={(e) =>
+                  setListing((prev) => ({ ...prev, aiNote: e.target.value }))
+                }
+                rows={2}
+                placeholder="e.g. tag says 32 but it measures 30 — use the measured size"
+                className={`mt-1 w-full resize-y rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-1 ${
+                  listing.aiNote?.trim()
+                    ? "border-red-400 bg-red-50 text-zinc-900 focus:border-red-500 focus:ring-red-500 dark:border-red-500/60 dark:bg-red-950/20 dark:text-zinc-100"
+                    : "border-zinc-300 bg-white text-zinc-900 focus:border-blue-500 focus:ring-blue-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+                }`}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+                Draft Note
+              </label>
+              <p className="mt-0.5 text-[11px] text-zinc-400 dark:text-zinc-500">
+                Internal only — never seen by the AI or eBay.
+              </p>
+              <textarea
+                value={listing.draftNote || ""}
+                onChange={(e) =>
+                  setListing((prev) => ({ ...prev, draftNote: e.target.value }))
+                }
+                rows={2}
+                placeholder="e.g. Shannon — double-check the stain on photo 4"
+                className={`mt-1 w-full resize-y rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-1 ${
+                  listing.draftNote?.trim()
+                    ? "border-red-400 bg-red-50 text-zinc-900 focus:border-red-500 focus:ring-red-500 dark:border-red-500/60 dark:bg-red-950/20 dark:text-zinc-100"
+                    : "border-zinc-300 bg-white text-zinc-900 focus:border-blue-500 focus:ring-blue-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+                }`}
+              />
+            </div>
+          </div>
 
           {/* Research buttons — Google reverse image search + eBay search.
               Always visible; disabled state stays in place rather than
