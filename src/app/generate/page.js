@@ -464,9 +464,6 @@ export default function Generate() {
               <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
                 AI Note
               </label>
-              <p className="mt-0.5 text-[11px] text-zinc-400 dark:text-zinc-500">
-                A hint for the AI — read when you Analyze.
-              </p>
               <textarea
                 value={listing.aiNote || ""}
                 onChange={(e) =>
@@ -485,9 +482,6 @@ export default function Generate() {
               <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
                 Draft Note
               </label>
-              <p className="mt-0.5 text-[11px] text-zinc-400 dark:text-zinc-500">
-                Internal only — never seen by the AI or eBay.
-              </p>
               <textarea
                 value={listing.draftNote || ""}
                 onChange={(e) =>
