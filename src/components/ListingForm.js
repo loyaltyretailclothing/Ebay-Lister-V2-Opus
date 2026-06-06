@@ -2,11 +2,20 @@
 
 import { useState, useEffect } from "react";
 import { DEFAULTS } from "@/lib/constants";
+import {
+  CONDITIONS,
+  allowedConditionsForCategory,
+  reconcileCondition,
+} from "@/lib/conditions";
 import ItemSpecificPicker from "@/components/ItemSpecificPicker";
 
 export default function ListingForm({ listing, onListingChange, onSubmit, submitting, submitStatus }) {
   const [categories, setCategories] = useState([]);
   const [specifics, setSpecifics] = useState([]);
+  // Conditions the current category allows. Defaults to all conditions so
+  // the dropdown is fully populated before a category is chosen and as a
+  // graceful fallback if the eBay condition lookup fails.
+  const [allowedConditions, setAllowedConditions] = useState(CONDITIONS);
   const [loadingCategories, setLoadingCategories] = useState(false);
   const [loadingSpecifics, setLoadingSpecifics] = useState(false);
   const [fillingSpecifics, setFillingSpecifics] = useState(false);
@@ -79,6 +88,18 @@ export default function ListingForm({ listing, onListingChange, onSubmit, submit
         if (data.success) {
           setSpecifics(data.specifics);
 
+          // Filter the condition dropdown to what this category supports,
+          // and auto-correct the saved condition if it's no longer valid
+          // (e.g. a jersey category that doesn't accept the Pre-Owned tier
+          // IDs). reconciledCondition is applied below — folded into the
+          // Pass 2 update when that runs, or applied on its own otherwise.
+          const allowed = allowedConditionsForCategory(data.conditionIds || []);
+          setAllowedConditions(allowed);
+          const reconciledCondition = reconcileCondition(
+            currentListing.condition,
+            allowed
+          );
+
           // Auto-add category to settings if not already there
           if (!settingsConfig[currentListing.categoryId]) {
             const specificsConfig = {};
@@ -113,6 +134,7 @@ export default function ListingForm({ listing, onListingChange, onSubmit, submit
           const hasSavedSpecifics =
             currentListing.itemSpecifics &&
             Object.keys(currentListing.itemSpecifics).length > 0;
+          let conditionApplied = false;
           if (currentListing.observations && !hasSavedSpecifics) {
             setFillingSpecifics(true);
             try {
@@ -141,16 +163,33 @@ export default function ListingForm({ listing, onListingChange, onSubmit, submit
                     }
                   }
                 }
+                // Fold the reconciled condition into the same update so it
+                // isn't clobbered by this spread of the captured listing.
                 onListingChange({
                   ...currentListing,
+                  condition: reconciledCondition,
                   itemSpecifics: cleaned,
                 });
+                conditionApplied = true;
               }
             } catch (err) {
               console.error("Pass 2 specifics fill failed:", err);
             } finally {
               setFillingSpecifics(false);
             }
+          }
+
+          // Apply the condition correction if Pass 2 didn't already fold it
+          // in — this is the path for existing drafts (Pass 2 skipped) and
+          // for new drafts where Pass 2 returned nothing usable.
+          if (
+            !conditionApplied &&
+            reconciledCondition !== currentListing.condition
+          ) {
+            onListingChange({
+              ...currentListing,
+              condition: reconciledCondition,
+            });
           }
         }
       } catch (err) {
@@ -428,12 +467,11 @@ export default function ListingForm({ listing, onListingChange, onSubmit, submit
             className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
           >
             <option value="">Select condition</option>
-            <option value="NEW_WITH_TAGS">New With Tags</option>
-            <option value="NEW_WITHOUT_TAGS">New Without Tags</option>
-            <option value="NEW_WITH_DEFECTS">New With Defects</option>
-            <option value="PRE_OWNED_EXCELLENT">Pre-Owned - Excellent</option>
-            <option value="PRE_OWNED_GOOD">Pre-Owned - Good</option>
-            <option value="PRE_OWNED_FAIR">Pre-Owned - Fair</option>
+            {allowedConditions.map((c) => (
+              <option key={c.key} value={c.key}>
+                {c.label}
+              </option>
+            ))}
           </select>
         </div>
 

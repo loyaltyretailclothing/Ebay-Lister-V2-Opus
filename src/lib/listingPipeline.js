@@ -158,6 +158,32 @@ export async function fetchCategorySpecifics(categoryId) {
   }
 }
 
+// Fetch the condition IDs a category allows via the Sell Metadata
+// get_item_condition_policies endpoint. Returns an array of conditionId
+// strings (e.g. ["1000","1500","3000"]). Best-effort: on any failure
+// returns [] so callers fall back to "show all conditions" rather than
+// blocking the form. Note the response shape differs from item aspects —
+// it nests under itemConditionPolicies[].itemConditions[].
+export async function fetchCategoryConditions(categoryId) {
+  if (!categoryId) return [];
+  try {
+    const token = await getUserToken();
+    const filter = encodeURIComponent(`categoryIds:{${categoryId}}`);
+    const res = await fetch(
+      `${EBAY_BASE_URL}/sell/metadata/v1/marketplace/EBAY_US/get_item_condition_policies?filter=${filter}`,
+      { headers: { Authorization: `Bearer ${token}`, Accept: "application/json" } }
+    );
+    if (!res.ok) throw new Error("Condition policies API failed");
+    const data = await res.json();
+    const policy = (data.itemConditionPolicies || [])[0];
+    const conditions = policy?.itemConditions || [];
+    return conditions.map((c) => String(c.conditionId));
+  } catch (err) {
+    console.error("fetchCategoryConditions failed:", err);
+    return [];
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Pass 2 — AI-fill item specifics from observations
 // ---------------------------------------------------------------------------

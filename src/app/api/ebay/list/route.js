@@ -1,18 +1,11 @@
 import { getUserToken, uploadPhotosToEps } from "@/lib/ebay";
 import { EBAY_BASE_URL } from "@/lib/constants";
+import { CONDITION_MAP } from "@/lib/conditions";
 import { NextResponse } from "next/server";
 
-// Map our condition values to eBay Inventory API fields
-// condition = enum string (passes serialization)
-// conditionId = clothing-specific numeric ID (overrides at publish time)
-const CONDITION_MAP = {
-  NEW_WITH_TAGS:       { condition: "NEW",              conditionId: "1000" },
-  NEW_WITHOUT_TAGS:    { condition: "NEW_OTHER",        conditionId: "1500" },
-  NEW_WITH_DEFECTS:    { condition: "NEW_WITH_DEFECTS", conditionId: "1750" },
-  PRE_OWNED_EXCELLENT: { condition: "PRE_OWNED_EXCELLENT", conditionId: "2990" },
-  PRE_OWNED_GOOD:      { condition: "USED_EXCELLENT",      conditionId: "3000" },
-  PRE_OWNED_FAIR:      { condition: "PRE_OWNED_FAIR",      conditionId: "3010" },
-};
+// CONDITION_MAP (our enum -> { condition, conditionId }) is now the shared
+// definition in @/lib/conditions, used by both this publish route and the
+// ListingForm condition dropdown so they can't drift.
 
 async function ebayFetch(path, options, token) {
   const res = await fetch(`${EBAY_BASE_URL}${path}`, {
