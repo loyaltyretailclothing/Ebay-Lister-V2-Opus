@@ -310,11 +310,6 @@ export default function CameraPage() {
             <h2 className="text-base font-semibold text-white">
               {noteModal === "ai" ? "AI Note" : "Draft Note"}
             </h2>
-            <p className="mt-0.5 text-xs text-zinc-400">
-              {noteModal === "ai"
-                ? "A hint for the AI — read when the listing is analyzed."
-                : "Internal only — never seen by the AI or eBay."}
-            </p>
             <textarea
               autoFocus
               value={noteDraft}
