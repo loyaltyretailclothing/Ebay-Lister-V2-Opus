@@ -246,14 +246,17 @@ export async function fillItemSpecifics(observations, specifics, title) {
     values: s.values.length > 0 ? s.values.slice(0, 200) : "free_text",
   }));
 
+  // Compact JSON (no indentation) — the model parses it identically, and
+  // pretty-printing a category's full value lists wastes a meaningful chunk
+  // of input tokens on newlines/indent. Zero accuracy impact.
   const userPrompt = `Here are my observations about the item:
-${JSON.stringify(observations || {}, null, 2)}
+${JSON.stringify(observations || {})}
 
 The listing title is: "${title || ""}"
 (Use this to know which keywords are already in the title — put additional SEO keywords in Theme)
 
 Here are the eBay item specifics for this category. Fill in every one:
-${JSON.stringify(specificsForPrompt, null, 2)}
+${JSON.stringify(specificsForPrompt)}
 
 Return the filled specifics as JSON.`;
 
@@ -361,27 +364,23 @@ export async function refineStyleName(listing) {
   const userPrompt = `Here is the current listing:
 Current Title: ${listing.title}
 Condition: ${listing.condition || "unknown"}
-Observations: ${JSON.stringify(
-    {
-      brand: obs.brand,
-      type: obs.type,
-      size: obs.size,
-      tag_size: obs.tag_size,
-      measured_size: obs.measured_size,
-      gender: obs.gender,
-      color: obs.color,
-      pattern: obs.pattern,
-      material: obs.material,
-      features: obs.features,
-      closure: obs.closure,
-      neckline: obs.neckline,
-      sleeve_length: obs.sleeve_length,
-      style: obs.style,
-      style_number: obs.style_number,
-    },
-    null,
-    2
-  )}
+Observations: ${JSON.stringify({
+    brand: obs.brand,
+    type: obs.type,
+    size: obs.size,
+    tag_size: obs.tag_size,
+    measured_size: obs.measured_size,
+    gender: obs.gender,
+    color: obs.color,
+    pattern: obs.pattern,
+    material: obs.material,
+    features: obs.features,
+    closure: obs.closure,
+    neckline: obs.neckline,
+    sleeve_length: obs.sleeve_length,
+    style: obs.style,
+    style_number: obs.style_number,
+  })}
 
 Here are the web search results for "${query}":
 ${searchText}
