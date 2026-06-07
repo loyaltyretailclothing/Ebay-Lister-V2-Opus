@@ -492,6 +492,10 @@ export async function POST(request) {
     }
 
     const listingId = publishRes.data?.listingId;
+    // Cost-tracking marker — count "[POST]" lines in the Vercel logs to see
+    // how many listings actually went live (vs how many were analyzed, which
+    // shows as "[COST] pass1-vision"). A gap between the two = re-analysis.
+    console.log(`[POST] published listing ${listingId} sku=${itemSku}`);
 
     // --- Step 4: Promote Listing (optional) ---
     let promoResult = null;

@@ -10,6 +10,26 @@ import { ebayRequest, getUserToken } from "@/lib/ebay";
 import { EBAY_BASE_URL } from "@/lib/constants";
 import { TITLE_RULES } from "@/lib/titleRules";
 
+// --- Cost logging -----------------------------------------------------------
+// Reads the usage object every Anthropic response already includes (free —
+// no extra call) and prints one [COST] line per AI pass to the server logs
+// (visible in the Vercel dashboard). Count "[COST] pass1-vision" lines to
+// see how many listings were analyzed; sum the est=$ amounts (or read the
+// auto-summed total in the Anthropic Console) for total spend.
+// Claude Sonnet 4.6 pricing: $3 / million input, $15 / million output.
+const SONNET_INPUT_PER_M = 3;
+const SONNET_OUTPUT_PER_M = 15;
+function logUsage(pass, usage) {
+  if (!usage) return;
+  const inTok = usage.input_tokens || 0;
+  const outTok = usage.output_tokens || 0;
+  const est =
+    (inTok / 1e6) * SONNET_INPUT_PER_M + (outTok / 1e6) * SONNET_OUTPUT_PER_M;
+  console.log(
+    `[COST] ${pass} in=${inTok} out=${outTok} est=$${est.toFixed(4)}`
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Vision pass — analyze photos and return the initial listing JSON
 // ---------------------------------------------------------------------------
@@ -99,6 +119,7 @@ export async function analyzeListing(photos, notes) {
     system: VISION_SYSTEM_PROMPT,
     messages: [{ role: "user", content }],
   });
+  logUsage("pass1-vision", response.usage);
 
   const textBlocks = response.content.filter((b) => b.type === "text");
   const responseText = textBlocks.map((b) => b.text).join("\n");
@@ -242,6 +263,7 @@ Return the filled specifics as JSON.`;
     system: SPECIFICS_SYSTEM_PROMPT,
     messages: [{ role: "user", content: userPrompt }],
   });
+  logUsage("pass2-specifics", response.usage);
 
   const responseText = response.content[0].text;
   let result;
@@ -375,6 +397,7 @@ If no style name found, return {"updated": false}.`;
     system: REFINE_SYSTEM_PROMPT,
     messages: [{ role: "user", content: userPrompt }],
   });
+  logUsage("pass3-refine", response.usage);
 
   const responseText = response.content[0].text;
   let result;
