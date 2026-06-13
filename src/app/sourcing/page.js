@@ -487,17 +487,19 @@ export default function SourcingPage() {
             <p className="mt-4 text-xs font-medium text-zinc-600 dark:text-zinc-400">
               Items bought (leave blank or 0 for a miss)
             </p>
-            <div className="mt-2 grid grid-cols-3 gap-2">
+            {/* Stacked + large on mobile (full width per tier); the desktop
+                3-across compact layout is preserved via md: overrides. */}
+            <div className="mt-2 grid grid-cols-1 gap-3 md:grid-cols-3 md:gap-2">
               {[
                 { key: "bb", label: "Bread & Butter" },
                 { key: "medium", label: "Medium" },
                 { key: "high", label: "High" },
               ].map((tier) => (
                 <div key={tier.key}>
-                  <label className="block text-[11px] text-zinc-500 dark:text-zinc-400">
+                  <label className="block text-xs text-zinc-500 md:text-[11px] dark:text-zinc-400">
                     {tier.label}
                   </label>
-                  <div className="mt-1 flex items-stretch gap-1">
+                  <div className="mt-1 flex items-stretch gap-1.5 md:gap-1">
                     {/* Typeable box — keyboard still works if you tap it */}
                     <input
                       type="number"
@@ -508,7 +510,7 @@ export default function SourcingPage() {
                         setTripModal({ ...tripModal, [tier.key]: e.target.value })
                       }
                       placeholder="0"
-                      className="w-full min-w-0 rounded-lg border border-zinc-300 bg-white px-2 py-2 text-center text-sm text-zinc-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+                      className="w-full min-w-0 rounded-lg border border-zinc-300 bg-white px-3 py-4 text-center text-xl font-semibold text-zinc-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 md:px-2 md:py-2 md:text-sm md:font-normal dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
                     />
                     {/* Stepper — tap to add/remove one without the keyboard */}
                     <div className="flex flex-shrink-0 flex-col">
@@ -516,9 +518,9 @@ export default function SourcingPage() {
                         type="button"
                         onClick={() => adjustTier(tier.key, 1)}
                         aria-label={`Add one ${tier.label}`}
-                        className="flex w-7 flex-1 items-center justify-center rounded-t-lg border border-zinc-300 text-zinc-600 hover:bg-zinc-100 active:bg-zinc-200 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                        className="flex w-14 flex-1 items-center justify-center rounded-t-lg border border-zinc-300 text-zinc-600 hover:bg-zinc-100 active:bg-zinc-200 md:w-7 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
                       >
-                        <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                        <svg className="h-6 w-6 md:h-3.5 md:w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                           <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" />
                         </svg>
                       </button>
@@ -526,9 +528,9 @@ export default function SourcingPage() {
                         type="button"
                         onClick={() => adjustTier(tier.key, -1)}
                         aria-label={`Remove one ${tier.label}`}
-                        className="flex w-7 flex-1 items-center justify-center rounded-b-lg border border-t-0 border-zinc-300 text-zinc-600 hover:bg-zinc-100 active:bg-zinc-200 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                        className="flex w-14 flex-1 items-center justify-center rounded-b-lg border border-t-0 border-zinc-300 text-zinc-600 hover:bg-zinc-100 active:bg-zinc-200 md:w-7 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
                       >
-                        <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                        <svg className="h-6 w-6 md:h-3.5 md:w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                           <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
                         </svg>
                       </button>
