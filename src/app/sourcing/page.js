@@ -138,8 +138,11 @@ export default function SourcingPage() {
       setStoreModal({ name: "", address: "" });
       return;
     }
+    // No default store — force an explicit pick so a trip can't be logged
+    // to the wrong store by accident. (The per-store "+ Log a trip to X"
+    // button pre-selects intentionally; this generic entry does not.)
     setTripModal({
-      storeId: stores[0].id,
+      storeId: "",
       date: todayStr(),
       bb: "",
       medium: "",
@@ -267,6 +270,12 @@ export default function SourcingPage() {
         <ul className="mt-5 space-y-3">
           {storeStats.map((s) => {
             const isOpen = expanded === s.id;
+            // Quality mix with each tier's share of total items. When the
+            // store has visits but 0 items (all misses), show counts only.
+            const pc = (n) => Math.round((n / s.totalItems) * 100);
+            const mix = s.totalItems
+              ? `${s.bb} B&B (${pc(s.bb)}%) · ${s.medium} Med (${pc(s.medium)}%) · ${s.high} High (${pc(s.high)}%)`
+              : `${s.bb} B&B · ${s.medium} Med · ${s.high} High`;
             return (
               <li
                 key={s.id}
@@ -307,7 +316,7 @@ export default function SourcingPage() {
                     </p>
                     {s.visits > 0 && (
                       <p className="mt-0.5 text-[11px] text-zinc-400 dark:text-zinc-500">
-                        {s.bb} B&amp;B · {s.medium} Med · {s.high} High
+                        {mix}
                       </p>
                     )}
                   </button>
@@ -466,6 +475,7 @@ export default function SourcingPage() {
               onChange={(e) => setTripModal({ ...tripModal, storeId: e.target.value })}
               className="mt-1 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
             >
+              <option value="">Select a store…</option>
               {stores.map((s) => (
                 <option key={s.id} value={s.id}>
                   {s.name}
