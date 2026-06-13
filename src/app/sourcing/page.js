@@ -1,6 +1,17 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import dynamic from "next/dynamic";
+
+// Map is client-only (Leaflet needs the DOM), loaded on demand.
+const SourcingMap = dynamic(() => import("@/components/SourcingMap"), {
+  ssr: false,
+  loading: () => (
+    <div className="flex h-[60vh] items-center justify-center rounded-lg border border-zinc-200 text-sm text-zinc-400 dark:border-zinc-800">
+      Loading map…
+    </div>
+  ),
+});
 
 function todayStr() {
   return new Date().toISOString().split("T")[0];
@@ -44,6 +55,7 @@ export default function SourcingPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [expanded, setExpanded] = useState(null); // expanded store id
+  const [view, setView] = useState("list"); // "list" | "map"
   // Modal state. storeModal = { id?, name, address }; tripModal = { storeId, date, bb, medium, high }
   const [storeModal, setStoreModal] = useState(null);
   const [tripModal, setTripModal] = useState(null);
@@ -110,9 +122,19 @@ export default function SourcingPage() {
     const address = (storeModal.address || "").trim();
     let nextStores;
     if (storeModal.id) {
-      nextStores = stores.map((s) =>
-        s.id === storeModal.id ? { ...s, name, address } : s
-      );
+      nextStores = stores.map((s) => {
+        if (s.id !== storeModal.id) return s;
+        // If the address changed, drop the old coordinates so the server
+        // re-geocodes the new address on save.
+        const addressChanged = (s.address || "") !== address;
+        return {
+          ...s,
+          name,
+          address,
+          lat: addressChanged ? undefined : s.lat,
+          lng: addressChanged ? undefined : s.lng,
+        };
+      });
     } else {
       nextStores = [
         ...stores,
@@ -194,6 +216,13 @@ export default function SourcingPage() {
     })
     .sort((a, b) => b.itemsPerVisit - a.itemsPerVisit);
 
+  const locatedCount = storeStats.filter(
+    (s) => typeof s.lat === "number"
+  ).length;
+  const unlocated = storeStats.filter(
+    (s) => s.address && s.address.trim() && typeof s.lat !== "number"
+  );
+
   return (
     <div className="mx-auto max-w-5xl px-4 py-4 md:px-6 md:py-6">
       {/* Header */}
@@ -225,6 +254,22 @@ export default function SourcingPage() {
         >
           + Add Store
         </button>
+        {/* List / Map toggle */}
+        <div className="ml-auto inline-flex rounded-lg border border-zinc-200 p-0.5 dark:border-zinc-800">
+          {["list", "map"].map((v) => (
+            <button
+              key={v}
+              onClick={() => setView(v)}
+              className={`rounded-md px-3 py-1 text-xs font-medium capitalize transition-colors ${
+                view === v
+                  ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
+                  : "text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200"
+              }`}
+            >
+              {v}
+            </button>
+          ))}
+        </div>
       </div>
 
       {error && (
@@ -253,6 +298,40 @@ export default function SourcingPage() {
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
           </svg>
+        </div>
+      ) : view === "map" ? (
+        <div className="mt-5">
+          {storeStats.length === 0 ? (
+            <p className="text-sm text-zinc-500 dark:text-zinc-400">
+              No stores yet. Add a store with an address to see it on the map.
+            </p>
+          ) : (
+            <>
+              {unlocated.length > 0 && (
+                <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs text-zinc-600 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300">
+                  <span>
+                    {unlocated.length} store{unlocated.length === 1 ? "" : "s"}{" "}
+                    not on the map yet.
+                  </span>
+                  <button
+                    onClick={() => persist(stores, trips)}
+                    disabled={saving}
+                    className="rounded bg-blue-600 px-2.5 py-1 font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+                  >
+                    {saving ? "Locating…" : "Locate on map"}
+                  </button>
+                </div>
+              )}
+              {locatedCount > 0 ? (
+                <SourcingMap stores={storeStats} />
+              ) : (
+                <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                  No mapped stores yet — add an address, then tap “Locate on
+                  map”.
+                </p>
+              )}
+            </>
+          )}
         </div>
       ) : storeStats.length === 0 ? (
         <div className="mt-12 flex flex-col items-center gap-3 text-center">

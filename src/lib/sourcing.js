@@ -35,6 +35,35 @@ export async function loadSourcing() {
   }
 }
 
+// Geocode a free-text address to { lat, lng } using OpenStreetMap's
+// Nominatim service (free, no API key). Best-effort: returns null on any
+// failure or no match. Runs server-side so we can set the User-Agent that
+// Nominatim's usage policy asks for.
+export async function geocodeAddress(address) {
+  if (!address || !address.trim()) return null;
+  try {
+    const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(
+      address
+    )}&format=json&limit=1`;
+    const res = await fetch(url, {
+      headers: {
+        "User-Agent": "ebay-lister-sourcing/1.0 (store map geocoding)",
+        Accept: "application/json",
+      },
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    const first = Array.isArray(data) ? data[0] : null;
+    if (!first) return null;
+    const lat = parseFloat(first.lat);
+    const lng = parseFloat(first.lon);
+    if (Number.isNaN(lat) || Number.isNaN(lng)) return null;
+    return { lat, lng };
+  } catch {
+    return null;
+  }
+}
+
 export async function saveSourcing(data) {
   const payload = normalize(data);
   const jsonStr = JSON.stringify(payload);
