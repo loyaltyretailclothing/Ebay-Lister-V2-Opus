@@ -7,6 +7,7 @@ const links = [
   { href: "/generate", label: "Create Listing" },
   { href: "/camera", label: "Camera" },
   { href: "/drafts", label: "Drafts" },
+  { href: "/sourcing", label: "Sourcing" },
   { href: "/settings", label: "Settings" },
 ];
 
