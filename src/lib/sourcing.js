@@ -35,15 +35,11 @@ export async function loadSourcing() {
   }
 }
 
-// Geocode a free-text address to { lat, lng } using OpenStreetMap's
-// Nominatim service (free, no API key). Best-effort: returns null on any
-// failure or no match. Runs server-side so we can set the User-Agent that
-// Nominatim's usage policy asks for.
-export async function geocodeAddress(address) {
-  if (!address || !address.trim()) return null;
+// Single Nominatim lookup → { lat, lng } | null.
+async function nominatimLookup(q) {
   try {
     const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(
-      address
+      q
     )}&format=json&limit=1`;
     const res = await fetch(url, {
       headers: {
@@ -62,6 +58,45 @@ export async function geocodeAddress(address) {
   } catch {
     return null;
   }
+}
+
+// Strip unit/suite designators that commonly break geocoding. Real example:
+// "2229 NW 138th St B" — Nominatim matches "138th St" but NOT "138th St B"
+// (the "B" is the unit). Handles explicit designators (Ste/Suite/Unit/Apt/
+// #/Bldg/Fl…) and a bare short token trailing a street-suffix word before a
+// comma. Only used as a fallback, so normal addresses are unaffected.
+function stripUnit(address) {
+  let s = address;
+  s = s.replace(
+    /[\s,]+(?:ste|suite|unit|apt|apartment|rm|room|bldg|building|fl|floor|#)\s*\.?\s*[a-z0-9-]+/gi,
+    ""
+  );
+  s = s.replace(
+    /(\b(?:st|street|ave|avenue|rd|road|blvd|dr|drive|ln|lane|ct|court|way|pl|place|pkwy|parkway|hwy|highway|cir|circle|ter|terrace|trl|trail))\.?\s+[a-z0-9]{1,3}(?=\s*,)/i,
+    "$1"
+  );
+  return s.replace(/\s{2,}/g, " ").replace(/\s+,/g, ",").trim();
+}
+
+// Geocode a free-text address to { lat, lng } using OpenStreetMap's free
+// Nominatim service (no API key). Tries the full address first (best
+// accuracy); if that finds nothing, retries once with unit/suite
+// designators stripped. Best-effort — returns null on total failure. Runs
+// server-side so we can set the User-Agent Nominatim's policy asks for.
+export async function geocodeAddress(address) {
+  if (!address || !address.trim()) return null;
+  const full = address.trim();
+
+  let result = await nominatimLookup(full);
+  if (result) return result;
+
+  const stripped = stripUnit(full);
+  if (stripped && stripped !== full) {
+    await new Promise((r) => setTimeout(r, 1100)); // be polite to Nominatim
+    result = await nominatimLookup(stripped);
+    if (result) return result;
+  }
+  return null;
 }
 
 export async function saveSourcing(data) {
