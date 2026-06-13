@@ -154,6 +154,22 @@ export default function SourcingPage() {
     );
   }
 
+  // Clear every store's coordinates and re-save, so the server re-geocodes
+  // them all from their addresses (e.g. after switching to a more accurate
+  // geocoder). Trips are untouched.
+  function relocateAll() {
+    if (stores.length === 0) return;
+    if (
+      !confirm(
+        "Re-locate all stores from their addresses? This re-geocodes every store."
+      )
+    ) {
+      return;
+    }
+    const cleared = stores.map((s) => ({ ...s, lat: undefined, lng: undefined }));
+    persist(cleared, trips);
+  }
+
   // --- Trip actions ---
   function openLogTrip() {
     if (stores.length === 0) {
@@ -319,6 +335,17 @@ export default function SourcingPage() {
                     className="rounded bg-blue-600 px-2.5 py-1 font-medium text-white hover:bg-blue-700 disabled:opacity-50"
                   >
                     {saving ? "Locating…" : "Locate on map"}
+                  </button>
+                </div>
+              )}
+              {locatedCount > 0 && (
+                <div className="mb-2 flex justify-end">
+                  <button
+                    onClick={relocateAll}
+                    disabled={saving}
+                    className="rounded-md border border-zinc-300 px-2.5 py-1 text-xs font-medium text-zinc-600 hover:bg-zinc-100 disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                  >
+                    {saving ? "Re-locating…" : "Re-locate all pins"}
                   </button>
                 </div>
               )}

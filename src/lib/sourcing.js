@@ -35,6 +35,36 @@ export async function loadSourcing() {
   }
 }
 
+// Google Geocoding lookup → { lat, lng } | null. Far better US house-number
+// coverage than Nominatim. Used when GOOGLE_CLOUD_API_KEY is configured.
+async function googleGeocode(address) {
+  const key = process.env.GOOGLE_CLOUD_API_KEY;
+  if (!key) return null;
+  try {
+    const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(
+      address
+    )}&key=${key}`;
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (data.status !== "OK" || !data.results || !data.results[0]) {
+      if (data.status && data.status !== "ZERO_RESULTS") {
+        console.error(
+          `Google geocode status ${data.status}: ${data.error_message || ""}`
+        );
+      }
+      return null;
+    }
+    const loc = data.results[0].geometry?.location;
+    if (!loc || typeof loc.lat !== "number" || typeof loc.lng !== "number") {
+      return null;
+    }
+    return { lat: loc.lat, lng: loc.lng };
+  } catch {
+    return null;
+  }
+}
+
 // Single Nominatim lookup → { lat, lng } | null.
 async function nominatimLookup(q) {
   try {
@@ -87,6 +117,12 @@ export async function geocodeAddress(address) {
   if (!address || !address.trim()) return null;
   const full = address.trim();
 
+  // Prefer Google when configured — accurate house-level coordinates.
+  const google = await googleGeocode(full);
+  if (google) return google;
+
+  // Fallback: free Nominatim (street-level for many US addresses), with a
+  // unit-strip retry.
   let result = await nominatimLookup(full);
   if (result) return result;
 
