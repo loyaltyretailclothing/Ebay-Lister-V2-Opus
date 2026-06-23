@@ -100,7 +100,7 @@ export default function CameraPage() {
   }
 
   async function handleCreateDraft() {
-    if (photos.length === 0) return;
+    if (photos.length === 0 || submitting) return;
     setSubmitting(true);
     setError("");
     setUploadProgress({ done: 0, total: photos.length });
@@ -145,6 +145,15 @@ export default function CameraPage() {
       }
       const aiPhotoIndices = [...aiSelected].sort((a, b) => a - b);
 
+      // Client-generated draft id makes the POST idempotent. This request is
+      // fire-and-forget and we navigate away immediately, which tears down
+      // the long-running connection (the pipeline takes 30-50s to respond);
+      // the platform then retries the request. Carrying a stable id means the
+      // retry overwrites the SAME draft instead of creating a duplicate.
+      const draftId = `draft_${Date.now()}_${Math.random()
+        .toString(36)
+        .slice(2, 8)}`;
+
       // 2. Fire-and-forget the background pipeline. We don't await the
       //    response — the draft row appears as "processing" immediately and
       //    the Drafts page polls for updates.
@@ -152,6 +161,7 @@ export default function CameraPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          draftId,
           listingPhotos,
           aiPhotoIndices,
           aiNote,
