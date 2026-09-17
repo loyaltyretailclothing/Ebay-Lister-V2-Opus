@@ -359,6 +359,9 @@ export default function ListingForm({ listing, onListingChange, onSubmit, submit
   const isNewCategory =
     listing.categoryId && !initialSettingsConfig[listing.categoryId];
 
+  // SKU is required to publish (never auto-generated).
+  const skuMissing = !String(listing.sku || "").trim();
+
   // Until the category's specifics load, assume Theme exists (true for all
   // common clothing categories).
   const categoryHasTheme =
@@ -468,15 +471,22 @@ export default function ListingForm({ listing, onListingChange, onSubmit, submit
       {/* 2b. SKU */}
       <div>
         <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
-          SKU <span className="text-xs text-zinc-400">(optional)</span>
+          SKU <span className="text-red-500">*</span>
         </label>
         <input
           type="text"
           value={listing.sku || ""}
           onChange={(e) => handleChange("sku", e.target.value)}
           placeholder="e.g. SH-2024-0001"
-          className="mt-1 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+          className={`mt-1 w-full rounded-lg border px-3 py-2 text-sm text-zinc-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:bg-zinc-800 dark:text-zinc-100 ${
+            skuMissing
+              ? "border-red-400 bg-red-50 dark:border-red-500/60 dark:bg-red-950/20"
+              : "border-zinc-300 bg-white dark:border-zinc-700"
+          }`}
         />
+        <p className={`mt-1 text-xs ${skuMissing ? "text-red-500" : "text-zinc-400"}`}>
+          Required. Must be a SKU that has never been used on eBay — used SKUs are blocked.
+        </p>
       </div>
 
       {/* 3. Item Specifics */}
@@ -1058,9 +1068,9 @@ export default function ListingForm({ listing, onListingChange, onSubmit, submit
         <button
           type="button"
           onClick={onSubmit}
-          disabled={submitting || !listing.title || !listing.categoryId || !listing.price}
+          disabled={submitting || !listing.title || !listing.categoryId || !listing.price || skuMissing}
           className={`w-full rounded-lg py-3 text-sm font-semibold text-white transition-colors ${
-            submitting || !listing.title || !listing.categoryId || !listing.price
+            submitting || !listing.title || !listing.categoryId || !listing.price || skuMissing
               ? "cursor-not-allowed bg-zinc-400"
               : "bg-green-600 hover:bg-green-700"
           }`}
@@ -1071,9 +1081,9 @@ export default function ListingForm({ listing, onListingChange, onSubmit, submit
               ? `Schedule Listing for ${listing.scheduledDate}`
               : "List on eBay"}
         </button>
-        {(!listing.title || !listing.categoryId || !listing.price) && (
+        {(!listing.title || !listing.categoryId || !listing.price || skuMissing) && (
           <p className="mt-2 text-center text-xs text-zinc-400">
-            Title, category, and price are required to list
+            Title, category, price, and SKU are required to list
           </p>
         )}
       </div>

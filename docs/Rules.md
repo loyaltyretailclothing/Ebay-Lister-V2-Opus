@@ -15,6 +15,7 @@ These are the working rules for this project. They override defaults. See [[Home
 8. **If a write is truly needed to verify**, send the complete current dataset (never partial or empty), and tell them exactly what was written.
 9. **Never delete their data** (drafts, photos, stores, trips). Drafts represent days of work. Offer to identify things; let them delete.
 10. **Never handle secrets.** They add API keys to Vercel and `.env.local` themselves. Keys never go in chat, notes, or commits.
+10a. **SKUs are sacred.** Never post without a SKU, never auto-generate one, and never post to a SKU that was ever used (live, sold, or ended). A failed or unclear eBay lookup means **stop**, never "probably unused." Anything that writes to eBay under a SKU must be checked *before* the write. Test publishing only with a fake photo link, so nothing can reach eBay even if a check is broken. See [[Orphan Offers and SKUs]].
 
 ## Code and deploys
 11. **Read the current code before claiming how it behaves.** Memory notes can be out of date.

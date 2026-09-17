@@ -8,6 +8,8 @@ AI-powered eBay listing tool. Two users (Shannon + Aaron), 200-400 listings/mont
 - Local dev and production share one Cloudinary account. Never write
   test/cleanup data to it; verify read-only. Never delete user data.
 - Never handle secrets; users add API keys to Vercel/.env.local themselves.
+- SKUs: required, never auto-generated, never reuse one ever used on eBay
+  (live/sold/ended); check before any write to eBay; failed lookup = stop.
 - Verify eBay rules against eBay's live API before stating them.
 - Build before commit; never commit .claude/settings.local.json;
   push to main deploys to Vercel.

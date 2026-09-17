@@ -364,6 +364,15 @@ export default function Generate() {
   }
 
   async function handleSubmitListing() {
+    // SKU is required — never post without one (the server checks too).
+    if (!String(listing.sku || "").trim()) {
+      setSubmitStatus({
+        type: "error",
+        message: "Failed: SKU is required. Add a SKU before posting. Nothing was posted.",
+        step: "sku_check",
+      });
+      return;
+    }
     setSubmitting(true);
     setSubmitStatus(null);
 

@@ -1,6 +1,7 @@
 import { getUserToken, uploadPhotosToEps } from "@/lib/ebay";
 import { EBAY_BASE_URL } from "@/lib/constants";
 import { CONDITION_MAP } from "@/lib/conditions";
+import { evaluateSkuLookup, offerWasListed } from "@/lib/skuGuard";
 import { NextResponse } from "next/server";
 
 // CONDITION_MAP (our enum -> { condition, conditionId }) is now the shared
@@ -96,6 +97,19 @@ export async function POST(request) {
     } = body;
 
     // Validation
+    // SKU is required — never auto-generated. Checked first, before anything
+    // is sent to eBay.
+    const itemSku = typeof sku === "string" ? sku.trim() : "";
+    if (!itemSku) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "SKU is required. Add a SKU before posting. Nothing was posted.",
+          step: "sku_check",
+        },
+        { status: 400 }
+      );
+    }
     if (!title) return NextResponse.json({ success: false, error: "Title is required" }, { status: 400 });
     if (!categoryId) return NextResponse.json({ success: false, error: "Category is required" }, { status: 400 });
     if (!price) return NextResponse.json({ success: false, error: "Price is required" }, { status: 400 });
@@ -106,7 +120,33 @@ export async function POST(request) {
     const itemDescriptionHtml = (item_description || "").replace(/\n/g, "<br>");
 
     const token = await getUserToken();
-    const itemSku = sku || `LISTING-${Date.now()}`;
+
+    // --- SKU safety check: BEFORE anything is uploaded or saved ---
+    // Saving an inventory item replaces whatever eBay holds under the SKU,
+    // and eBay pushes that onto any listing using it — this overwrote live
+    // listings with a different item. Stop unless the SKU has never been on
+    // a listing (live, sold, or ended). Any lookup failure also stops.
+    let skuCheck;
+    try {
+      const lookup = await ebayFetch(
+        `/sell/inventory/v1/offer?sku=${encodeURIComponent(itemSku)}`,
+        { method: "GET" },
+        token
+      );
+      skuCheck = evaluateSkuLookup(itemSku, lookup);
+    } catch (err) {
+      skuCheck = {
+        allowed: false,
+        message: `Couldn't confirm SKU "${itemSku}" is unused (${err.message}). Nothing was posted or changed — please try again.`,
+      };
+    }
+    if (!skuCheck.allowed) {
+      console.log(`[SKU BLOCKED] ${skuCheck.message}`);
+      return NextResponse.json(
+        { success: false, error: skuCheck.message, step: "sku_check" },
+        { status: 400 }
+      );
+    }
 
     // --- Step 0: Upload photos to eBay's EPS via the Media API ---
     // Hand eBay back its own URLs in the Inventory API call so revisions
@@ -337,26 +377,30 @@ export async function POST(request) {
           // best-effort — fall through; we'll surface a generic error below
         }
 
-        const publishedOffers = existingOffers.filter(
-          (o) => o.status === "PUBLISHED"
-        );
-        if (publishedOffers.length > 0) {
-          const summaries = publishedOffers.map((o) => {
+        // Backup safety net (the SKU check above should already have
+        // stopped this): never touch an offer that has ever been on a
+        // listing — live, sold, or ended. Sold/ended offers are UNPUBLISHED
+        // too, so status alone is not enough; a listing id means it was real.
+        const listedOffers = existingOffers.filter(offerWasListed);
+        if (listedOffers.length > 0) {
+          const summaries = listedOffers.map((o) => {
             const listingId = o.listing?.listingId;
-            return listingId ? `PUBLISHED (listing ${listingId})` : "PUBLISHED";
+            const state = o.listing?.listingStatus || o.status;
+            return listingId ? `${state} (listing ${listingId})` : state;
           });
           return NextResponse.json(
             {
               success: false,
-              error: `SKU "${itemSku}" is in use by a live listing on your eBay account. Existing offer(s): ${summaries.join(", ")}. Choose a different SKU (or end the existing listing on eBay first) and try again.`,
+              error: `SKU "${itemSku}" was already used on a listing: ${summaries.join(", ")}. Use a SKU that has never been used and try again.`,
               step: "offer",
             },
             { status: 400 }
           );
         }
 
+        // Only never-listed leftovers from a failed publish remain.
         const unpublishedOffers = existingOffers.filter(
-          (o) => o.status === "UNPUBLISHED" || !o.status
+          (o) => !offerWasListed(o)
         );
         if (unpublishedOffers.length === 0) {
           // eBay said "already exists" but we couldn't see anything.

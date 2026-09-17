@@ -28,6 +28,7 @@ Navigation: desktop top bar (Create Listing, Camera, Drafts, Sourcing, Settings)
 | `titleRules.js` | The title formula and SEO keyword rules shared by all prompts |
 | `titleKeywords.js` | Builds the title from pieces + keywords, keyword chip moves, Theme overflow, description title sync |
 | `descriptionTemplate.js` | Description body + 2-inch rule |
+| `skuGuard.js` | SKU safety check: blocks any SKU ever used on eBay before publishing |
 | `conditions.js` | Single source of truth for conditions and eBay condition IDs |
 | `ebay.js` | OAuth tokens, EPS photo upload |
 | `cloudinary.js` | Photo upload/delete |
