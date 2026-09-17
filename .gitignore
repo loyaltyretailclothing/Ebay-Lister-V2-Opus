@@ -36,6 +36,9 @@ yarn-error.log*
 # vercel
 .vercel
 
+# obsidian (per-user app settings for the docs vault)
+docs/.obsidian/
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts

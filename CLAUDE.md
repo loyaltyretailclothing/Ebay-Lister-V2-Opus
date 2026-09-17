@@ -2,6 +2,21 @@
 
 AI-powered eBay listing tool. Two users (Shannon + Aaron), 200-400 listings/month.
 
+## Core Rules (always apply)
+- Discuss before coding: explain, propose, wait for "go ahead".
+  "Don't make changes" = investigate only.
+- Local dev and production share one Cloudinary account. Never write
+  test/cleanup data to it; verify read-only. Never delete user data.
+- Never handle secrets; users add API keys to Vercel/.env.local themselves.
+- Verify eBay rules against eBay's live API before stating them.
+- Build before commit; never commit .claude/settings.local.json;
+  push to main deploys to Vercel.
+
+## Knowledge Base
+Read `docs/Home.md` at the start of a session, and the relevant
+`docs/` note before working on an area. Full rules: `docs/Rules.md`.
+When something changes, update the matching note in the same session.
+
 ## Tech Stack
 - Next.js (App Router) with Tailwind CSS on Vercel
 - Anthropic Claude for AI photo analysis
