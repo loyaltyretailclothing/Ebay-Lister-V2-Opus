@@ -40,6 +40,13 @@ const INITIAL_LISTING = {
   // they persist through draft save/load and survive re-analysis.
   aiNote: "",
   draftNote: "",
+  // SEO title pieces + ranked keywords from analysis. The app assembles the
+  // title from these; keyword chips move keywords between title and Theme.
+  // Empty for listings made before this feature (chips just don't show).
+  titleParts: null,
+  keywords: [],
+  // Bumped on every analysis so the category lookup re-runs (see handleAnalyze).
+  analysisRun: 0,
 };
 
 export default function Generate() {
@@ -211,6 +218,16 @@ export default function Generate() {
   }
 
   async function handleAnalyze() {
+    // Re-analyzing redoes the listing from the photos, replacing what the AI
+    // created. Confirm first so a stray click can't wipe a finished listing.
+    if (
+      listing.title?.trim() &&
+      !window.confirm(
+        "Redo this listing from the photos?\n\nThe AI will redo the title, keywords, condition, description, category, and item specifics. Your photos, notes, price, SKU, weight, dimensions, and policies stay.\n\nNothing is saved until you click Update Draft."
+      )
+    ) {
+      return;
+    }
     setAnalyzing(true);
     setError("");
     setLookupStatus("");
@@ -259,10 +276,20 @@ export default function Generate() {
         // produce identical drafts.
         const finalListing = applyDescriptionTemplate(aiListing);
 
+        // Start from square one for everything the AI creates: clear the
+        // category and item specifics so the category is looked up fresh and
+        // item specifics (incl. Theme keywords) are refilled — just like the
+        // first analysis. User-entered fields (price, SKU, weight, policies,
+        // notes…) come from `prev` and are kept. analysisRun changes on every
+        // analysis so the category lookup re-runs even if the AI returns the
+        // same category keywords as last time.
         setListing((prev) => ({
           ...prev,
           ...finalListing,
+          categoryId: "",
+          categoryName: "",
           itemSpecifics: {},
+          analysisRun: Date.now(),
         }));
       } else {
         setError(data.error || "Analysis failed");

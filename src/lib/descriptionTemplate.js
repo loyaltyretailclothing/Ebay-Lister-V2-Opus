@@ -68,6 +68,8 @@ export function applyTwoInchAsterisk(title, observations) {
   if (!measured) return title;
   const sizeStr = `${measured[0]}x${measured[1]}`;
   if (!title.includes(sizeStr)) return title;
+  // Already applied (the assembled title adds it up front) — don't double it.
+  if (title.includes(`${sizeStr}*`)) return title;
   let next = title.replace(sizeStr, sizeStr + "*");
   if (next.length > 80) next = next.substring(0, 80);
   return next;

@@ -8,6 +8,7 @@ import {
   refineStyleName,
   applyDescriptionTemplate,
 } from "@/lib/listingPipeline";
+import { applyKeywordTheme } from "@/lib/titleKeywords";
 
 // Pipeline takes ~30-60s (Claude vision + eBay + Claude pass 2 + optional
 // Brave refine). Vercel default is 10s on Hobby / 60s on Pro; push to 60s so
@@ -107,12 +108,23 @@ export async function POST(request) {
         listing.categoryId = cat.categoryId;
         listing.categoryName = cat.categoryName;
         const specificsSchema = await fetchCategorySpecifics(cat.categoryId);
+        const hasKeywords =
+          Array.isArray(listing.keywords) && listing.keywords.length > 0;
         const filled = await fillItemSpecifics(
           listing.observations,
           specificsSchema,
-          listing.title
+          listing.title,
+          { themeManaged: hasKeywords }
         );
-        listing.itemSpecifics = filled;
+        // Overflow keywords → Theme; if this category has no Theme field,
+        // drop them so no keyword chip is left unplaced.
+        const applied = applyKeywordTheme({
+          keywords: listing.keywords,
+          itemSpecifics: filled,
+          hasTheme: specificsSchema.some((s) => s.name === "Theme"),
+        });
+        listing.itemSpecifics = applied.itemSpecifics;
+        listing.keywords = applied.keywords;
       }
     } catch (catErr) {
       console.error("Category/specifics step failed:", catErr);

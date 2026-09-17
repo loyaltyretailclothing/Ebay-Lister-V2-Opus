@@ -12,7 +12,7 @@ AI-powered eBay listing tool for Aaron and Shannon (husband/wife resellers, 200â
 ## Pages
 | Page | What it does |
 |---|---|
-| `/generate` (Create Listing) | Drag photos in, AI Note / Draft Note boxes, Google Lens + eBay research buttons, Analyze, listing form, publish |
+| `/generate` (Create Listing) | Drag photos in, AI Note / Draft Note boxes, Google Lens + eBay research buttons, Analyze, listing form with keyword chips under the title, publish |
 | `/camera` | Shoot photos, review, pick AI photos, notes, Create Draft (runs in background) |
 | `/drafts` | Draft list with processing/error states; opens a draft in `/generate` |
 | `/library` | Photo library with folders (All Photos / Shannon / Aaron), "Load older photos" |
@@ -25,7 +25,8 @@ Navigation: desktop top bar (Create Listing, Camera, Drafts, Sourcing, Settings)
 | File | Role |
 |---|---|
 | `listingPipeline.js` | Claude calls (vision, specifics, refine), category lookup, specifics + condition fetch, `[COST]` logging |
-| `titleRules.js` | The title formula shared by all prompts |
+| `titleRules.js` | The title formula and SEO keyword rules shared by all prompts |
+| `titleKeywords.js` | Builds the title from pieces + keywords, keyword chip moves, Theme overflow, description title sync |
 | `descriptionTemplate.js` | Description body + 2-inch rule |
 | `conditions.js` | Single source of truth for conditions and eBay condition IDs |
 | `ebay.js` | OAuth tokens, EPS photo upload |

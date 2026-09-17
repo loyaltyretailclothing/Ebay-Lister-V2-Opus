@@ -14,7 +14,7 @@ export async function POST(request) {
       );
     }
 
-    const { observations, specifics, title } = await request.json();
+    const { observations, specifics, title, themeManaged } = await request.json();
 
     if (!specifics?.length) {
       return NextResponse.json(
@@ -23,7 +23,9 @@ export async function POST(request) {
       );
     }
 
-    const filled = await fillItemSpecifics(observations, specifics, title);
+    const filled = await fillItemSpecifics(observations, specifics, title, {
+      themeManaged: !!themeManaged,
+    });
     return NextResponse.json({ success: true, specifics: filled });
   } catch (error) {
     console.error("Pass 2 specifics error:", error);

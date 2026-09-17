@@ -4,6 +4,12 @@ What we chose and why, newest first. Dates come from git history. See [[Home]].
 
 | Date | Decision | Why |
 |---|---|---|
+| 2026-09-16 | Title keywords: AI-generated, SEO-ranked Tier 1/2/3 after color; overflow to Theme only | The AI only added keywords it could read in photos. Google-style "what do buyers search" thinking was missing. See [[Title Keywords Plan]]. |
+| 2026-09-16 | Keyword chips clickable from day one; every chip must be placed in the title or Theme | Quick reordering without orphan keywords. The app does it, so no AI cost. |
+| 2026-09-16 | Re-analyzing a draft redoes the listing from the photos (AI fields only); saving stays manual via Update Draft; confirmation first | Re-analyze left item specifics and Theme empty. Users want "square one" but must not lose typed info (price, SKU, weight, policies) or overwrite a draft by accident. |
+| 2026-09-16 | No keyword log for now | The AI ranks keywords well on its own (like asking Google). A log would add an extra AI step, a shared file two users could overwrite, a page to build, and a way to repeat bad keywords with no delete. Revisit if titles seem inconsistent. |
+| 2026-09-16 | Code strips words already in the title from keywords | First live test produced "T-Shirt … Sun Shirt Athletic Shirt". eBay matches words anywhere in the title, so shorter keywords lose nothing and save room. |
+| 2026-09-16 | Title changes sync to the description's title line | Description must match the eBay title; fixes an existing gap with hand-edited titles. |
 | 2026-09-16 | Docs vault in `docs/`, opened in Obsidian | Long conversations get summarized and rules were being forgotten. Notes persist and are backed up in git. |
 | 2026-06-22 | Camera drafts: client sends the draft ID | Fire-and-forget request was retried by the platform and created duplicate drafts. A stable ID makes retries overwrite. See [[Drafts and Camera Flow]]. |
 | 2026-06-13 | Google Geocoding for Sourcing pins, free Nominatim as fallback | Nominatim placed some stores (Goodwill Britton, Retreads) on the wrong spot. Google is accurate and stays within its free allowance. |

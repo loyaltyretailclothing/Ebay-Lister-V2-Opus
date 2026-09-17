@@ -8,6 +8,16 @@ import {
   reconcileCondition,
 } from "@/lib/conditions";
 import ItemSpecificPicker from "@/components/ItemSpecificPicker";
+import KeywordChips from "@/components/KeywordChips";
+import {
+  applyKeywordTheme,
+  buildBaseTitle,
+  hasTitleParts,
+  mergeTheme,
+  moveKeywordToTheme,
+  moveKeywordToTitle,
+  syncDescriptionTitle,
+} from "@/lib/titleKeywords";
 
 export default function ListingForm({ listing, onListingChange, onSubmit, submitting, submitStatus }) {
   const [categories, setCategories] = useState([]);
@@ -22,6 +32,7 @@ export default function ListingForm({ listing, onListingChange, onSubmit, submit
   const [settingsConfig, setSettingsConfig] = useState({});
   const [initialSettingsConfig, setInitialSettingsConfig] = useState({});
   const [policies, setPolicies] = useState({});
+  const [keywordNotice, setKeywordNotice] = useState("");
 
   // Load settings config + policies
   useEffect(() => {
@@ -70,7 +81,9 @@ export default function ListingForm({ listing, onListingChange, onSubmit, submit
     }
 
     fetchCategories();
-  }, [listing?.category_keywords]);
+    // analysisRun: re-run after every analysis (including re-analyzing a
+    // draft) even when the AI returns the same category keywords.
+  }, [listing?.category_keywords, listing?.analysisRun]);
 
   // Fetch item specifics when category changes, then trigger Pass 2
   useEffect(() => {
@@ -130,6 +143,13 @@ export default function ListingForm({ listing, onListingChange, onSubmit, submit
             }).catch(() => {});
           }
 
+          // Does this category have a Theme field? Overflow keywords go there;
+          // without one, overflow keywords are dropped so no chip is unplaced.
+          const categoryHasTheme = data.specifics.some((s) => s.name === "Theme");
+          const hasKeywords =
+            Array.isArray(currentListing.keywords) &&
+            currentListing.keywords.length > 0;
+
           // Pass 2: AI fills specifics — skip if already populated (e.g. loaded from draft)
           const hasSavedSpecifics =
             currentListing.itemSpecifics &&
@@ -145,6 +165,7 @@ export default function ListingForm({ listing, onListingChange, onSubmit, submit
                   observations: currentListing.observations,
                   specifics: data.specifics,
                   title: currentListing.title,
+                  themeManaged: hasKeywords,
                 }),
               });
               const pass2Data = await pass2Res.json();
@@ -163,12 +184,19 @@ export default function ListingForm({ listing, onListingChange, onSubmit, submit
                     }
                   }
                 }
+                // Overflow keywords → Theme (no-op for listings without keywords).
+                const applied = applyKeywordTheme({
+                  keywords: currentListing.keywords,
+                  itemSpecifics: cleaned,
+                  hasTheme: categoryHasTheme,
+                });
                 // Fold the reconciled condition into the same update so it
                 // isn't clobbered by this spread of the captured listing.
                 onListingChange({
                   ...currentListing,
                   condition: reconciledCondition,
-                  itemSpecifics: cleaned,
+                  itemSpecifics: applied.itemSpecifics,
+                  keywords: applied.keywords,
                 });
                 conditionApplied = true;
               }
@@ -182,13 +210,26 @@ export default function ListingForm({ listing, onListingChange, onSubmit, submit
           // Apply the condition correction if Pass 2 didn't already fold it
           // in — this is the path for existing drafts (Pass 2 skipped) and
           // for new drafts where Pass 2 returned nothing usable.
+          // Also drop Theme-placed keywords if the category has no Theme field
+          // (e.g. the user switched categories on a draft with keywords).
+          const unplacedKeywords =
+            hasKeywords &&
+            !categoryHasTheme &&
+            currentListing.keywords.some((k) => k.placement === "theme");
           if (
             !conditionApplied &&
-            reconciledCondition !== currentListing.condition
+            (reconciledCondition !== currentListing.condition || unplacedKeywords)
           ) {
             onListingChange({
               ...currentListing,
               condition: reconciledCondition,
+              ...(unplacedKeywords
+                ? {
+                    keywords: currentListing.keywords.filter(
+                      (k) => k.placement === "title"
+                    ),
+                  }
+                : {}),
             });
           }
         }
@@ -252,11 +293,76 @@ export default function ListingForm({ listing, onListingChange, onSubmit, submit
 
   function handleSpecificChange(name, value) {
     const updated = { ...listing.itemSpecifics, [name]: value };
+    // If a Theme keyword is removed by hand in the Theme picker, remove its
+    // chip too — every chip must stay placed in the title or Theme.
+    if (name === "Theme" && Array.isArray(listing.keywords) && listing.keywords.length > 0) {
+      const themeNow = new Set(
+        (Array.isArray(value) ? value : value ? [value] : []).map((v) =>
+          String(v).toLowerCase()
+        )
+      );
+      const keywords = listing.keywords.filter(
+        (k) => k.placement !== "theme" || themeNow.has(k.keyword.toLowerCase())
+      );
+      onListingChange({ ...listing, itemSpecifics: updated, keywords });
+      return;
+    }
     handleChange("itemSpecifics", updated);
+  }
+
+  // Typing in the title keeps the description's title line in sync.
+  function handleTitleChange(value) {
+    onListingChange({
+      ...listing,
+      title: value,
+      item_description: syncDescriptionTitle(listing.item_description, value),
+    });
+  }
+
+  // Keyword chip click: move between title and Theme, rebuild the title,
+  // update Theme, and sync the description's title line.
+  function handleKeywordToggle(index) {
+    const keyword = listing.keywords?.[index];
+    if (!keyword || !hasTitleParts(listing)) return;
+    const base = buildBaseTitle(listing.titleParts, listing.observations);
+    const result =
+      keyword.placement === "title"
+        ? moveKeywordToTheme(base, listing.keywords, index, { hasTheme: categoryHasTheme })
+        : moveKeywordToTitle(base, listing.keywords, index);
+
+    if (!result.ok) {
+      setKeywordNotice(`"${keyword.keyword}" is too long to fit in the title.`);
+      return;
+    }
+    setKeywordNotice("");
+
+    // Only write Theme once item specifics exist. Before that, the item
+    // specifics fill applies Theme from the keywords itself (and must still
+    // run, which it won't if itemSpecifics is already non-empty).
+    let itemSpecifics = listing.itemSpecifics;
+    if (itemSpecifics && Object.keys(itemSpecifics).length > 0) {
+      itemSpecifics = { ...itemSpecifics };
+      const theme = mergeTheme(itemSpecifics.Theme, result.keywords);
+      if (theme === "") delete itemSpecifics.Theme;
+      else itemSpecifics.Theme = theme;
+    }
+
+    onListingChange({
+      ...listing,
+      title: result.title,
+      keywords: result.keywords,
+      itemSpecifics,
+      item_description: syncDescriptionTitle(listing.item_description, result.title),
+    });
   }
 
   const isNewCategory =
     listing.categoryId && !initialSettingsConfig[listing.categoryId];
+
+  // Until the category's specifics load, assume Theme exists (true for all
+  // common clothing categories).
+  const categoryHasTheme =
+    specifics.length === 0 || specifics.some((s) => s.name === "Theme");
 
   const requiredSpecifics = specifics.filter((s) => s.required);
   const additionalSpecifics = specifics.filter((s) => !s.required);
@@ -289,9 +395,18 @@ export default function ListingForm({ listing, onListingChange, onSubmit, submit
           type="text"
           maxLength={80}
           value={listing.title || ""}
-          onChange={(e) => handleChange("title", e.target.value)}
+          onChange={(e) => handleTitleChange(e.target.value)}
           className="mt-1 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
         />
+        {hasTitleParts(listing) && (
+          <KeywordChips
+            keywords={listing.keywords}
+            onToggle={handleKeywordToggle}
+            disabled={fillingSpecifics || loadingSpecifics}
+            hasTheme={categoryHasTheme}
+            notice={keywordNotice}
+          />
+        )}
       </div>
 
       {/* 2. Category */}

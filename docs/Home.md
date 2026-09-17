@@ -9,6 +9,9 @@ Open this `docs` folder in Obsidian with **"Open folder as vault."**
 - [[Open Issues]] — what's unresolved and waiting on a decision.
 - [[Decision Log]] — what we chose and why.
 
+## Plans and recent features
+- [[Title Keywords Plan]] — SEO-ranked keyword tiers, clickable chips, re-analyze redo (live)
+
 ## How the app works
 - [[Overview]] — the big picture and where things live
 - [[AI Pipeline]] — photo analysis, titles, item specifics

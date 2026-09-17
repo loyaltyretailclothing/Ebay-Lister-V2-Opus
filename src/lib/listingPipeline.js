@@ -9,6 +9,7 @@ import client from "@/lib/claude";
 import { ebayRequest, getUserToken } from "@/lib/ebay";
 import { EBAY_BASE_URL } from "@/lib/constants";
 import { TITLE_RULES } from "@/lib/titleRules";
+import { assembleListingTitle, hasTitleParts } from "@/lib/titleKeywords";
 
 // --- Cost logging -----------------------------------------------------------
 // Reads the usage object every Anthropic response already includes (free —
@@ -40,7 +41,19 @@ ${TITLE_RULES}
 
 You must return a JSON object with these fields:
 {
-  "title": "Follow the TITLE FORMULA above exactly — 75-80 characters, universal slot order, no banned words.",
+  "title_parts": {
+    "brand": "Brand exactly as on the tag",
+    "style_name": "Style name per the [Style Name] slot rules, or null",
+    "type": "Item type as it should read in the title (e.g. 'Quarter Zip', 'Jeans')",
+    "gender": "Mens, Womens, Boys, Girls, or Unisex",
+    "size": "Size as it should read in the title (measured size if the 2-inch rule applies)",
+    "color": "Primary color as it should read in the title"
+  },
+  "keywords": [
+    {"keyword": "Best search keyword", "tier": 1},
+    {"keyword": "Next keyword", "tier": 2}
+  ],
+  "title": "Your own complete title following the TITLE FORMULA — used only as a backup if title_parts is missing.",
   "category_keywords": "2-3 keywords to search eBay categories (e.g. 'mens dress shirt')",
   "condition": "One of: NEW_WITH_TAGS, NEW_WITHOUT_TAGS, NEW_WITH_DEFECTS, PRE_OWNED_EXCELLENT, PRE_OWNED_GOOD, PRE_OWNED_FAIR",
   "condition_description": "For pre-owned items, describe the condition in detail including any flaws. For NWT or NWOT, leave as empty string.",
@@ -68,6 +81,7 @@ You must return a JSON object with these fields:
 }
 
 Rules:
+- KEYWORDS: follow the KEYWORDS rules above — SEO-ranked (Tier 1 best), 6-10 keywords, true for this item, no keyword spam
 - Be precise with brand names — spell them exactly as shown
 - 2-INCH RULE (pants/shorts/jeans only): If measured waist OR inseam differs from tag by 2+ inches, use the MEASURED size in the title and in observations.size. Always populate observations.tag_size and observations.measured_size with their respective values — the app will auto-build the 'Tag - X / Measures Y' lines in the description.
 - NWT = tags are visibly attached in photos
@@ -123,7 +137,28 @@ export async function analyzeListing(photos, notes) {
 
   const textBlocks = response.content.filter((b) => b.type === "text");
   const responseText = textBlocks.map((b) => b.text).join("\n");
-  return parseListingJson(responseText);
+  const parsed = parseListingJson(responseText);
+
+  // Title pieces + SEO keywords → the app assembles the final title. The NWT
+  // flag is set from the condition (not the AI) so the NWT-only rule always
+  // holds. If the pieces are missing, assembleListingTitle leaves the AI's own
+  // title in place.
+  if (parsed && parsed.title_parts && typeof parsed.title_parts === "object") {
+    parsed.titleParts = {
+      ...parsed.title_parts,
+      nwt: parsed.condition === "NEW_WITH_TAGS",
+    };
+  }
+  if (parsed && typeof parsed === "object") {
+    delete parsed.title_parts;
+    // Always set both fields so a re-analysis never inherits the previous
+    // item's pieces/keywords on the Create Listing page.
+    if (!parsed.titleParts) parsed.titleParts = null;
+    if (!Array.isArray(parsed.keywords)) parsed.keywords = [];
+    // Without pieces the AI's own title is kept and there are no chips.
+    if (!hasTitleParts(parsed)) parsed.keywords = [];
+  }
+  return assembleListingTitle(parsed);
 }
 
 // ---------------------------------------------------------------------------
@@ -223,7 +258,7 @@ Rules:
 - For required specifics, make your best effort — never leave them null unless truly unknown.
 - For "Size" specifics, match the format eBay expects (e.g. "Regular - S" not just "S" if the presets use that format).
 - For "Department" or "Gender" specifics, map observations like "Mens" to the eBay preset (e.g. "Men").
-- THEME: Use Theme as an SEO keyword overflow field. Pick 2-3 relevant themes that did NOT fit in the 80-character title. Only use actual themes/styles (e.g. "Athletic", "Casual", "Outdoor", "Holiday", "Tropical", "Vintage", "Streetwear"). Do NOT put features here — Stretch, Lined, Moisture-Wicking, etc. are features, not themes. Never leave Theme null — always find relevant keywords.
+- THEME: If the request says "Theme is managed by the app", return null for Theme — the app fills it with overflow keywords. Otherwise: use Theme as an SEO keyword overflow field. Pick 2-3 relevant themes that did NOT fit in the 80-character title. Only use actual themes/styles (e.g. "Athletic", "Casual", "Outdoor", "Holiday", "Tropical", "Vintage", "Streetwear"). Do NOT put features here — Stretch, Lined, Moisture-Wicking, etc. are features, not themes. Never leave Theme null — always find relevant keywords.
 - MULTI-VALUE SPECIFICS: Some specifics accept multiple values (like Theme, Features, etc.). When providing multiple values for a single specific, return them as a JSON array: ["value1", "value2"]. NEVER combine multiple values into one comma-separated string.
 - SEASON: Infer the season from the item type, material, and weight. Fleece/heavy knits = "Fall", "Winter". Linen/lightweight = "Spring", "Summer". Use eBay preset values when they match.
 - Return ONLY valid JSON, no markdown or explanation.
@@ -237,7 +272,15 @@ Return format:
   }
 }`;
 
-export async function fillItemSpecifics(observations, specifics, title) {
+// themeManaged: true when the listing has SEO keywords — the app puts
+// overflow keywords in Theme itself, so Pass 2 must leave Theme empty.
+// Listings without keywords (older drafts) keep the original Theme behavior.
+export async function fillItemSpecifics(
+  observations,
+  specifics,
+  title,
+  { themeManaged = false } = {}
+) {
   if (!specifics?.length) throw new Error("No specifics provided");
 
   const specificsForPrompt = specifics.map((s) => ({
@@ -253,7 +296,11 @@ export async function fillItemSpecifics(observations, specifics, title) {
 ${JSON.stringify(observations || {})}
 
 The listing title is: "${title || ""}"
-(Use this to know which keywords are already in the title — put additional SEO keywords in Theme)
+${
+  themeManaged
+    ? "Theme is managed by the app — return null for Theme."
+    : "(Use this to know which keywords are already in the title — put additional SEO keywords in Theme)"
+}
 
 Here are the eBay item specifics for this category. Fill in every one:
 ${JSON.stringify(specificsForPrompt)}
@@ -309,13 +356,13 @@ Decision rules:
 - If 2 or more results agree on the same style name (or a close variant), use it
 - If only generic type words remain after stripping gender + type, return {"updated": false}
 
-PART 2 — If you found a style name, REBUILD the title from scratch using the rules below. Do NOT just insert the style name into the existing title. Generate a fresh title that follows the formula exactly and packs in tier 2 extras to hit 75-80 characters.
+PART 2 — If you found a style name, also write a backup title from scratch using the rules below (the app normally rebuilds the title itself from the style name and the listing's keywords; your title is only used if that isn't possible).
 
 ${TITLE_RULES}
 
 Response format:
 - If no style name found: return exactly {"updated": false}
-- If style name found: return {"updated": true, "title": "freshly rebuilt 75-80 char title", "observations": {"style_name": "the style name"}}
+- If style name found: return {"updated": true, "style_name": "the style name", "title": "backup 75-80 char title"}
 - Return ONLY valid JSON, no markdown or explanation`;
 
 async function braveSearch(query) {
@@ -386,7 +433,7 @@ Here are the web search results for "${query}":
 ${searchText}
 
 Step 1: Extract the style name using the extraction rules.
-Step 2: If found, REBUILD the title from scratch using TITLE_RULES above — do not just patch the existing title. Use observations (brand, type, size, gender, color, features) + the new style name, and pack tier 2 extras to reach 75-80 chars. Respect the NWT-only condition prefix rule and the banned-word list.
+Step 2: If found, write a backup title from scratch using TITLE_RULES above. Use observations (brand, type, size, gender, color, features) + the new style name. Respect the NWT-only condition prefix rule and the banned-word list.
 
 If no style name found, return {"updated": false}.`;
 
@@ -415,10 +462,31 @@ If no style name found, return {"updated": false}.`;
 
   if (!result.updated) return null;
 
+  // Accept both the new ({style_name}) and old ({observations:{style_name}})
+  // response shapes.
+  const styleName = result.style_name || result.observations?.style_name || null;
+
   const merge = {};
-  if (result.title) merge.title = result.title;
-  if (result.observations) {
-    merge.observations = { ...listing.observations, ...result.observations };
+  merge.observations = {
+    ...listing.observations,
+    ...(result.observations || {}),
+    ...(styleName ? { style_name: styleName } : {}),
+  };
+
+  if (styleName && hasTitleParts(listing)) {
+    // Rebuild from the pieces with the new style name, reusing the listing's
+    // SEO keywords (placement is recomputed; keywords that now repeat a
+    // style-name word are removed automatically).
+    const rebuilt = assembleListingTitle({
+      ...listing,
+      observations: merge.observations,
+      titleParts: { ...listing.titleParts, style_name: styleName },
+    });
+    merge.title = rebuilt.title;
+    merge.titleParts = rebuilt.titleParts;
+    merge.keywords = rebuilt.keywords;
+  } else if (result.title) {
+    merge.title = result.title;
   }
   return merge;
 }

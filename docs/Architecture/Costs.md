@@ -12,6 +12,8 @@ See [[AI Pipeline]], [[Overview]].
 
 Measured 2026-06-06, before Pass 2's JSON was compacted the same day, so it should be a bit lower now.
 
+SEO keywords (2026-09-16) add about +$0.003 per analysis on Pass 1. See [[Title Keywords Plan]].
+
 ## Why the dashboard shows ~$0.11 per listing
 Cost is per **analysis**, not per posted listing. Publishing costs $0 in AI. Drafts that are abandoned or re-analyzed spread their cost over the listings that do post. Roughly 1.5 analyses per posted listing ≈ $0.11.
 

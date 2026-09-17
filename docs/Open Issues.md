@@ -10,6 +10,7 @@ eBay error #25129: "Regular is not a valid Size Type for the Size 33" (also 37).
   1. Auto-pick the Size Type eBay allows. Always publishes, but 33/35/37 show as "Big & Tall."
   2. Investigate keeping "Regular": test leaving Size Type out, or sending eBay's combined "Regular - 33" value.
 
+
 ## 2. "Failed to load drafts / photos" when both users are working
 - **Data was never at risk** (verified: 79 drafts and 1,533 photos intact).
 - **Likely cause:** Cloudinary free-plan limit on API requests per hour. The Drafts page re-checks every 5 seconds while anything is processing, and two people doubles it.
