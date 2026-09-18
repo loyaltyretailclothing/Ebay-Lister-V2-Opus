@@ -20,16 +20,12 @@ Ideas we want to come back to. Nothing here is built or agreed in detail yet. Se
 - Profit per item, store and brand, and days to sell. Gives [[Sourcing]] real money numbers.
 - Biggest effort: needs a way to tie each item to where it came from (SKU prefix per store, or a tap in the camera).
 
-## 4. Faster draft finishing — BUILT 2026-09-18
-- After a successful listing the app opens the next draft by itself (or a blank listing when none is waiting). The "Listed on eBay!" message shows centered in the top bar for 10 seconds (on the phone, pinned above the buttons). See [[Draft Queue Plan]].
-- "Ready to list" mark — not wanted.
-
-## 5. Shipping weight and box size filled in automatically (no AI)
+## 4. Shipping weight and box size filled in automatically (no AI)
 - Save a typical weight and box size per item type once (e.g. tee 8 oz, jeans 1 lb 8 oz, hoodie 1 lb 12 oz).
 - The app fills them in when the category is chosen, and you adjust when needed.
 - **Why:** it's typed on every single listing. Small per item, but hundreds of times a month.
 
-## 6. Old listing report (items that aren't moving)
+## 5. Old listing report (items that aren't moving)
 - A list of items live 90+ days with no watchers and no views, so you can decide what to relist, bundle, or pull.
 - Pairs with #1: markdowns and offers handle slow sellers; this catches items getting no attention at all.
 - **Check with eBay's live API before building:** where views and watcher counts come from (likely the traffic report and the listings data), and how far back the data goes.
@@ -38,6 +34,9 @@ Ideas we want to come back to. Nothing here is built or agreed in detail yet. Se
 - Bin location / pick list — pulling orders isn't a problem.
 - Duplicate listing warning, daily scoreboard, blurry/dark photo warning.
 - Bulk changes to several drafts — not right now.
+- "Ready to list" mark on drafts.
+
+(Built from this list: auto next draft after listing, 2026-09-18 — see [[Draft Queue Plan]].)
 
 ## Smaller items already noted elsewhere
 - Dark mode toggle (follows the device for now).
