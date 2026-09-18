@@ -24,6 +24,11 @@ Ideas we want to come back to. Nothing here is built or agreed in detail yet. Se
 - Optionally move to the next draft automatically after a successful listing (result bar stays pinned).
 - A "ready to list" mark for a quick pass over complete drafts.
 
+## 5. Shipping weight and box size filled in automatically (no AI)
+- Save a typical weight and box size per item type once (e.g. tee 8 oz, jeans 1 lb 8 oz, hoodie 1 lb 12 oz).
+- The app fills them in when the category is chosen, and you adjust when needed.
+- **Why:** it's typed on every single listing. Small per item, but hundreds of times a month.
+
 ## Smaller items already noted elsewhere
 - Dark mode toggle (follows the device for now).
 - Camera autofocus: continuous focus + return to continuous after a tap (watching; see [[Open Issues]]).
