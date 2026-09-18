@@ -29,7 +29,6 @@ export default function CameraPage() {
   // AI picks are kept by photo (its blob URL), not by position, so removing
   // a shot in the camera strip can't shift the picks onto other photos.
   const [aiPicked, setAiPicked] = useState(new Set());
-  const [aiInitialized, setAiInitialized] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(null); // { done, total }
   const [error, setError] = useState("");
@@ -65,14 +64,9 @@ export default function CameraPage() {
       if (!keep.has(p.url)) URL.revokeObjectURL(p.url);
     });
     setPhotos(captured);
-    setAiPicked((prev) => {
-      if (!aiInitialized) {
-        // First time in Review: the first 3 photos are picked for the AI.
-        return new Set(captured.slice(0, 3).map((p) => p.url));
-      }
-      return new Set([...prev].filter((u) => keep.has(u)));
-    });
-    setAiInitialized(true);
+    // Nothing is picked for the AI automatically — you pick them in Review.
+    // Picks made before ← Back are kept (minus any photos removed since).
+    setAiPicked((prev) => new Set([...prev].filter((u) => keep.has(u))));
     setPhase("review");
   }
 

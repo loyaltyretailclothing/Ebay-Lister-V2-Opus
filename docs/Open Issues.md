@@ -35,6 +35,7 @@ Diagnosed, not fixed. See [[Description Line Breaks]].
 Pass 2 sends up to 200 allowed values per item specific. Cutting to ~50 could save money, but eBay doesn't guarantee value order, so the correct brand could be cut. Plan: measure which specifics are large before trimming. See [[Costs]].
 
 ## Smaller / later
+- **Camera autofocus sometimes slow** (reported 2026-09-18, watching, no change yet). Likely causes: after a tap the camera stays locked on that spot ("single-shot" focus) until the next tap, and the app never asks for continuous focus when the camera opens. Proposed fix if it keeps happening: request continuous focus on open, and return to continuous ~2s after a tap. Lighting also affects speed.
 - Resilience for Claude "overloaded" (529) errors during analysis.
 - EPS audit / re-upload tool (Phase 2 of [[Photo Hosting (EPS)]]).
 - Full UI design pass once features are done.
