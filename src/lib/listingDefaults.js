@@ -21,7 +21,8 @@ export const INITIAL_LISTING = {
   returnPolicyId: "",
   itemSpecifics: {},
   sku: "",
-  scheduleEnabled: true,
+  // Off by default — listings are rarely scheduled.
+  scheduleEnabled: false,
   scheduledDate: "",
   scheduledTime: "17:00",
   // aiNote — read by Claude during analysis (a hint to help it get the item

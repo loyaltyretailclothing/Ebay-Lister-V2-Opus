@@ -213,7 +213,13 @@ export default function useListingEditor() {
             getCategories(l.category_keywords).catch(() => null),
           ]);
           clearStatus();
-          setListing({ ...INITIAL_LISTING, ...(data.draft.listing || {}) });
+          // Older drafts saved Schedule as on by default with no date (which
+          // never scheduled anything); show those as off.
+          setListing({
+            ...INITIAL_LISTING,
+            ...l,
+            scheduleEnabled: !!(l.scheduleEnabled && l.scheduledDate),
+          });
           setAiPhotosState(data.draft.aiPhotos || []);
           setListingPhotosState(data.draft.listingPhotos || []);
           setDraftId(id);
