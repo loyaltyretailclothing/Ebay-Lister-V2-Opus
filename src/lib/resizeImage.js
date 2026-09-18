@@ -1,5 +1,6 @@
-// Resize an image in the browser before uploading (1600px, JPEG 75%).
-export function resizeImage(file, maxSize = 1600, quality = 0.75) {
+// Resize an image in the browser before uploading (1600px, JPEG 90%).
+// Kept high on purpose: Cloudinary does the one real compression (quality 80).
+export function resizeImage(file, maxSize = 1600, quality = 0.9) {
   return new Promise((resolve) => {
     const img = new Image();
     const url = URL.createObjectURL(file);

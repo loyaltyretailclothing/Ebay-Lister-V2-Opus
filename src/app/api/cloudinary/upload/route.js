@@ -32,7 +32,7 @@ export async function POST(request) {
         folder: folderPath,
         width: 1600,
         height: 1600,
-        quality: 75,
+        quality: 80,
         context: `folder=${folder}`,
       });
 

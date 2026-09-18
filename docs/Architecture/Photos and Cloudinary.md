@@ -10,7 +10,9 @@ See [[Overview]].
 | Item specifics settings | Raw JSON `ebay-listings/config/item-specifics` |
 | Sourcing | Raw JSON `ebay-listings/config/sourcing` |
 
-Photos are stored at 1600×1600 @75%. AI analysis gets smaller transformed versions.
+Photos are stored shrunk to fit inside 1600×1600, keeping their shape, at quality 80 (changed from 75 on 2026-09-18; older photos stay at 75). The phone compresses lightly first (camera and library both JPEG 90) so Cloudinary does the one real compression. Before 2026-09-18 a leftover setting forced every upload to exactly 1600×1600, which squashed non-square photos. Existing photos were all square, so nothing looked wrong.
+
+AI analysis gets its own copy made on request: 600px, quality 70 (`c_limit,w_600,q_70`). It doesn't depend on the storage quality, so the AI cost is the same.
 
 ## ⚠️ Local dev and production use the same Cloudinary account
 Testing locally reads and writes real data. See [[Rules]] #6–8.

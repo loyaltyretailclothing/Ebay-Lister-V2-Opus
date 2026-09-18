@@ -33,7 +33,7 @@ When something changes, update the matching note in the same session.
 ## Key Conventions
 - API routes use Next.js Route Handlers (`route.js`)
 - eBay auth uses OAuth 2.0 refresh token flow (see `src/lib/ebay.js`)
-- Photos resize to 1600x1600@75% for storage, 800px@75% for AI analysis
+- Photos fit inside 1600x1600 (shape kept) @80% for storage, 600px@70% for AI analysis
 - All env vars listed in `.env.local.example`
 
 ## Commands

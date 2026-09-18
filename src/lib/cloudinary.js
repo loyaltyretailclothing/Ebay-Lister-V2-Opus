@@ -8,20 +8,24 @@ cloudinary.config({
 
 export default cloudinary;
 
+// Stored photos: shrink to fit inside 1600×1600 (keeping their shape) at
+// quality 80. Size/quality go ONLY into the transformation — passed at the
+// top level too, Cloudinary adds a second step that forces an exact square.
 export async function uploadPhoto(fileBuffer, options = {}) {
+  const { width, height, quality, ...rest } = options;
   return new Promise((resolve, reject) => {
     const uploadStream = cloudinary.uploader.upload_stream(
       {
-        folder: options.folder || "ebay-listings",
+        ...rest,
+        folder: rest.folder || "ebay-listings",
         transformation: [
           {
-            width: options.width || 1600,
-            height: options.height || 1600,
+            width: width || 1600,
+            height: height || 1600,
             crop: "limit",
-            quality: options.quality || 75,
+            quality: quality || 80,
           },
         ],
-        ...options,
       },
       (error, result) => {
         if (error) reject(error);
