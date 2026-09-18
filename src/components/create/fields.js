@@ -121,7 +121,7 @@ export function SkuField({ listing, form, touch }) {
       />
       {form.skuMissing && (
         <p className={`mt-1 text-bad ${touch ? "text-base" : "text-sm"}`}>
-          Required. Must be a SKU that has never been used on eBay — used SKUs are blocked.
+          Required
         </p>
       )}
     </div>
