@@ -29,6 +29,16 @@ Ideas we want to come back to. Nothing here is built or agreed in detail yet. Se
 - The app fills them in when the category is chosen, and you adjust when needed.
 - **Why:** it's typed on every single listing. Small per item, but hundreds of times a month.
 
+## 6. Old listing report (items that aren't moving)
+- A list of items live 90+ days with no watchers and no views, so you can decide what to relist, bundle, or pull.
+- Pairs with #1: markdowns and offers handle slow sellers; this catches items getting no attention at all.
+- **Check with eBay's live API before building:** where views and watcher counts come from (likely the traffic report and the listings data), and how far back the data goes.
+
+## Not wanted (decided 2026-09-18)
+- Bin location / pick list — pulling orders isn't a problem.
+- Duplicate listing warning, daily scoreboard.
+- Bulk changes to several drafts — not right now.
+
 ## Smaller items already noted elsewhere
 - Dark mode toggle (follows the device for now).
 - Camera autofocus: continuous focus + return to continuous after a tap (watching; see [[Open Issues]]).
