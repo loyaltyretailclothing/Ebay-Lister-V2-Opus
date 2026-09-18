@@ -1,0 +1,755 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Create Listing — phone</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+
+  <!-- Built by Tailwind v4 from lister-theme.css. See README.md. -->
+  <link rel="stylesheet" href="./lister-theme.css">
+</head>
+
+<!--
+  PHONE — CREATE LISTING.  Designed at 390×844 (Android, Chrome).
+
+  Same form as the desktop screen, same fields, nothing removed. The desktop's
+  three columns become FIVE TABS — Photos · Details · Specifics · Price · Ship
+  — because 390px cannot show three columns and a 30-field form scrolled as one
+  page is a thumb-mile of scrolling to reach Price.
+
+  FOUR THINGS NEVER SCROLL, in this order down the screen:
+    1. the header          — which draft this is, and the ••• menu
+    2. the top lane        — what the app has just DONE (lookup, analyze, save)
+    3. the pinned strip    — what happened when you pressed LIST (or what is
+                             still missing), directly above the button
+    4. the action bar      — Analyze · Save · List on eBay
+
+  Lanes 2 and 3 are separate on purpose: one is about the draft, one is about
+  the listing attempt, and they can be true at the same time.
+
+  NO THEME TOGGLE IN THIS HEADER. Dark mode lives in the More sheet and nowhere
+  else on the phone. Add class="dark" to .app-shell.
+-->
+
+<body class="font-sans text-lg antialiased">
+
+<div class="app-shell relative mx-auto flex h-screen w-full max-w-[430px] flex-col overflow-hidden bg-bg text-ink">
+
+  <!-- ══ 1 · HEADER ═════════════════════════════════════════════════════════ -->
+  <header class="flex h-12 shrink-0 items-center gap-2 border-b border-line bg-panel px-3">
+    <h1 class="m-0 text-2xl font-semibold tracking-[-0.01em]">Create Listing</h1>
+
+    <!-- A saved draft shows its SKU. A blank listing shows instead:
+         <span class="badge border-dashed border-line-strong bg-sunken text-ink-3 font-medium">New · not saved</span>
+         — dashed, because nothing has been written to the queue yet. -->
+    <span class="badge mono">SH-1042</span>
+
+    <div class="grow"></div>
+
+    <!-- ••• MENU: screen actions that have no room on a tab. Two entries, and
+         they are both existing app actions — nothing new was invented to fill
+         it. Skip Draft is NOT here; it sits under Draft Note on the Photos
+         tab, exactly as on desktop. -->
+    <button type="button" aria-label="More actions" data-action="open-menu"
+            class="flex size-9 cursor-pointer items-center justify-center rounded-panel border-0 bg-transparent text-ink-2">
+      <svg class="size-[19px]" viewBox="0 0 24 24" fill="currentColor"><circle cx="5.5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="18.5" cy="12" r="1.7"/></svg>
+    </button>
+  </header>
+
+  <!-- ══ 2 · TOP LANE ═══════════════════════════════════════════════════════
+       What the app has just done TO THE DRAFT. One strip, one state at a time:
+       style · analyzing · lookup · saved · none.
+
+       The style-lookup result is informational and can be dismissed. The two
+       in-flight states clear themselves. "Draft saved" clears after ~3s.
+
+       NO PHOTO COUNTS IN THE ANALYZE STATES. The app sends every photo in one
+       request, so "3 of 9 analyzed" would be invented. Two messages, in order:
+         lane-info + spinner   "Analyzing photos…"
+         lane-info + spinner   "Looking up style number 710671545…" -->
+  <div class="lane lane-ok shrink-0">
+    <svg class="size-[13px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.6"/><path d="M8.2 12.2 11 15l4.8-5.4"/></svg>
+    <p>Style <span class="mono">710671545</span> found · Classic Fit Mesh Polo</p>
+    <button type="button" class="x" aria-label="Dismiss">
+      <svg class="size-[13px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>
+    </button>
+  </div>
+
+  <!-- ══ TABS ═══════════════════════════════════════════════════════════════
+       Five, in the order the work happens. They do not scroll with the form,
+       so you can jump from Ship back to Photos without scrolling up first. -->
+  <nav aria-label="Listing sections" class="flex h-11 shrink-0 gap-0.5 border-b border-line bg-panel px-1.5">
+    <button type="button" class="tab" aria-pressed="false">Photos</button>
+    <button type="button" class="tab" aria-pressed="true">Details</button>
+    <button type="button" class="tab" aria-pressed="false">Specifics</button>
+    <button type="button" class="tab" aria-pressed="false">Price</button>
+    <button type="button" class="tab" aria-pressed="false">Ship</button>
+  </nav>
+
+  <main class="flex min-h-0 grow flex-col gap-3.5 overflow-y-auto bg-panel p-3">
+
+    <!-- ══════════════════════════════════════════════════════════════════
+         TAB · PHOTOS
+         Two SEPARATE zones. This is the app's actual model and it must not be
+         collapsed into one grid: the listing photos are what buyers see, in
+         order; the AI photos are the close-ups the analyzer reads. A photo can
+         be in one, the other, or both.
+         ══════════════════════════════════════════════════════════════════ -->
+    <div class="hidden flex-col gap-3.5" data-tab="photos">
+
+      <div>
+        <div class="mb-[7px] flex items-center gap-2">
+          <h2 class="lbl">eBay Listing Photos</h2>
+          <span class="mono text-sm text-ink-3">7 of 24</span>
+          <div class="grow"></div>
+          <span class="hint text-sm">Hold &amp; drag to reorder</span>
+        </div>
+        <div class="grid grid-cols-4 gap-1.5">
+          <!-- FIRST = the gallery image, and it says so. Order is the publish
+               order, which is why this zone is drag-reorderable and the AI one
+               is not. -->
+          <div class="relative flex h-[82px] items-center justify-center overflow-hidden rounded-panel border border-line" style="background:#dfe3ea">
+            <svg class="size-6" viewBox="0 0 24 24" fill="none" stroke="rgba(30,38,50,.32)" stroke-width="1.4" stroke-linejoin="round"><path d="M9.5 3.5 4.5 6.2 6 9.4l2-.9V20h8V8.5l2 .9 1.5-3.2-5-2.7a3 3 0 0 1-5 0z"/></svg>
+            <span class="lbl absolute inset-x-0 bottom-0 bg-accent py-0.5 text-center text-2xs tracking-[0.1em] text-on-accent">Main</span>
+            <button type="button" aria-label="Remove photo" class="absolute right-[3px] top-[3px] flex size-[22px] cursor-pointer items-center justify-center rounded-bar border-0 p-0 text-white" style="background:rgb(16 20 28 / .62)">
+              <svg class="size-[11px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>
+            </button>
+          </div>
+          <div class="relative flex h-[82px] items-center justify-center overflow-hidden rounded-panel border border-line" style="background:#e6e1da">
+            <svg class="size-6" viewBox="0 0 24 24" fill="none" stroke="rgba(30,38,50,.32)" stroke-width="1.4" stroke-linejoin="round"><path d="M9.5 3.5 4.5 6.2 6 9.4l2-.9V20h8V8.5l2 .9 1.5-3.2-5-2.7a3 3 0 0 1-5 0z"/></svg>
+            <button type="button" aria-label="Remove photo" class="absolute right-[3px] top-[3px] flex size-[22px] cursor-pointer items-center justify-center rounded-bar border-0 p-0 text-white" style="background:rgb(16 20 28 / .62)">
+              <svg class="size-[11px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>
+            </button>
+          </div>
+          <!-- Repeat per listing photo. -->
+          <button type="button" class="flex h-[82px] cursor-pointer flex-col items-center justify-center gap-0.5 rounded-panel border border-dashed border-line-strong bg-sunken font-sans text-ink-3">
+            <svg class="size-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M12 6v12M6 12h12"/></svg>
+            <span class="text-xs">Add</span>
+          </button>
+        </div>
+      </div>
+
+      <div>
+        <div class="mb-[7px] flex items-center gap-2">
+          <h2 class="lbl">AI Analysis Photos</h2>
+          <!-- Amber when the count is at eBay's limit for the request; plain
+               otherwise. The count is photos SENT, not photos analysed. -->
+          <span class="mono rounded-chip bg-sunken px-[7px] py-0.5 text-sm font-semibold text-ink-3">6 of 8</span>
+        </div>
+        <div class="grid grid-cols-4 gap-1.5">
+          <div class="relative flex h-[82px] items-center justify-center overflow-hidden rounded-panel border border-line" style="background:#dce5e1">
+            <svg class="size-6" viewBox="0 0 24 24" fill="none" stroke="rgba(30,38,50,.32)" stroke-width="1.4" stroke-linejoin="round"><path d="M9.5 3.5 4.5 6.2 6 9.4l2-.9V20h8V8.5l2 .9 1.5-3.2-5-2.7a3 3 0 0 1-5 0z"/></svg>
+            <button type="button" aria-label="Remove photo" class="absolute right-[3px] top-[3px] flex size-[22px] cursor-pointer items-center justify-center rounded-bar border-0 p-0 text-white" style="background:rgb(16 20 28 / .62)">
+              <svg class="size-[11px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>
+            </button>
+          </div>
+          <!-- Repeat per AI photo. -->
+          <button type="button" class="flex h-[82px] cursor-pointer flex-col items-center justify-center gap-0.5 rounded-panel border border-dashed border-line-strong bg-sunken font-sans text-ink-3">
+            <svg class="size-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M12 6v12M6 12h12"/></svg>
+            <span class="text-xs">Add</span>
+          </button>
+        </div>
+      </div>
+
+      <div>
+        <h2 class="lbl mb-[7px]">Research</h2>
+        <div class="flex gap-2">
+          <!-- Google search needs a photo first, so pressing it puts the screen
+               into pick-a-photo mode (.btn-active, amber) rather than opening
+               a dead search. -->
+          <button type="button" class="btn btn-touch flex-1" data-action="pick-photo">
+            <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="11" cy="11" r="6.6"/><path d="M15.9 15.9 20.5 20.5"/></svg>
+            Google
+          </button>
+          <button type="button" class="btn btn-touch flex-1">
+            <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="11" cy="11" r="6.6"/><path d="M15.9 15.9 20.5 20.5"/></svg>
+            eBay
+          </button>
+        </div>
+        <p class="hint mt-[7px] hidden font-medium text-warn" data-state="picking">Pick a photo above to search on Google.</p>
+      </div>
+
+      <div>
+        <div class="mb-1.5 flex items-center gap-[7px]">
+          <h2 class="lbl">AI Note</h2>
+          <!-- A filled AI note is marked, because it changes what comes back
+               from Analyze and is otherwise three lines of grey text. -->
+          <span class="size-1.5 rounded-full bg-bad"></span>
+        </div>
+        <label class="sr-only" for="ai-note-m">AI note</label>
+        <textarea id="ai-note-m" rows="3" class="textarea input-filled w-full rounded-panel p-3 text-lg leading-5" placeholder="Added by Analyze Photos">Pit to pit 22in, length 29in, sleeve 9in. Tag reads Classic Fit, size L.</textarea>
+      </div>
+
+      <div>
+        <h2 class="lbl mb-1.5">Draft Note</h2>
+        <label class="sr-only" for="draft-note-m">Draft note</label>
+        <textarea id="draft-note-m" rows="2" class="textarea w-full rounded-panel p-3 text-lg leading-5" placeholder="Notes for yourself — not sent to eBay"></textarea>
+      </div>
+
+      <!-- SKIP DRAFT is a checkbox, not a button: it is a state of the draft,
+           and it saves the moment it is ticked. -->
+      <label class="flex min-h-touch cursor-pointer items-center gap-2.5 text-lg font-medium">
+        <input type="checkbox" class="size-5 shrink-0 accent-[var(--color-accent)]">
+        Skip Draft
+      </label>
+      <p class="hint -mt-1.5">Saves the moment you tick it. The draft keeps its place in the queue — only Next draft passes over it.</p>
+
+      <!-- ON A BLANK LISTING, Skip Draft and Delete Draft are hidden (there is
+           no draft to skip or delete) and this line replaces them:
+           <p class="hint">Skip Draft and Delete Draft appear once this is a
+           draft — tap Save Draft to add it to the queue.</p> -->
+
+      <button type="button" class="btn btn-touch w-full">Open Photo Library</button>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════════════════
+         TAB · DETAILS
+         ══════════════════════════════════════════════════════════════════ -->
+    <div class="flex flex-col gap-3.5" data-tab="details">
+
+      <div>
+        <div class="flex items-baseline gap-2">
+          <label class="fl" for="title-m">Title</label>
+          <div class="grow"></div>
+          <!-- eBay's hard limit. The app has it from eBay, so it is stated
+               rather than discovered by being rejected. -->
+          <span class="mono text-base text-ink-2">76 / 80</span>
+        </div>
+        <textarea id="title-m" rows="3" class="textarea w-full rounded-panel p-3 text-lg leading-5" placeholder="Brand, line, item, department, size, colour, keyword">Polo Ralph Lauren Classic Fit Mesh Polo Shirt Mens Large Navy Blue Pony Logo</textarea>
+      </div>
+
+      <div>
+        <div class="mb-2 flex flex-wrap items-center gap-2.5">
+          <h2 class="lbl">Keywords</h2>
+          <div class="grow"></div>
+          <span class="inline-flex items-center gap-[5px] text-base font-medium text-legend"><span class="swatch bg-accent"></span> In title</span>
+          <span class="inline-flex items-center gap-[5px] text-base font-medium text-legend"><span class="swatch border-[1.5px] border-legend"></span> In Theme</span>
+        </div>
+
+        <!-- Tiered by search weight, because that is the only thing that makes
+             one keyword worth more room in an 80-character title than another. -->
+        <div class="flex flex-col gap-2">
+          <div>
+            <p class="lbl mb-[5px] text-xs">Tier 1</p>
+            <div class="flex flex-wrap gap-1.5">
+              <button type="button" class="chip chip-in-title">Polo Ralph Lauren</button>
+              <button type="button" class="chip chip-in-title">Mesh Polo</button>
+              <button type="button" class="chip chip-in-theme">Big Pony <span class="lbl text-[8px] tracking-[0.08em] text-ink-3">Theme</span></button>
+            </div>
+          </div>
+          <div>
+            <p class="lbl mb-[5px] text-xs">Tier 2</p>
+            <div class="flex flex-wrap gap-1.5">
+              <button type="button" class="chip chip-in-title">Classic Fit</button>
+              <button type="button" class="chip chip-in-theme">Country Club <span class="lbl text-[8px] tracking-[0.08em] text-ink-3">Theme</span></button>
+            </div>
+          </div>
+          <!-- Repeat per tier. -->
+        </div>
+        <p class="hint mt-2">Tier 1 carries the most search weight — get those into the title first.</p>
+      </div>
+
+      <div>
+        <label class="fl" for="cat-m">Category</label>
+        <span class="sel">
+          <select id="cat-m" class="select h-touch w-full rounded-panel text-lg">
+            <option>Men's Clothing &gt; Shirts &gt; Polos</option>
+            <option>Men's Clothing &gt; Shirts &gt; Casual Button-Down Shirts</option>
+            <option>Men's Clothing &gt; T-Shirts</option>
+          </select>
+          <svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9.5 12 15.5 18 9.5"/></svg>
+        </span>
+        <p class="hint mt-[5px]">In Clothing, Shoes &amp; Accessories &gt; Men</p>
+      </div>
+
+      <div>
+        <label class="fl" for="sku-m">SKU <span class="text-bad">*</span></label>
+        <input id="sku-m" type="text" class="input mono h-touch w-full rounded-panel text-lg" value="SH-1042" placeholder="Required">
+      </div>
+
+      <div>
+        <label class="fl" for="cond-m">Condition</label>
+        <span class="sel">
+          <select id="cond-m" class="select h-touch w-full rounded-panel text-lg">
+            <option>Pre-Owned - Excellent</option>
+            <option>New With Tags</option>
+            <option>New Without Tags</option>
+            <option>New With Defects</option>
+            <option>Pre-Owned - Good</option>
+            <option>Pre-Owned - Fair</option>
+          </select>
+          <svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9.5 12 15.5 18 9.5"/></svg>
+        </span>
+      </div>
+
+      <div>
+        <label class="fl" for="cond-desc-m">Condition Description</label>
+        <textarea id="cond-desc-m" rows="2" class="textarea w-full rounded-panel p-3 text-lg leading-5">Excellent pre-owned condition. No stains or holes. Light wear at cuffs.</textarea>
+      </div>
+
+      <div>
+        <div class="flex items-center gap-2">
+          <label class="fl" for="desc-m">Description</label>
+          <div class="grow"></div>
+          <!-- The description is the one long field. It gets a FIXED HEIGHT and
+               its own scroll so it cannot push Price and Ship off the tab. -->
+          <span class="hint text-sm">Scrolls in place</span>
+        </div>
+        <textarea id="desc-m" class="textarea h-[150px] w-full overflow-y-auto rounded-panel p-3 text-md leading-[19px]" placeholder="Written by Analyze Photos, yours to edit">Polo Ralph Lauren men's classic fit mesh polo in navy blue. Size Large. Short sleeve, ribbed collar and cuffs, two-button placket, embroidered pony at left chest. 100% cotton.
+
+Measurements laid flat: pit to pit 22 in, length 29 in, sleeve 9 in.
+
+Excellent pre-owned condition — no stains, holes or fading.</textarea>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════════════════
+         TAB · SPECIFICS
+         The fields AND the counts come from eBay, per category. With no
+         category there is literally nothing to draw — so this is keyed off
+         THE CATEGORY, not off "is this a new listing". An existing draft
+         whose category was cleared shows the same hint.
+         ══════════════════════════════════════════════════════════════════ -->
+    <div class="hidden flex-col gap-3.5" data-tab="specifics">
+
+      <!-- No category: -->
+      <p class="hint hidden" data-state="no-category">Item specifics appear once a category is chosen.</p>
+
+      <div>
+        <p class="lbl mb-2">Required</p>
+        <!-- 2 up. Each is a .pick button, not a select: the app's picker does
+             search, multi-select and custom values, none of which a native
+             select can do. -->
+        <div class="grid grid-cols-2 gap-[9px]">
+          <div>
+            <span class="fl text-sm">Brand</span>
+            <button type="button" class="pick h-touch w-full rounded-panel text-lg" data-action="open-picker">
+              <span>Polo Ralph Lauren</span>
+              <svg class="size-3.5 shrink-0 opacity-60" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9.5 12 15.5 18 9.5"/></svg>
+            </button>
+          </div>
+          <div>
+            <span class="fl text-sm">Size</span>
+            <button type="button" class="pick h-touch w-full rounded-panel text-lg" data-action="open-picker">
+              <span>L</span>
+              <svg class="size-3.5 shrink-0 opacity-60" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9.5 12 15.5 18 9.5"/></svg>
+            </button>
+          </div>
+          <!-- Repeat per required specific. -->
+        </div>
+      </div>
+
+      <div>
+        <div class="mb-2 flex items-center gap-2">
+          <p class="lbl">Additional</p>
+          <span class="mono text-sm text-ink-3">12 / 30</span>
+          <div class="grow"></div>
+          <!-- eBay returns 30 optional specifics for this category. Showing all
+               30 at once buries the 12 that are filled, so empties collapse
+               behind one button. -->
+          <button type="button" class="btn h-[34px] px-2.5 text-base">Show all 30</button>
+        </div>
+        <div class="grid grid-cols-2 gap-[9px]">
+          <div>
+            <span class="fl text-sm">Fit</span>
+            <button type="button" class="pick h-touch w-full rounded-panel text-lg" data-action="open-picker">
+              <span>Classic</span>
+              <svg class="size-3.5 shrink-0 opacity-60" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9.5 12 15.5 18 9.5"/></svg>
+            </button>
+          </div>
+          <div>
+            <span class="fl text-sm">Theme</span>
+            <button type="button" class="pick h-touch w-full rounded-panel text-lg" data-action="open-picker">
+              <span>6 selected</span>
+              <svg class="size-3.5 shrink-0 opacity-60" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9.5 12 15.5 18 9.5"/></svg>
+            </button>
+          </div>
+          <!-- An EMPTY specific uses .pick-empty on the inner span so the
+               placeholder is ink-3 rather than reading as a real value. -->
+          <div>
+            <span class="fl text-sm">Occasion</span>
+            <button type="button" class="pick h-touch w-full rounded-panel text-lg" data-action="open-picker">
+              <span class="pick-empty">—</span>
+              <svg class="size-3.5 shrink-0 opacity-60" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9.5 12 15.5 18 9.5"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════════════════
+         TAB · PRICE
+         Three optional blocks, each behind its own toggle, each revealing its
+         fields IN PLACE. A toggle whose fields appear somewhere else is the
+         fastest way to have someone promote a listing at the wrong ad rate.
+         ══════════════════════════════════════════════════════════════════ -->
+    <div class="hidden flex-col gap-3.5" data-tab="price">
+
+      <div>
+        <span class="fl">Format</span>
+        <div class="seg seg-touch">
+          <button type="button" aria-pressed="true">Buy It Now</button>
+          <button type="button" aria-pressed="false">Auction</button>
+        </div>
+      </div>
+
+      <div class="flex gap-2.5">
+        <div class="flex-1">
+          <label class="fl" for="price-m">Price</label>
+          <input id="price-m" type="text" class="input mono h-touch w-full rounded-panel text-lg" value="38.00">
+        </div>
+        <div class="w-[110px] shrink-0">
+          <label class="fl" for="qty-m">Quantity</label>
+          <input id="qty-m" type="text" class="input mono h-touch w-full rounded-panel text-lg" value="1">
+        </div>
+      </div>
+
+      <div class="group px-3 py-1">
+
+        <div class="py-2.5">
+          <div class="flex items-center gap-2.5">
+            <button type="button" class="toggle toggle-touch" aria-pressed="true" aria-label="Allow offers"><span class="toggle-knob"></span></button>
+            <span class="text-lg font-medium">Allow Offers</span>
+          </div>
+          <div class="mt-[9px] flex gap-2.5">
+            <div class="flex-1">
+              <label class="fl text-sm" for="min-offer-m">Minimum Offer</label>
+              <input id="min-offer-m" type="text" class="input mono h-touch w-full rounded-panel text-lg" value="30.00">
+            </div>
+            <div class="flex-1">
+              <label class="fl text-sm" for="auto-accept-m">Auto Accept</label>
+              <input id="auto-accept-m" type="text" class="input mono h-touch w-full rounded-panel text-lg" value="34.00">
+            </div>
+          </div>
+        </div>
+
+        <div class="border-t border-line py-2.5">
+          <div class="flex items-center gap-2.5">
+            <button type="button" class="toggle toggle-touch" aria-pressed="false" aria-label="Schedule listing"><span class="toggle-knob"></span></button>
+            <span class="text-lg font-medium">Schedule Listing</span>
+          </div>
+          <!-- Off, so its two fields are not rendered. When on, the LIST button
+               relabels to "Schedule for Sep 21, 7:00 PM" — the button must say
+               what it will actually do. -->
+        </div>
+
+        <div class="border-t border-line py-2.5">
+          <div class="flex items-center gap-2.5">
+            <button type="button" class="toggle toggle-touch" aria-pressed="true" aria-label="Promote listing"><span class="toggle-knob"></span></button>
+            <span class="text-lg font-medium">Promote Listing</span>
+          </div>
+          <div class="mt-[9px] w-[140px]">
+            <label class="fl text-sm" for="ad-rate-m">Ad rate %</label>
+            <input id="ad-rate-m" type="text" class="input mono h-touch w-full rounded-panel text-lg" value="2.0">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════════════════
+         TAB · SHIP
+         ══════════════════════════════════════════════════════════════════ -->
+    <div class="hidden flex-col gap-3.5" data-tab="ship">
+
+      <div>
+        <label class="fl" for="ship-pol-m">Shipping Policy</label>
+        <span class="sel">
+          <select id="ship-pol-m" class="select h-touch w-full rounded-panel text-lg">
+            <option>Free Shipping — USPS Ground Advantage</option>
+            <option>Buyer Pays — Calculated</option>
+          </select>
+          <svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9.5 12 15.5 18 9.5"/></svg>
+        </span>
+      </div>
+
+      <div>
+        <span class="fl">Package Weight</span>
+        <div class="flex items-center gap-2">
+          <input type="text" aria-label="Pounds" class="input mono h-touch flex-1 rounded-panel text-lg" value="1">
+          <span class="hint">lbs</span>
+          <input type="text" aria-label="Ounces" class="input mono h-touch flex-1 rounded-panel text-lg" value="4">
+          <span class="hint">oz</span>
+        </div>
+      </div>
+
+      <div>
+        <span class="fl">Package Dimensions (in)</span>
+        <div class="flex items-center gap-2">
+          <input type="text" aria-label="Length" class="input mono h-touch flex-1 rounded-panel text-lg" value="12">
+          <span class="hint">×</span>
+          <input type="text" aria-label="Width" class="input mono h-touch flex-1 rounded-panel text-lg" value="10">
+          <span class="hint">×</span>
+          <input type="text" aria-label="Height" class="input mono h-touch flex-1 rounded-panel text-lg" value="2">
+        </div>
+      </div>
+
+      <div>
+        <label class="fl" for="origin-m">Item Origin</label>
+        <!-- Read-only, with the lock, because it comes from the eBay account. -->
+        <span class="ro">
+          <input id="origin-m" type="text" readonly class="input h-touch w-full rounded-panel text-lg" value="Charlotte, NC 28202">
+          <svg class="size-[15px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4.5" y="10.5" width="15" height="10" rx="2"/><path d="M8 10.5V7.8a4 4 0 0 1 8 0v2.7"/></svg>
+        </span>
+      </div>
+
+      <div>
+        <label class="fl" for="pay-pol-m">Payment Policy</label>
+        <span class="sel">
+          <select id="pay-pol-m" class="select h-touch w-full rounded-panel text-lg">
+            <option>eBay Managed Payments — Default</option>
+          </select>
+          <svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9.5 12 15.5 18 9.5"/></svg>
+        </span>
+      </div>
+
+      <div>
+        <span class="fl">Return Policy</span>
+        <!-- A missing policy is a dashed empty slot with the fix beside it, not
+             an empty select that looks like a choice was made. -->
+        <div class="flex min-h-touch items-center gap-2.5 rounded-panel border border-dashed border-line-strong bg-sunken px-3">
+          <span class="hint">None saved</span>
+          <a href="/settings" class="text-md font-medium text-accent">Add in Settings</a>
+        </div>
+      </div>
+
+      <p class="hint">Listing publishes to the eBay account connected in Settings. Photos upload in the order shown; the first is the gallery image.</p>
+    </div>
+
+  </main>
+
+  <!-- ══ 3 · PINNED STRIP ═══════════════════════════════════════════════════
+       What happened when you pressed LIST — or what is still missing. Pinned
+       here, directly above the button it is about, and NEVER inside a
+       scrolling tab, where a success or an eBay error can be scrolled out of
+       sight and missed.
+
+       One state at a time, in this precedence: fail > ok > required. -->
+
+  <!-- REQUIRED — amber, not red: nothing has failed yet. The List button is
+       .btn-off while this shows. -->
+  <div class="pin pin-warn hidden" data-pin="required">
+    <svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="8.6"/><path d="M12 7.8v5M12 16.1v.1"/></svg>
+    <p>Title, category, price and SKU are required to list.</p>
+  </div>
+
+  <!-- SUCCESS — ONE state, not a bar plus a popup. This strip carries what the
+       popup used to: the item photo, the item number and the promotion result,
+       plus the three ways on. It stays until one is tapped or it is dismissed.
+
+       "Next draft" and "New listing" both exist because they are different:
+       Next draft opens the next queued item; New listing clears to a blank
+       form and writes nothing.
+
+       The published draft has ALREADY been deleted — the app deletes a draft
+       the moment it lists, the Drafts list refreshes, and the count drops by
+       one. No row stays highlighted anywhere. -->
+  <div class="pin pin-ok hidden flex-col gap-[9px]" data-pin="ok">
+    <div class="flex w-full items-start gap-[9px]">
+      <span class="flex size-[38px] shrink-0 items-center justify-center rounded-bar border border-ok-line" style="background:#dfe3ea">
+        <svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="rgba(30,38,50,.34)" stroke-width="1.4" stroke-linejoin="round"><path d="M9.5 3.5 4.5 6.2 6 9.4l2-.9V20h8V8.5l2 .9 1.5-3.2-5-2.7a3 3 0 0 1-5 0z"/></svg>
+      </span>
+      <p class="m-0 min-w-0 flex-1 text-md font-semibold leading-[18px]">Listed on eBay!
+        <span class="block text-base font-normal">Item <span class="mono">3961028447</span> · Promoted at 2.0% ad rate.</span>
+      </p>
+      <button type="button" class="x" aria-label="Dismiss">
+        <svg class="size-[13px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>
+      </button>
+    </div>
+    <div class="flex w-full gap-[7px]">
+      <button type="button" class="btn h-[38px] min-w-0 flex-1 border-ok-line px-2 text-base text-ok">View on eBay</button>
+      <button type="button" class="btn h-[38px] min-w-0 flex-1 border-ok-line px-2 text-base text-ok">Next draft</button>
+      <button type="button" class="btn h-[38px] min-w-0 flex-1 border-ok-line px-2 text-base text-ok">New listing</button>
+    </div>
+    <!--
+      LISTED, PROMOTION FAILED: same strip with pin-warn. AMBER, NEVER RED, and
+      no action button — the item IS live; only the ad campaign did not apply.
+    -->
+  </div>
+
+  <!-- FAILURE — "Failed: " and then EBAY'S MESSAGE, WORD FOR WORD, error code
+       included. Nothing is reworded, shortened or "translated": the wording is
+       what a search of eBay's help finds, and a reworded error cannot be
+       searched for. The form is left completely intact so the offending field
+       can be fixed and resubmitted. -->
+  <div class="pin pin-bad hidden" data-pin="fail">
+    <svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="8.6"/><path d="M12 7.6v5.2M12 16.2v.1"/></svg>
+    <p>Failed: <span class="font-normal">[#25129] Regular is not a valid Size Type for the Size L in this category. Choose a Size Type that matches the Size.</span></p>
+    <button type="button" class="x" aria-label="Dismiss">
+      <svg class="size-[13px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>
+    </button>
+  </div>
+
+  <!-- ══ 4 · ACTION BAR ═════════════════════════════════════════════════════
+       LABELLED, not icon-only. A wrench-and-page pair is unreadable at a
+       glance, and the middle button has three labels to carry anyway:
+       "Save Draft" on a blank listing, "Update Draft" once it is a draft,
+       "Saving…" in flight (plus .btn-off and a spinner).
+
+       min-w-[106px] on that button is load-bearing: without it the bar
+       reflows between the three labels and List on eBay moves under the thumb
+       mid-tap. -->
+  <div class="flex shrink-0 gap-2 border-t border-line bg-panel px-3 pb-[22px] pt-[9px]">
+    <button type="button" class="btn btn-touch shrink-0 px-3 text-md">Analyze</button>
+    <button type="button" class="btn btn-touch min-w-[106px] shrink-0 px-3 text-md">Update Draft</button>
+    <button type="button" class="btn btn-primary btn-touch min-w-0 grow">List on eBay</button>
+  </div>
+
+  <!-- ══ BOTTOM BAR ═════════════════════════════════════════════════════════
+       Canonical copy in nav.html. Create is current here. -->
+  <nav aria-label="Main" class="flex h-16 shrink-0 items-start border-t border-line bg-panel px-1">
+    <a href="/library" class="tabm no-underline">
+      <svg class="size-[21px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><rect x="3.5" y="3.5" width="7.2" height="7.2" rx="1.6"/><rect x="13.3" y="3.5" width="7.2" height="7.2" rx="1.6"/><rect x="3.5" y="13.3" width="7.2" height="7.2" rx="1.6"/><rect x="13.3" y="13.3" width="7.2" height="7.2" rx="1.6"/></svg>
+      <span class="lbl text-2xs tracking-[0.05em] text-current">Library</span>
+    </a>
+    <a href="/create" aria-current="page" class="tabm tabm-on no-underline">
+      <svg class="size-[21px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="3.5" width="17" height="17" rx="3.5"/><path d="M12 8.4v7.2M8.4 12h7.2"/></svg>
+      <span class="lbl text-2xs tracking-[0.05em] text-current">Create</span>
+    </a>
+    <div class="flex flex-1 justify-center">
+      <a href="/camera" aria-label="Open camera" class="fab no-underline">
+        <svg class="size-[26px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 8.6h3.2L8.2 6.5h7.6l1.5 2.1h3.2a1 1 0 0 1 1 1v7.9a1 1 0 0 1-1 1H3.5a1 1 0 0 1-1-1V9.6a1 1 0 0 1 1-1z"/><circle cx="12" cy="13.4" r="3.2"/></svg>
+      </a>
+    </div>
+    <a href="/drafts" class="tabm no-underline">
+      <svg class="size-[21px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="4.2" y="3.5" width="13.5" height="17" rx="2.4"/><path d="M7.6 8.4h6.7M7.6 12h6.7M7.6 15.6h3.6"/></svg>
+      <span class="lbl text-2xs tracking-[0.05em] text-current">Drafts</span>
+    </a>
+    <button type="button" class="tabm border-0 bg-transparent" data-action="open-more">
+      <svg class="size-[21px]" viewBox="0 0 24 24" fill="currentColor"><circle cx="5.5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="18.5" cy="12" r="1.8"/></svg>
+      <span class="lbl text-2xs tracking-[0.05em] text-current">More</span>
+    </button>
+  </nav>
+
+  <!-- ══ ITEM-SPECIFIC PICKER ═══════════════════════════════════════════════
+       The app's existing picker: search, multi-select, custom values. STYLING
+       ONLY — the behaviour is already built.
+
+       A bottom sheet at 74% height, not a full-screen page: the field you came
+       from stays visible above it, and the list starts under the thumb rather
+       than at the top of the screen. -->
+  <div id="picker-scrim" class="scrim hidden !items-end !p-0">
+    <div class="sheet flex h-[74%] w-full flex-col px-2 pb-[18px] pt-2">
+      <div class="grab"></div>
+
+      <div class="flex items-center gap-2 px-1 pb-2.5">
+        <div class="min-w-0 grow">
+          <p class="lbl text-xs">Item specific</p>
+          <p class="m-0 mt-0.5 text-2xl font-semibold">Theme</p>
+        </div>
+        <button type="button" class="btn btn-touch shrink-0 px-3.5" data-action="close-sheet">Done</button>
+      </div>
+
+      <div class="px-1 pb-2.5">
+        <input type="text" class="input h-touch w-full rounded-panel text-lg" placeholder="Search or add your own" aria-label="Search Theme values">
+      </div>
+
+      <div class="min-h-0 flex-1 overflow-y-auto px-1">
+        <button type="button" class="orow">
+          <span class="box box-on"><svg class="size-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 12.5 9.5 17.5 19.5 6.5"/></svg></span>
+          <span class="min-w-0 grow">Big Pony</span>
+        </button>
+        <button type="button" class="orow">
+          <span class="box box-on"><svg class="size-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 12.5 9.5 17.5 19.5 6.5"/></svg></span>
+          <span class="min-w-0 grow">Ivy Style</span>
+          <!-- A value the user typed rather than one eBay offered. -->
+          <span class="lbl text-2xs">Your own</span>
+        </button>
+        <button type="button" class="orow">
+          <span class="box"><svg class="size-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 12.5 9.5 17.5 19.5 6.5"/></svg></span>
+          <span class="min-w-0 grow">Preppy</span>
+        </button>
+        <!-- Repeat per value. -->
+      </div>
+
+      <!-- eBay's own per-field limit. The app has it from eBay, so it is shown
+           rather than left to be discovered by a rejected listing. -->
+      <p class="hint px-1.5 pt-2.5">6 selected · eBay allows up to 10 for this field.</p>
+    </div>
+  </div>
+
+  <!-- ══ ••• MENU ═══════════════════════════════════════════════════════════
+       Two entries. Both are existing app actions; nothing was invented to pad
+       the sheet. Delete Draft opens the same confirm as the desktop screen. -->
+  <div id="menu-scrim" class="scrim hidden !items-end !p-0">
+    <div class="bsheet w-full">
+      <div class="grab"></div>
+      <button type="button" class="srow" data-action="close-sheet">
+        <svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 6v12M6 12h12"/></svg>
+        New listing
+      </button>
+      <button type="button" class="srow srow-bad" data-action="close-sheet">
+        <svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4.8 6.6h14.4"/><path d="M9.3 6.6V4.9h5.4v1.7"/><path d="M6.6 6.6 7.5 20h9l.9-13.4"/><path d="M10.4 10.2v6M13.6 10.2v6"/></svg>
+        Delete Draft
+      </button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  const shell = document.querySelector('.app-shell');
+
+  // Theme: follow the device until the user chooses in the More sheet. There is
+  // no toggle on this screen — see nav.html.
+  const THEME_KEY = 'lister.theme';
+  const media = window.matchMedia('(prefers-color-scheme: dark)');
+  let chosen = null;
+  try { chosen = localStorage.getItem(THEME_KEY); } catch {}
+  shell.classList.toggle('dark', chosen ? chosen === 'dark' : media.matches);
+  media.addEventListener('change', e => { if (!chosen) shell.classList.toggle('dark', e.matches); });
+
+  // Tabs. Switching a tab NEVER touches the form state — every tab's fields
+  // stay mounted in the DOM, so a half-typed title survives a trip to Ship and
+  // back. Hide, do not unmount.
+  const tabs = document.querySelectorAll('.tab');
+  const panes = document.querySelectorAll('[data-tab]');
+  const main = document.querySelector('main');
+  tabs.forEach((t, i) => t.addEventListener('click', () => {
+    tabs.forEach((x, j) => x.setAttribute('aria-pressed', String(i === j)));
+    panes.forEach((p, j) => {
+      p.classList.toggle('hidden', i !== j);
+      p.classList.toggle('flex', i === j);
+    });
+    main.scrollTop = 0;
+  }));
+
+  // Toggles on the Price tab. Each one's fields live inside its own block and
+  // are revealed in place.
+  document.querySelectorAll('.toggle').forEach(t => t.addEventListener('click', () => {
+    t.setAttribute('aria-pressed', String(t.getAttribute('aria-pressed') !== 'true'));
+    // Show/hide the sibling field row here.
+  }));
+
+  // Dismissible strips: the style lane, and the two listing results. The
+  // required-fields strip has no ✕ — it clears when the fields are filled.
+  document.querySelectorAll('.x').forEach(b => b.addEventListener('click', () => {
+    b.closest('.lane, .pin').classList.add('hidden');
+  }));
+
+  // Sheets. Both close on backdrop, on Done and on Escape.
+  const picker = document.getElementById('picker-scrim');
+  const menu = document.getElementById('menu-scrim');
+  const closeSheets = () => { picker.classList.add('hidden'); menu.classList.add('hidden'); };
+
+  document.querySelectorAll('[data-action="open-picker"]').forEach(b =>
+    b.addEventListener('click', () => picker.classList.remove('hidden')));
+  document.querySelector('[data-action="open-menu"]').addEventListener('click', () =>
+    menu.classList.remove('hidden'));
+  document.querySelectorAll('[data-action="close-sheet"]').forEach(b =>
+    b.addEventListener('click', closeSheets));
+  [picker, menu].forEach(s => s.addEventListener('click', e => { if (e.target === s) closeSheets(); }));
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeSheets(); });
+
+  // Picker rows are multi-select: tapping toggles, it does not close the sheet.
+  // Done closes it. Enforce eBay's per-field cap here and grey the untouched
+  // rows once it is reached.
+  picker.querySelectorAll('.orow').forEach(row => row.addEventListener('click', () => {
+    row.querySelector('.box').classList.toggle('box-on');
+  }));
+</script>
+</body>
+</html>

@@ -1,0 +1,796 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Create Listing</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+
+  <!-- Built by Tailwind v4 from lister-theme.css. See README.md. -->
+  <link rel="stylesheet" href="./lister-theme.css">
+</head>
+
+<!--
+  Add class="dark" to .app-shell below for dark mode. Nothing else changes —
+  every colour is a token that redefines itself under .dark.
+
+  Icons are inline stroke SVGs at 1.7 stroke-width on a 24 viewBox, sized
+  18–21px. Swap in your icon set; keep the weight, or the rail looks wrong.
+  Placeholder icons are marked ICON.
+-->
+
+<body class="font-sans text-md antialiased">
+
+<div class="app-shell relative flex w-full min-w-[1280px] h-screen min-h-[640px] overflow-hidden bg-bg text-ink">
+
+  <!-- ══ NAV RAIL ═══════════════════════════════════════════════════════════ -->
+  <nav aria-label="Main" class="flex w-18 shrink-0 flex-col items-center gap-0.5 bg-panel border-r border-line py-3">
+    <!-- There is no Home screen: the logo and the site's front page both go
+         straight to Create Listing. -->
+    <a href="/create" aria-label="Lister — Create Listing"
+       class="mb-2.5 flex size-[34px] items-center justify-center rounded-[9px] bg-accent text-on-accent">
+      <svg class="size-[19px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><!-- ICON tag --><path d="M13.4 3.5H20a.5.5 0 0 1 .5.5v6.6l-9.4 9.4a1.6 1.6 0 0 1-2.2 0l-5.4-5.4a1.6 1.6 0 0 1 0-2.2z"/><circle cx="16.7" cy="7.3" r="1.2"/></svg>
+    </a>
+
+    <!-- The whole desktop rail: the logo, Create Listing, Settings. Nothing else.
+         NO Library, NO Drafts — the Photos | Drafts panel below covers both, and
+         a rail entry would only navigate away from the screen you are working
+         on. NO Camera — it is a phone screen. NO Sourcing — that page is still
+         in the app, just unlinked. NO Home — it does not exist.
+         The phone nav is different: see nav.html. -->
+    <a href="/create" aria-current="page"
+       class="flex h-[50px] w-14 flex-col items-center justify-center gap-[3px] rounded-panel bg-accent-weak text-accent no-underline">
+      <svg class="size-[19px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="3.5" width="17" height="17" rx="3.5"/><path d="M12 8.4v7.2M8.4 12h7.2"/></svg>
+      <span class="lbl text-2xs tracking-[0.05em] text-current">Create</span>
+    </a>
+
+    <div class="grow"></div>
+
+    <!-- Dark mode. Toggles `dark` on .app-shell. -->
+    <button type="button" aria-label="Switch theme" data-action="toggle-theme"
+            class="flex size-10 items-center justify-center rounded-panel border-0 bg-transparent text-ink-2 cursor-pointer hover:bg-panel-2">
+      <svg class="size-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M20 14.6A8.6 8.6 0 0 1 9.4 4 8.6 8.6 0 1 0 20 14.6z"/></svg>
+    </button>
+    <a href="/settings" class="flex h-[50px] w-14 flex-col items-center justify-center gap-[3px] rounded-panel text-ink-2 no-underline hover:bg-panel-2">
+      <svg class="size-[19px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M3.5 7.5h10M18.4 7.5h2.1M3.5 16.5h4.1M12.4 16.5h8.1"/><circle cx="15.9" cy="7.5" r="2.3"/><circle cx="9.9" cy="16.5" r="2.3"/></svg>
+      <span class="lbl text-2xs tracking-[0.05em] text-current">Settings</span>
+    </a>
+  </nav>
+
+  <div class="flex min-w-0 grow flex-col">
+
+    <!-- ══ ACTION BAR — never scrolls ═══════════════════════════════════════ -->
+    <header class="flex h-13 shrink-0 items-center gap-3 border-b border-line bg-panel px-4">
+      <h1 class="m-0 text-xl font-semibold tracking-[-0.01em]">Create Listing</h1>
+      <!-- A saved draft shows its SKU. A blank listing shows instead:
+           <span class="badge border-dashed text-ink-3">New listing · not saved</span> -->
+      <span class="badge font-mono">SH-1042</span>
+
+      <!-- Save confirmation. Show for ~3s after a save, then remove. -->
+      <span class="inline-flex items-center gap-1.5 rounded-chip border border-ok-line bg-ok-weak px-2 py-[3px] text-sm font-medium text-ok">
+        <svg class="size-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 12.5 9.5 17.5 19.5 6.5"/></svg>
+        Draft saved
+      </span>
+
+      <span aria-hidden="true" class="h-[18px] w-px bg-line"></span>
+
+      <!-- NEW LISTING. Clears the form, both photo zones, the AI note and the
+           draft note, and deselects the row in the queue. It does NOT create or
+           save a draft — nothing reaches the queue until Save Draft is clicked.
+           With unsaved edits it opens the SAME Save / Discard / Cancel popup
+           that switching drafts uses; Discard clears, Cancel stays put.
+           On a blank listing: keep it enabled, it is simply a no-op.
+           Account defaults survive the clear — quantity 1, Buy It Now, Allow
+           Offers, Promote and its ad rate, and the shipping, payment and return
+           policies. Only what the ITEM owns is cleared. -->
+      <button type="button" class="btn btn-sm" data-action="new-listing">
+        <svg class="size-[13px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 6v12M6 12h12"/></svg>
+        New listing
+      </button>
+
+      <div class="grow"></div>
+
+      <!-- Swap for the bad-state hint when required fields are missing:
+           <p class="m-0 text-sm text-ink-3">Fill Title, Category, Price and SKU to list.</p> -->
+      <p class="m-0 flex items-center gap-1.5 text-sm text-ok">
+        <svg class="size-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 12.5 9.5 17.5 19.5 6.5"/></svg>
+        Title, category, price and SKU complete
+      </p>
+
+      <div class="flex items-center gap-2">
+        <button type="button" class="btn">
+          <svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.2v4M12 16.8v4M3.2 12h4M16.8 12h4"/><circle cx="12" cy="12" r="3.4"/></svg>
+          Analyze Photos
+          <!-- While running: spinner + "Analyzing photos…" then "Looking up style number…" -->
+        </button>
+        <!-- Three labels, one button, one fixed min-width so the row never
+             shifts: "Save Draft" on a blank listing, "Update Draft" once it is a
+             draft, "Saving…" in flight — then add .btn-off and a .spin spinner.
+             This is the ONLY control that writes to the queue. -->
+        <button type="button" class="btn min-w-[104px]">Update Draft</button>
+        <button type="button" class="btn btn-primary btn-lg">List on eBay</button>
+        <!-- Scheduled: "Schedule for Sep 21, 7:00 PM" · Incomplete: add `disabled` -->
+      </div>
+    </header>
+
+    <!-- ══ STATUS LANE ══════════════════════════════════════════════════════
+         Pinned under the action bar, above the columns. Holds the style-lookup
+         banner, analyze progress, errors, AND THE RESULT OF LIST ON EBAY.
+
+         The listing result must live here or in a popup — never inside a
+         scrolling pane, where a success or an eBay error can be scrolled out
+         of sight and missed. Success shows this bar AND opens the success
+         popup; failure shows the bar alone and keeps the form intact so the
+         offending field can be fixed and resubmitted. -->
+    <div class="lane lane-ok shrink-0">
+      <svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.6"/><path d="M8.2 12.2 11 15l4.8-5.4"/></svg>
+      <p>Style number <span class="font-mono">710671545</span> found
+        <span class="font-normal opacity-85">Polo Ralph Lauren · Classic Fit Mesh Polo · 2019 · Item specifics prefilled</span></p>
+      <!-- Dismiss. The style-lookup banner is informational and is the ONE lane
+           state the user can close: it has already done its job once the
+           specifics are prefilled, and it otherwise sits there for the whole
+           session. Analyze progress, errors and listing results have NO ✕ —
+           they either clear themselves or must be read and acted on. -->
+      <button type="button" aria-label="Dismiss"
+              class="-mt-px flex size-[22px] shrink-0 items-center justify-center rounded-[5px] text-current hover:bg-black/5 dark:hover:bg-white/10">
+        <svg class="size-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>
+      </button>
+      <!--
+        Other states for this same lane — swap `lane-ok` for the matching
+        `lane-*` class. The lane PRINTS THE APP'S MESSAGE VERBATIM: nothing is
+        appended to it, and it wraps rather than truncating.
+
+        Style not found   lane-info  "No style number found on the tag"
+        Lookup failed     lane-bad   "Style lookup failed — retry"
+        Analyze running   lane-info  spinner + "Analyzing photos…"
+        Analyze error     lane-bad   "Analysis failed: photo 3 could not be read."
+
+        LISTED OK         lane-ok    message + a "Next draft" button in .acts
+        LISTED, NO PROMO  lane-warn   the item IS live — amber, never red, no action
+        LISTING FAILED    lane-bad    eBay's message verbatim; "Change SKU" only for SKU errors
+        ERROR DRAFT OPENED lane-bad   the message stored on that draft, verbatim, shown the
+                                      moment it is opened — no action button, because the
+                                      fields to fix are already on screen. Clears when the
+                                      draft next saves or publishes successfully.
+      -->
+    </div>
+
+    <!-- ══ FOUR COLUMNS ════════════════════════════════════════════════════ -->
+    <div class="flex min-h-0 grow">
+
+      <!-- ── 1. PHOTO LIBRARY ──────────────────────────────────────────────
+           Classes: `lib` always; add `lib-auto` until the user clicks the
+           collapse control; add `lib-closed` when they have collapsed it.
+           Below 1400px `lib-auto` collapses itself. -->
+      <aside class="lib lib-auto flex min-h-0 shrink-0 flex-col border-r border-line bg-panel">
+
+        <!-- At 40px the switch becomes two icon buttons, so the mode is still
+             readable and changeable without expanding the panel. -->
+        <div class="lib-spine flex-col items-center gap-2.5 py-2.5">
+          <button type="button" aria-label="Expand panel" data-action="lib-open"
+                  class="flex size-6 items-center justify-center rounded-chip border-0 bg-transparent text-ink-3 cursor-pointer">
+            <svg class="size-[15px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.5 5.5 16 12l-6.5 6.5"/></svg>
+          </button>
+          <button type="button" class="modebtn modebtn-on" aria-label="Photos" aria-pressed="true" data-action="mode-photos">
+            <svg class="size-[15px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="3.5" y="3.5" width="7.2" height="7.2" rx="1.6"/><rect x="13.3" y="3.5" width="7.2" height="7.2" rx="1.6"/><rect x="3.5" y="13.3" width="7.2" height="7.2" rx="1.6"/><rect x="13.3" y="13.3" width="7.2" height="7.2" rx="1.6"/></svg>
+          </button>
+          <button type="button" class="modebtn" aria-label="Drafts" aria-pressed="false" data-action="mode-drafts">
+            <svg class="size-[15px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4.2" y="3.5" width="13.5" height="17" rx="2.4"/><path d="M7.6 8.4h6.7M7.6 12h6.7M7.6 15.6h3.6"/></svg>
+          </button>
+          <!-- Reads the current mode and its count: "Photos · 48" or "Drafts · 12" -->
+          <span class="lbl [writing-mode:vertical-rl] tracking-[0.14em]">Photos · 48</span>
+        </div>
+
+        <div class="lib-body flex min-h-0 grow flex-col">
+          <!-- Panel switch. Photos is the existing library, unchanged. -->
+          <div class="flex items-center gap-2 px-3 pt-2.5 pb-2">
+            <div class="seg grow">
+              <button type="button" aria-pressed="true" data-action="mode-photos">Photos</button>
+              <button type="button" aria-pressed="false" data-action="mode-drafts">Drafts</button>
+            </div>
+            <button type="button" aria-label="Collapse panel" data-action="lib-close"
+                    class="flex size-6 shrink-0 items-center justify-center rounded-chip border-0 bg-transparent text-ink-3 cursor-pointer hover:bg-panel-2">
+              <svg class="size-[15px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 5.5 8 12l6.5 6.5"/></svg>
+            </button>
+          </div>
+
+          <!-- Folder tabs -->
+          <div class="px-3 pb-2">
+            <div class="seg">
+              <button type="button" aria-pressed="true">All</button>
+              <button type="button" aria-pressed="false">Shannon</button>
+              <button type="button" aria-pressed="false">Aaron</button>
+            </div>
+          </div>
+
+          <div class="flex gap-1.5 px-3 pb-2">
+            <button type="button" class="btn btn-primary grow">
+              <svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16.5V4.2M7.4 8.8 12 4.2l4.6 4.6"/><path d="M4.5 15.5v3.2a1.3 1.3 0 0 0 1.3 1.3h12.4a1.3 1.3 0 0 0 1.3-1.3v-3.2"/></svg>
+              Upload Photos
+            </button>
+            <button type="button" class="btn" aria-label="Add note to selected photos">Note</button>
+            <button type="button" class="btn btn-ghost">Clear</button>
+          </div>
+
+          <!-- Selection bar — render only when n > 0 -->
+          <div class="mx-3 mb-2 flex flex-wrap items-center gap-1.5 rounded-bar border border-accent-line bg-accent-weak px-2 py-[7px]">
+            <span class="font-mono text-sm font-semibold text-accent">2 selected</span>
+            <div class="grow"></div>
+            <button type="button" class="btn btn-sm btn-danger">Delete (2)</button>
+            <span class="text-xs text-ink-3">Move to</span>
+            <button type="button" class="btn btn-sm">Shannon</button>
+            <button type="button" class="btn btn-sm">Aaron</button>
+          </div>
+
+          <div class="min-h-0 grow overflow-y-auto px-3">
+            <div class="grid grid-cols-3 gap-1.5">
+              <!-- Repeat per photo. Selected: add `ring-2 ring-inset ring-accent`. -->
+              <div class="relative flex h-[88px] items-center justify-center overflow-hidden rounded-field border border-line bg-[#dfe3ea]">
+                <img src="" alt="" class="absolute inset-0 size-full object-cover">
+                <span class="absolute bottom-[3px] left-1 font-mono text-[8px] text-black/60">IMG_4812</span>
+                <!-- Selected check -->
+                <span class="absolute left-1 top-1 flex size-[15px] items-center justify-center rounded-[4px] bg-accent text-on-accent">
+                  <svg class="size-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 12.5 9.5 17.5 19.5 6.5"/></svg>
+                </span>
+                <!-- Has a note -->
+                <span aria-label="Has note" class="absolute right-1 top-1 flex size-[15px] items-center justify-center rounded-[4px] border border-warn-line bg-warn-weak text-warn">
+                  <svg class="size-[9px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M5.5 7h13M5.5 12h13M5.5 17h8"/></svg>
+                </span>
+              </div>
+            </div>
+            <button type="button" class="btn btn-ghost mt-2 mb-1.5 w-full">Load older photos</button>
+          </div>
+
+          <p class="m-0 border-t border-line px-3 py-2.5 text-sm text-ink-3">
+            Double-click a photo to enlarge. Drag onto a zone to the right, or use the send buttons.
+          </p>
+        </div>
+
+        <!-- ══ DRAFTS MODE ════════════════════════════════════════════════
+             Renders in place of .lib-body's photo content when the switch is
+             on Drafts. Sorted OLDEST → NEWEST, which is what makes Next draft
+             the next eligible row down. -->
+        <div class="lib-drafts hidden min-h-0 grow flex-col">
+          <div class="flex items-center gap-2 px-3 pb-2">
+            <span class="lbl text-xs">12 drafts</span>
+            <div class="grow"></div>
+            <!-- The ONLY automatic refreshes are: save, publish, Next draft.
+                 This button is the manual one. Nothing polls. -->
+            <button type="button" class="btn btn-sm btn-ghost" data-action="drafts-refresh">
+              <svg class="size-[13px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 1 1-2.3-5.6"/><path d="M20.5 4v4.4h-4.4"/></svg>
+              Refresh
+            </button>
+          </div>
+
+          <div class="min-h-0 grow overflow-y-auto px-2 pb-2 flex flex-col gap-0.5">
+
+            <!-- Error. Included by Next draft — these are the ones needing attention. -->
+            <button type="button" class="drow">
+              <span class="dthumb bg-[#dce5e1]"><img src="" alt="" class="size-full object-cover"></span>
+              <span class="min-w-0 grow">
+                <span class="dtitle">Ralph Lauren Chino Shorts Mens 33 Khaki</span>
+                <span class="dstat text-bad"><span class="dot bg-bad"></span>Error</span>
+              </span>
+            </button>
+
+            <!-- Selected. Highlight persists while its listing is in the form. -->
+            <button type="button" class="drow drow-on" aria-current="true">
+              <span class="dthumb bg-[#e2dfe8]"><img src="" alt="" class="size-full object-cover"></span>
+              <span class="min-w-0 grow">
+                <span class="dtitle">Polo Ralph Lauren Classic Fit Mesh Polo Shirt</span>
+                <span class="dstat text-ok"><span class="dot bg-ok"></span>Ready</span>
+              </span>
+            </button>
+
+            <!-- Processing: NO handler at all, not a disabled one. Keeps the
+                 spinner until a manual refresh says otherwise. -->
+            <div class="drow drow-off">
+              <span class="dthumb bg-[#e8e2da]"><img src="" alt="" class="size-full object-cover"></span>
+              <span class="min-w-0 grow">
+                <span class="dtitle">Carhartt WIP Detroit Jacket Mens Large Brown</span>
+                <span class="dstat text-ink-3">
+                  <svg class="size-[11px] animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 3.6a8.4 8.4 0 1 1-5.9 2.5"/></svg>
+                  Processing
+                </span>
+              </span>
+            </div>
+
+            <!-- Skipped: still opens on click. Only Next draft passes over it. -->
+            <button type="button" class="drow">
+              <span class="dthumb bg-[#d9e0e8]"><img src="" alt="" class="size-full object-cover"></span>
+              <span class="min-w-0 grow">
+                <span class="dtitle">Nike Windrunner Jacket Mens XL Navy</span>
+                <span class="dstat text-ok"><span class="dot bg-ok"></span>Ready<span class="skipped">Skipped</span></span>
+              </span>
+            </button>
+
+            <!-- … remaining drafts, same shape … -->
+          </div>
+
+          <p class="m-0 border-t border-line px-3 py-2.5 text-sm text-ink-3">
+            Oldest first, so Next draft is the next row down. Refreshes on save, publish,
+            Next draft and Refresh — never on a timer.
+          </p>
+        </div>
+
+        <!-- Queue empty: the listing area shows ONLY this line, centred.
+             It is also where Next draft lands when nothing is left.
+             <p class="m-0 text-[20px] font-semibold tracking-[-0.01em]">You're all caught up 🎉</p> -->
+      </aside>
+
+      <!-- ── 2. PHOTOS & NOTES ───────────────────────────────────────────────
+           When the panel is deliberately collapsed this column takes its width
+           (356 → 616) and the tiles roughly double, for inspecting a photo.
+           The form column is unchanged either way. See .lib.lib-closed ~ .photos -->
+      <section class="photos flex shrink-0 flex-col gap-3 overflow-y-auto border-r border-line bg-panel p-3">
+
+        <!-- In Google pick-a-photo mode add: shadow-[0_0_0_2px_var(--color-warn-line)] -->
+        <div class="pzone rounded-panel border border-line p-[9px]">
+          <div class="mb-[7px] flex items-center gap-2">
+            <h2 class="lbl">eBay Listing Photos</h2>
+            <span class="font-mono text-xs text-ink-3">7</span>
+            <div class="grow"></div>
+            <span class="text-xs text-ink-3">Drag to reorder</span>
+          </div>
+          <div class="pgrid grid grid-cols-4 gap-1.5">
+            <!-- Repeat per photo; first one carries the MAIN strip -->
+            <div class="ptile bg-[#dfe3ea]">
+              <img src="" alt="" class="absolute inset-0 size-full object-cover">
+              <span class="lbl absolute inset-x-0 bottom-0 bg-accent py-0.5 text-center text-2xs tracking-[0.1em] text-on-accent">Main</span>
+              <button type="button" aria-label="Remove photo"
+                      class="absolute right-[3px] top-[3px] flex size-4 items-center justify-center rounded-[4px] border-0 bg-black/60 p-0 text-white cursor-pointer">
+                <svg class="size-[9px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>
+              </button>
+            </div>
+            <!-- Drop target, always last -->
+            <button type="button" class="pdrop">
+              <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M12 6v12M6 12h12"/></svg>
+              <span class="text-2xs">Drop</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- AI Analysis Photos — same grid, capped at 8, badge shows n/8 -->
+        <div class="pzone rounded-panel border border-line p-[9px]">
+          <div class="mb-[7px] flex items-center gap-2">
+            <h2 class="lbl">AI Analysis Photos</h2>
+            <span class="badge badge-accent">6/8</span>
+          </div>
+          <div class="pgrid grid grid-cols-4 gap-1.5"><!-- … --></div>
+        </div>
+
+        <div>
+          <h2 class="lbl mb-1.5">Research</h2>
+          <div class="flex gap-1.5">
+            <!-- Add btn-active while pick-a-photo mode is on -->
+            <button type="button" class="btn grow">Google</button>
+            <button type="button" class="btn grow">eBay</button>
+          </div>
+          <p class="mt-[7px] m-0 hidden text-sm font-medium text-warn" data-when="pick-mode">Pick a photo to search on Google.</p>
+        </div>
+
+        <!-- AI Note — turns red whenever it has content -->
+        <div>
+          <div class="mb-1.5 flex items-center gap-1.5">
+            <h2 class="lbl text-bad">AI Note</h2>
+            <span class="size-1.5 rounded-full bg-bad"></span>
+          </div>
+          <label class="sr-only" for="ai-note">AI note</label>
+          <textarea id="ai-note" rows="3" class="textarea input-filled">Pit to pit 22in, length 29in, sleeve 9in.</textarea>
+        </div>
+
+        <div>
+          <h2 class="lbl mb-1.5">Draft Note</h2>
+          <label class="sr-only" for="draft-note">Draft note</label>
+          <textarea id="draft-note" rows="3" class="textarea" placeholder="Notes for yourself — not sent to eBay"></textarea>
+        </div>
+
+        <!-- Saves the instant it is ticked; sticks until unticked. The draft keeps
+             its place in the queue with a grey Skipped label and still opens on
+             click — skipping changes one thing only: Next draft passes over it. -->
+        <div class="flex flex-wrap items-center gap-2">
+          <label class="flex cursor-pointer items-center gap-2 text-base font-medium">
+            <input type="checkbox" class="m-0 size-[15px] cursor-pointer accent-accent">
+            Skip Draft
+          </label>
+          <span class="inline-flex items-center gap-1 rounded-chip border border-ok-line bg-ok-weak px-1.5 py-0.5 text-xs font-medium text-ok">
+            <svg class="size-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 12.5 9.5 17.5 19.5 6.5"/></svg>
+            Saved
+          </span>
+
+          <div class="grow"></div>
+
+          <!-- Destructive, so it stays quiet until hovered and never fires
+               directly: it only opens the confirm dialog below. -->
+          <button type="button" class="btn btn-sm btn-danger" data-action="ask-delete">
+            <svg class="size-[13px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4.8 6.6h14.4"/><path d="M9.3 6.6V4.9h5.4v1.7"/><path d="M6.6 6.6 7.5 20h9l.9-13.4"/><path d="M10.4 10.2v6M13.6 10.2v6"/></svg>
+            Delete Draft
+          </button>
+        </div>
+      </section>
+
+      <!-- ── 3 + 4. THE FORM — two independently scrolling panes ───────────── -->
+      <section class="flex min-w-0 grow overflow-hidden bg-panel">
+
+        <!-- PANE A: title, keywords, category, SKU, item specifics -->
+        <div class="form-pane-a flex min-h-0 flex-col gap-3.5 overflow-y-auto px-4 py-3.5">
+
+          <div>
+            <div class="flex items-baseline gap-2">
+              <label class="fl" for="title">Title</label>
+              <div class="grow"></div>
+              <span class="font-mono text-sm text-ink-2">76 / 80</span>
+            </div>
+            <!-- Two lines, so all 80 characters stay visible at every width. -->
+            <textarea id="title" rows="2" class="textarea leading-[19px]">Polo Ralph Lauren Classic Fit Mesh Polo Shirt Mens Large Navy Blue Pony Logo</textarea>
+          </div>
+
+          <!-- Keywords -->
+          <div>
+            <div class="mb-[7px] flex items-center gap-2.5">
+              <h2 class="lbl">Keywords</h2>
+              <div class="grow"></div>
+              <span class="inline-flex items-center gap-1.5 text-xs text-ink-3"><span class="size-2.5 rounded-[3px] bg-accent"></span> In title</span>
+              <span class="inline-flex items-center gap-1.5 text-xs text-ink-3"><span class="size-2.5 rounded-[3px] border border-line-strong"></span> In Theme</span>
+            </div>
+            <div class="flex flex-col gap-1.5">
+              <!-- One row per tier -->
+              <div class="flex items-start gap-2">
+                <span class="lbl w-12 shrink-0 pt-[5px] text-xs">Tier 1</span>
+                <!-- Chips are ONLY the keywords added after Color — never the brand,
+                     never the style name. Title Case; no word the title carries on its
+                     own; no banned words; tiers fill in order. `.chip` sets
+                     shrink-0 + nowrap, without which a long chip spills over its
+                     neighbour. -->
+                <div class="flex flex-wrap gap-[5px]">
+                  <button type="button" class="chip chip-in-title">Pony Logo</button>
+                  <button type="button" class="chip chip-in-theme">
+                    Big Pony <span class="lbl text-[8px] tracking-[0.08em]">Theme</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+            <p class="mt-[7px] m-0 text-sm text-ink-3">Tier 1 carries the most search weight — get those into the title first.</p>
+          </div>
+
+          <!-- Category + SKU share a row -->
+          <div class="row">
+            <!-- A dropdown, not a modal. The option text is the readable tail of
+                 the path; the parent path sits under it so nothing is truncated. -->
+            <div class="min-w-[200px] flex-[1_1_240px]">
+              <label class="fl" for="cat">Category</label>
+              <select id="cat" class="select">
+                <option>Men's Clothing &gt; Shirts &gt; Polos</option>
+                <option>Men's Clothing &gt; Shirts &gt; Casual Button-Down Shirts</option>
+                <option>Men's Clothing &gt; T-Shirts</option>
+              </select>
+              <p class="mt-1 m-0 text-sm text-ink-3">In Clothing, Shoes &amp; Accessories &gt; Men</p>
+              <!-- New category: add `input-invalid` to the select and a bad-state line here -->
+            </div>
+            <div class="min-w-[120px] flex-[0_1_150px]">
+              <label class="fl" for="sku">SKU <span class="text-bad">*</span></label>
+              <input id="sku" type="text" class="input font-mono" value="SH-1042">
+            </div>
+          </div>
+
+          <!-- Item specifics -->
+          <div class="border-t border-line pt-3">
+            <div class="mb-2 flex items-center gap-2">
+              <h2 class="lbl">Item Specifics</h2>
+            </div>
+
+            <!-- NOTHING HERE UNTIL A CATEGORY IS CHOSEN. The field list and both
+                 counts come from eBay per category, so with no category picked
+                 the Required and Additional blocks below are not rendered at all
+                 — no em-dash placeholders, no "0 filled · 30 empty" — and this
+                 line stands in their place:
+                 <p class="hint">Item specifics appear once a category is chosen.</p>
+                 This is about the CATEGORY, not about being a new listing: an
+                 open draft with no category shows the same thing. -->
+            <p class="lbl mb-1.5 text-xs">Required</p>
+            <div class="spec-grid grid gap-2">
+              <!-- Repeat for all 9 required fields -->
+              <div>
+                <span class="fl">Brand</span>
+                <button type="button" class="pick">
+                  <span class="truncate">Polo Ralph Lauren</span>
+                  <svg class="size-[13px] shrink-0 opacity-60" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9.5 12 15.5 18 9.5"/></svg>
+                </button>
+              </div>
+            </div>
+
+            <div class="mt-3 flex items-center gap-2">
+              <p class="lbl text-xs">Additional</p>
+              <span class="font-mono text-xs text-ink-3">12 filled · 18 empty</span>
+              <div class="grow"></div>
+              <button type="button" class="btn btn-sm">Show all 30</button>
+            </div>
+
+            <div class="spec-grid mt-[7px] grid gap-2">
+              <!-- Filled first, then empties (class `pick-empty`, value "—") -->
+            </div>
+          </div>
+        </div>
+
+        <!-- PANE B: condition, description, pricing, toggles, shipping.
+             Scrolls on its own — pane A never drags it. -->
+        <div class="form-pane-b flex min-h-0 flex-col gap-3.5 overflow-y-auto border-l border-line px-4 py-3.5">
+
+          <div class="row">
+            <div class="min-w-[150px] flex-[0_1_196px]">
+              <label class="fl" for="cond">Condition</label>
+              <select id="cond" class="select">
+                <option>Pre-Owned - Excellent</option>
+                <option>New With Tags</option>
+                <option>New Without Tags</option>
+                <option>New With Defects</option>
+                <option>Pre-Owned - Good</option>
+                <option>Pre-Owned - Fair</option>
+              </select>
+            </div>
+            <!-- Condition Description shows only for the Pre-Owned grades -->
+            <div class="min-w-[180px] flex-[1_1_200px]">
+              <label class="fl" for="cond-desc">Condition Description</label>
+              <input id="cond-desc" type="text" class="input" value="No stains or holes. Light wear at cuffs.">
+            </div>
+          </div>
+
+          <div>
+            <div class="flex items-center gap-2">
+              <label class="fl" for="desc">Description</label>
+              <div class="grow"></div>
+              <span class="text-xs text-ink-3">Scrolls in place</span>
+            </div>
+            <!-- Fixed height on purpose: a long description must never push
+                 pricing and shipping off the screen. -->
+            <textarea id="desc" class="textarea h-[148px] overflow-y-auto leading-[19px]"></textarea>
+          </div>
+
+          <!-- Pricing — one row -->
+          <div class="row row-end border-t border-line pt-3">
+            <div class="min-w-[150px] flex-[0_1_180px]">
+              <span class="fl">Format</span>
+              <div class="seg">
+                <button type="button" aria-pressed="true">Buy It Now</button>
+                <button type="button" aria-pressed="false">Auction</button>
+              </div>
+            </div>
+            <div class="min-w-[96px] flex-[0_1_124px]">
+              <label class="fl" for="price">Price</label>
+              <input id="price" type="text" class="input font-mono" value="$34.99">
+            </div>
+            <div class="min-w-[76px] flex-[0_1_100px]">
+              <label class="fl" for="qty">Quantity</label>
+              <input id="qty" type="text" class="input font-mono" value="1">
+            </div>
+          </div>
+
+          <!-- Offers / Schedule / Promote. Each reveals its fields inline. -->
+          <div class="group px-2.5 py-1">
+            <!-- Wraps rather than clipping: at a narrow pane the fields drop to
+                 their own line instead of pushing past the edge. -->
+            <div class="flex flex-wrap items-center gap-x-2.5 gap-y-2 py-[7px]">
+              <button type="button" class="toggle" aria-pressed="true" aria-label="Allow offers"><span class="toggle-knob"></span></button>
+              <span class="whitespace-nowrap text-base font-medium">Allow Offers</span>
+              <div class="ml-auto flex items-center gap-2">
+                <label class="fl m-0 whitespace-nowrap" for="min-offer">Minimum</label>
+                <input id="min-offer" type="text" class="input w-[84px] font-mono" value="$28.00">
+                <label class="fl m-0 whitespace-nowrap" for="auto-accept">Auto accept</label>
+                <input id="auto-accept" type="text" class="input w-[84px] font-mono" value="$31.00">
+              </div>
+            </div>
+            <div class="flex items-center gap-2.5 border-t border-line py-[7px]">
+              <button type="button" class="toggle" aria-pressed="false" aria-label="Schedule listing"><span class="toggle-knob"></span></button>
+              <span class="text-base font-medium">Schedule Listing</span>
+              <div class="grow"></div>
+              <!-- When on: Date + Time inputs, and the submit button relabels -->
+            </div>
+            <div class="flex items-center gap-2.5 border-t border-line py-[7px]">
+              <button type="button" class="toggle" aria-pressed="true" aria-label="Promote listing"><span class="toggle-knob"></span></button>
+              <span class="text-base font-medium">Promote Listing</span>
+              <div class="grow"></div>
+              <div class="flex items-center gap-2">
+                <label class="fl m-0" for="ad-rate">Ad rate</label>
+                <input id="ad-rate" type="text" class="input w-[78px] font-mono" value="2.0 %">
+              </div>
+            </div>
+          </div>
+
+          <div class="flex flex-col gap-2.5 border-t border-line pt-3">
+            <h2 class="lbl">Shipping</h2>
+            <div>
+              <label class="fl" for="ship-pol">Shipping Policy</label>
+              <select id="ship-pol" class="select"><option>Free Shipping — USPS Ground Advantage</option></select>
+            </div>
+            <div class="row row-end">
+              <div class="flex-[0_1_auto]">
+                <span class="fl">Package Weight</span>
+                <div class="flex items-center gap-1.5">
+                  <input type="text" aria-label="Pounds" class="input w-[54px] font-mono" value="0">
+                  <span class="text-sm text-ink-3">lbs</span>
+                  <input type="text" aria-label="Ounces" class="input w-[54px] font-mono" value="9">
+                  <span class="text-sm text-ink-3">oz</span>
+                </div>
+              </div>
+              <div class="flex-[0_1_auto]">
+                <span class="fl">Package Dimensions</span>
+                <div class="flex items-center gap-1.5">
+                  <input type="text" aria-label="Length" class="input w-12 font-mono" value="10">
+                  <span class="text-sm text-ink-3">×</span>
+                  <input type="text" aria-label="Width" class="input w-12 font-mono" value="8">
+                  <span class="text-sm text-ink-3">×</span>
+                  <input type="text" aria-label="Height" class="input w-12 font-mono" value="2">
+                  <span class="text-sm text-ink-3">in</span>
+                </div>
+              </div>
+            </div>
+            <!-- Country of manufacture, read-only. Its own row so it never clips. -->
+            <div>
+              <label class="fl" for="origin">Item Origin</label>
+              <input id="origin" type="text" readonly class="input" value="Sri Lanka">
+            </div>
+            <div class="row">
+              <div class="min-w-[170px] flex-[1_1_200px]">
+                <label class="fl" for="pay-pol">Payment Policy</label>
+                <select id="pay-pol" class="select"><option>eBay Managed Payments — Default</option></select>
+              </div>
+              <!-- Empty policy state -->
+              <div class="min-w-[170px] flex-[1_1_200px]">
+                <span class="fl">Return Policy</span>
+                <div class="flex h-field items-center gap-2 rounded-field border border-dashed border-line-strong bg-sunken px-2.5">
+                  <span class="text-sm text-ink-3">None saved</span>
+                  <a href="/settings" class="text-sm font-medium text-accent">Add in Settings</a>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- No result box here on purpose — see the status lane. -->
+
+          <div class="flex items-center gap-3 border-t border-line pt-3">
+            <p class="m-0 grow text-sm text-ink-3">Photos upload in the order shown; the first is the gallery image.</p>
+            <button type="button" class="btn btn-primary btn-lg min-w-[200px]">List on eBay</button>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <!-- ══ DELETE DRAFT — CONFIRM ══════════════════════════════════════════════
+       Never destructive on the first click. Cancel and Escape both close it and
+       change nothing. Confirming removes the row, then opens the next draft by
+       the same rule Next draft uses: oldest, not skipped, not processing. If the
+       deleted draft was the last one, the screen shows "You're all caught up".
+       Add `hidden` to keep it closed; the script below toggles that class.      -->
+  <!-- ══ UNSAVED EDITS — ONE POPUP, TWO WAYS OUT ════════════════════════════
+       Opened by New listing and by clicking another draft row, whenever the open
+       draft has unsaved edits. Save writes the draft, then leaves; Discard leaves
+       without writing; Cancel stays put. Never shown when nothing has changed.  -->
+  <div class="scrim hidden" id="leave-scrim">
+    <div class="dialog" role="alertdialog" aria-modal="true" aria-labelledby="leave-heading">
+      <p id="leave-heading" class="m-0 text-lg font-semibold">Save changes?</p>
+      <p class="hint mt-1.5">You have unsaved edits to <span class="mono text-ink-2">SH-1042</span>.</p>
+      <div class="mt-3.5 flex justify-end gap-2">
+        <button type="button" class="btn" data-action="close-leave">Cancel</button>
+        <button type="button" class="btn" data-action="discard-leave">Discard</button>
+        <button type="button" class="btn btn-primary" data-action="save-leave">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="scrim hidden" id="delete-scrim">
+    <div class="dialog" role="alertdialog" aria-modal="true" aria-labelledby="delete-heading">
+      <p id="delete-heading" class="m-0 text-lg font-semibold">Delete this draft?</p>
+      <p class="hint mt-1.5"><span class="mono text-ink-2">SH-1042</span> · Polo Ralph Lauren Classic Fit Mesh Polo Shirt</p>
+      <p class="hint mt-2">Deletes the draft and its photos from the queue. This can’t be undone. Nothing on eBay changes.</p>
+      <div class="mt-3.5 flex justify-end gap-2">
+        <button type="button" class="btn" data-action="close-delete">Cancel</button>
+        <button type="button" class="btn btn-danger" data-action="confirm-delete">Delete Draft</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // The three bits of layout state. Everything else is server/framework data.
+  const shell = document.querySelector('.app-shell');
+  const lib = document.querySelector('.lib');
+
+  // Theme: follow the device setting until the user chooses for themselves,
+  // then remember their choice and stop following.
+  const THEME_KEY = 'lister.theme';
+  const media = window.matchMedia('(prefers-color-scheme: dark)');
+  let chosen = null;
+  try { chosen = localStorage.getItem(THEME_KEY); } catch {}
+
+  const apply = dark => shell.classList.toggle('dark', dark);
+  apply(chosen ? chosen === 'dark' : media.matches);
+
+  media.addEventListener('change', e => { if (!chosen) apply(e.matches); });
+
+  document.querySelector('[data-action="toggle-theme"]')?.addEventListener('click', () => {
+    const dark = !shell.classList.contains('dark');
+    apply(dark);
+    chosen = dark ? 'dark' : 'light';
+    try { localStorage.setItem(THEME_KEY, chosen); } catch {}
+  });
+
+  // Once the user makes a choice, drop `lib-auto` so their choice wins at
+  // every width and the container query stops overriding it.
+  document.querySelector('[data-action="lib-close"]')?.addEventListener('click', () => {
+    lib.classList.remove('lib-auto');
+    lib.classList.add('lib-closed');
+  });
+  document.querySelector('[data-action="lib-open"]')?.addEventListener('click', () => {
+    lib.classList.remove('lib-auto', 'lib-closed');
+  });
+
+  // Panel switch. Photos and Drafts are two bodies in one panel; switching
+  // does not touch the listing area, and the panel keeps its scroll position.
+  const photosBody = lib.querySelector('.lib-body');
+  const draftsBody = lib.querySelector('.lib-drafts');
+  const setMode = mode => {
+    const drafts = mode === 'drafts';
+    photosBody.classList.toggle('hidden', drafts);
+    photosBody.classList.toggle('flex', !drafts);
+    draftsBody.classList.toggle('hidden', !drafts);
+    draftsBody.classList.toggle('flex', drafts);
+    lib.querySelectorAll('[data-action="mode-photos"]').forEach(b => {
+      b.setAttribute('aria-pressed', String(!drafts));
+      b.classList.toggle('modebtn-on', b.classList.contains('modebtn') && !drafts);
+    });
+    lib.querySelectorAll('[data-action="mode-drafts"]').forEach(b => {
+      b.setAttribute('aria-pressed', String(drafts));
+      b.classList.toggle('modebtn-on', b.classList.contains('modebtn') && drafts);
+    });
+  };
+  lib.querySelectorAll('[data-action="mode-photos"]').forEach(b =>
+    b.addEventListener('click', () => setMode('photos')));
+  lib.querySelectorAll('[data-action="mode-drafts"]').forEach(b =>
+    b.addEventListener('click', () => setMode('drafts')));
+
+  // New listing. With unsaved edits it asks first; with none it clears at once.
+  // Clearing is a form reset, never a write: nothing is added to the queue here.
+  const leaveScrim = document.getElementById('leave-scrim');
+  const closeLeave = () => leaveScrim.classList.add('hidden');
+  const clearForm = () => { /* reset fields, empty both photo zones, deselect the row */ };
+  const isDirty = () => true; // replace with the real dirty check
+  document.querySelector('[data-action="new-listing"]')?.addEventListener('click', () => {
+    if (!isDirty()) { clearForm(); return; }
+    leaveScrim.classList.remove('hidden');
+    leaveScrim.querySelector('[data-action="close-leave"]').focus();
+  });
+  leaveScrim.addEventListener('click', e => { if (e.target === leaveScrim) closeLeave(); });
+  leaveScrim.querySelector('[data-action="close-leave"]').addEventListener('click', closeLeave);
+  leaveScrim.querySelector('[data-action="discard-leave"]').addEventListener('click', () => {
+    closeLeave(); clearForm();
+  });
+  leaveScrim.querySelector('[data-action="save-leave"]').addEventListener('click', () => {
+    closeLeave(); /* save the draft, refresh the list, then: */ clearForm();
+  });
+
+  // Delete Draft. The button opens the dialog; only the dialog deletes.
+  const scrim = document.getElementById('delete-scrim');
+  const closeDelete = () => scrim.classList.add('hidden');
+  document.querySelector('[data-action="ask-delete"]')?.addEventListener('click', () => {
+    scrim.classList.remove('hidden');
+    scrim.querySelector('[data-action="close-delete"]').focus();
+  });
+  // Backdrop click closes; a click anywhere inside the dialog does not.
+  scrim.addEventListener('click', e => { if (e.target === scrim) closeDelete(); });
+  scrim.querySelectorAll('[data-action="close-delete"]').forEach(b =>
+    b.addEventListener('click', closeDelete));
+  document.addEventListener('keydown', e => {
+    if (e.key !== 'Escape') return;
+    if (!scrim.classList.contains('hidden')) closeDelete();
+    if (!leaveScrim.classList.contains('hidden')) closeLeave();
+  });
+  // Wire to the real endpoint: DELETE the draft, refresh the list, open the
+  // next one by the Next draft rule.
+  scrim.querySelector('[data-action="confirm-delete"]').addEventListener('click', closeDelete);
+</script>
+</body>
+</html>

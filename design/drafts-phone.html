@@ -1,0 +1,275 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Drafts — phone</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+
+  <!-- Built by Tailwind v4 from lister-theme.css. See README.md. -->
+  <link rel="stylesheet" href="./lister-theme.css">
+</head>
+
+<!--
+  PHONE — DRAFTS.  Designed at 390×844 (Android, Chrome).
+
+  Add class="dark" to .app-shell for dark mode. On the phone the theme toggle
+  lives in ONE place only — the More sheet (see nav.html). There is no moon in
+  any phone header.
+
+  Every tap target on this screen is at least 44px tall. The two exceptions to
+  "make it smaller to fit more" are: the row's 56px thumbnail, which is what
+  the user actually recognises a draft by, and the 44px delete button.
+-->
+
+<body class="font-sans text-lg antialiased">
+
+<div class="app-shell relative mx-auto flex h-screen w-full max-w-[430px] flex-col overflow-hidden bg-panel text-ink">
+
+  <!-- ══ HEADER ═════════════════════════════════════════════════════════════
+       Title, live count, Refresh. Nothing else: no search, no sort control,
+       no filter — the page has none today and none was added. -->
+  <header class="flex h-14 shrink-0 items-center gap-2.5 border-b border-line pl-3.5 pr-1.5">
+    <h1 class="m-0 text-3xl font-semibold tracking-[-0.01em]">Drafts</h1>
+
+    <!-- The count is the number of rows actually in the list. It is NOT a
+         server total: this list is fully loaded, so the two cannot disagree. -->
+    <span class="rounded-chip border border-line bg-sunken px-2 py-[3px] font-mono text-base text-ink-2">8 drafts</span>
+
+    <div class="grow"></div>
+
+    <!-- REFRESH is the only way the list updates besides opening the page.
+         There is deliberately no polling: a list that reorders itself under a
+         thumb mid-tap opens the wrong draft. -->
+    <button type="button"
+            class="flex h-11 cursor-pointer items-center gap-1.5 rounded-panel border-0 bg-transparent px-2.5 font-sans text-md font-medium text-accent">
+      <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 1 1-2.3-5.6"/><path d="M20.5 4v4.4h-4.4"/></svg>
+      Refresh
+    </button>
+  </header>
+
+  <!-- ══ LIST ═══════════════════════════════════════════════════════════════
+       Sorted OLDEST → NEWEST by creation date, the same order the desktop
+       queue uses, so "Next draft" on desktop and the top of this list mean
+       the same draft. -->
+  <div class="min-h-0 grow overflow-y-auto">
+
+    <!-- ── ROW: ERROR ────────────────────────────────────────────────────────
+         An Error draft is one whose BACKGROUND PROCESSING failed — the AI
+         analysis or the photo upload. It is never an eBay publish failure: a
+         draft that reaches eBay is deleted on success, and a publish failure
+         is reported on the listing screen, not stored on the row.
+
+         The message is the app's own, printed verbatim over two lines and
+         clamped. It replaces nothing: the pill and the date still show, they
+         just move to their own line so a long message has the full width. -->
+    <div class="lrow">
+      <button type="button" class="rowmain">
+        <span class="rthumb" style="background:#dfe3ea">
+          <!-- ICON garment placeholder — replace with the draft's first photo -->
+          <svg class="size-6" viewBox="0 0 24 24" fill="none" stroke="rgba(30,38,50,.32)" stroke-width="1.4" stroke-linejoin="round"><path d="M9.5 3.5 4.5 6.2 6 9.4l2-.9V20h8V8.5l2 .9 1.5-3.2-5-2.7a3 3 0 0 1-5 0z"/></svg>
+        </span>
+        <span class="min-w-0 grow">
+          <span class="rtitle">Ralph Lauren Chino Shorts Mens 33 Khaki</span>
+          <span class="rmeta">
+            <span class="pill pill-err mt-px">Error</span>
+            <span class="rmeta-date">Created 14 Sep</span>
+          </span>
+          <span class="rmeta-err">Analysis failed: AI service overloaded, try again</span>
+        </span>
+      </button>
+      <button type="button" class="rdel" aria-label="Delete draft Ralph Lauren Chino Shorts Mens 33 Khaki">
+        <svg class="size-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4.8 6.6h14.4"/><path d="M9.3 6.6V4.9h5.4v1.7"/><path d="M6.6 6.6 7.5 20h9l.9-13.4"/><path d="M10.4 10.2v6M13.6 10.2v6"/></svg>
+      </button>
+    </div>
+
+    <!-- ── ROW: READY (the ordinary case) ────────────────────────────────────
+         Meta line is THREE elements, never one string:
+
+           .rmeta-cond  the condition — truncates
+           ·            the separator, dropped with the condition
+           .rmeta-date  the date — shrink-0, NEVER truncates
+
+         Getting this wrong produces "Created 1…", which is worse than no date
+         at all, and the date is the thing the list is sorted by. -->
+    <div class="lrow">
+      <button type="button" class="rowmain">
+        <span class="rthumb" style="background:#e6e1da">
+          <svg class="size-6" viewBox="0 0 24 24" fill="none" stroke="rgba(30,38,50,.32)" stroke-width="1.4" stroke-linejoin="round"><path d="M9.5 3.5 4.5 6.2 6 9.4l2-.9V20h8V8.5l2 .9 1.5-3.2-5-2.7a3 3 0 0 1-5 0z"/></svg>
+        </span>
+        <span class="min-w-0 grow">
+          <span class="rtitle">Polo Ralph Lauren Classic Fit Mesh Polo Shirt</span>
+          <span class="rmeta">
+            <span class="rmeta-cond">Pre-Owned - Excellent</span>
+            <span class="rmeta-date" aria-hidden="true">·</span>
+            <span class="rmeta-date">Created 14 Sep</span>
+          </span>
+        </span>
+      </button>
+      <button type="button" class="rdel" aria-label="Delete draft Polo Ralph Lauren Classic Fit Mesh Polo Shirt">
+        <svg class="size-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4.8 6.6h14.4"/><path d="M9.3 6.6V4.9h5.4v1.7"/><path d="M6.6 6.6 7.5 20h9l.9-13.4"/><path d="M10.4 10.2v6M13.6 10.2v6"/></svg>
+      </button>
+    </div>
+
+    <!-- ── ROW: PROCESSING ───────────────────────────────────────────────────
+         Dimmed AND inert: .rowmain-off drops it to 55% and removes the press
+         state, and no click handler is bound. A draft still being analysed has
+         no fields to edit, so opening it would show a form that is about to be
+         overwritten. The delete button stays live — a stuck job must be
+         removable without waiting for it.
+
+         No condition and no spinner text beyond the pill: the app has no
+         per-photo progress, because every photo goes to the AI in ONE request. -->
+    <div class="lrow">
+      <button type="button" class="rowmain rowmain-off" aria-disabled="true">
+        <span class="rthumb" style="background:#e2dfe8">
+          <svg class="size-6" viewBox="0 0 24 24" fill="none" stroke="rgba(30,38,50,.32)" stroke-width="1.4" stroke-linejoin="round"><path d="M9.5 3.5 4.5 6.2 6 9.4l2-.9V20h8V8.5l2 .9 1.5-3.2-5-2.7a3 3 0 0 1-5 0z"/></svg>
+        </span>
+        <span class="min-w-0 grow">
+          <span class="rtitle">Carhartt WIP Detroit Jacket Mens Large Brown</span>
+          <span class="rmeta">
+            <span class="pill pill-busy mt-px">
+              <svg class="size-[11px] animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 3.6a8.4 8.4 0 1 1-5.9 2.5"/></svg>
+              Processing
+            </span>
+            <span class="rmeta-date">Created 15 Sep</span>
+          </span>
+        </span>
+      </button>
+      <button type="button" class="rdel" aria-label="Delete draft Carhartt WIP Detroit Jacket Mens Large Brown">
+        <svg class="size-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4.8 6.6h14.4"/><path d="M9.3 6.6V4.9h5.4v1.7"/><path d="M6.6 6.6 7.5 20h9l.9-13.4"/><path d="M10.4 10.2v6M13.6 10.2v6"/></svg>
+      </button>
+    </div>
+
+    <!-- ── ROW: SKIPPED ──────────────────────────────────────────────────────
+         Skipped is a grey pill, not a red one, and the row stays fully
+         openable: skipping is a "not now", not a failure. The condition is
+         the first thing dropped when the pill and the date need the room. -->
+    <div class="lrow">
+      <button type="button" class="rowmain">
+        <span class="rthumb" style="background:#e8e2da">
+          <svg class="size-6" viewBox="0 0 24 24" fill="none" stroke="rgba(30,38,50,.32)" stroke-width="1.4" stroke-linejoin="round"><path d="M9.5 3.5 4.5 6.2 6 9.4l2-.9V20h8V8.5l2 .9 1.5-3.2-5-2.7a3 3 0 0 1-5 0z"/></svg>
+        </span>
+        <span class="min-w-0 grow">
+          <span class="rtitle">Nike Windrunner Jacket Mens XL Navy</span>
+          <span class="rmeta">
+            <span class="pill pill-skip mt-px">Skipped</span>
+            <span class="rmeta-cond">Pre-Owned - Excellent</span>
+            <span class="rmeta-date" aria-hidden="true">·</span>
+            <span class="rmeta-date">Created 15 Sep</span>
+          </span>
+        </span>
+      </button>
+      <button type="button" class="rdel" aria-label="Delete draft Nike Windrunner Jacket Mens XL Navy">
+        <svg class="size-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4.8 6.6h14.4"/><path d="M9.3 6.6V4.9h5.4v1.7"/><path d="M6.6 6.6 7.5 20h9l.9-13.4"/><path d="M10.4 10.2v6M13.6 10.2v6"/></svg>
+      </button>
+    </div>
+
+    <!-- Repeat for every draft: Ready rows as above, Processing with
+         .rowmain-off, Error with .pill-err + .rmeta-err. -->
+
+    <!-- The footer note explains the two rules a user cannot see: the sort
+         order and the absence of auto-refresh. It sits after the last row, in
+         the scroll area, so it costs nothing above the fold. -->
+    <p class="hint px-3.5 pb-[18px] pt-3.5">Oldest first, by the date each draft was created. The list refreshes when you open this page and when you tap Refresh — never on a timer.</p>
+  </div>
+
+  <!-- ══ EMPTY STATE ════════════════════════════════════════════════════════
+       Replaces the scroll area (not the header, and not the nav bar — the
+       count reads "0 drafts" and Refresh still works). One action, and it is
+       the one that fixes the emptiness. -->
+  <div class="hidden min-h-0 grow flex-col items-center justify-center gap-3.5 p-6" data-state="empty">
+    <span class="flex size-[60px] items-center justify-center rounded-full border border-line bg-sunken text-ink-3">
+      <svg class="size-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4.2" y="3.5" width="13.5" height="17" rx="2.4"/><path d="M7.6 8.4h6.7M7.6 12h6.7M7.6 15.6h3.6"/></svg>
+    </span>
+    <p class="m-0 text-3xl font-semibold">No drafts yet</p>
+    <a href="/create" class="btn btn-primary btn-touch no-underline">Create Listing</a>
+  </div>
+
+  <!-- ══ BOTTOM BAR ═════════════════════════════════════════════════════════
+       Identical on every phone screen except Camera, which is full-screen and
+       has none. The canonical copy with all five entries lives in nav.html —
+       keep them in sync. Drafts is current here. -->
+  <nav aria-label="Main" class="flex h-16 shrink-0 items-start border-t border-line bg-panel px-1">
+    <a href="/library" class="tabm no-underline">
+      <svg class="size-[21px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><rect x="3.5" y="3.5" width="7.2" height="7.2" rx="1.6"/><rect x="13.3" y="3.5" width="7.2" height="7.2" rx="1.6"/><rect x="3.5" y="13.3" width="7.2" height="7.2" rx="1.6"/><rect x="13.3" y="13.3" width="7.2" height="7.2" rx="1.6"/></svg>
+      <span class="lbl text-2xs tracking-[0.05em] text-current">Library</span>
+    </a>
+    <a href="/create" class="tabm no-underline">
+      <svg class="size-[21px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="3.5" width="17" height="17" rx="3.5"/><path d="M12 8.4v7.2M8.4 12h7.2"/></svg>
+      <span class="lbl text-2xs tracking-[0.05em] text-current">Create</span>
+    </a>
+    <div class="flex flex-1 justify-center">
+      <a href="/camera" aria-label="Open camera" class="fab no-underline">
+        <svg class="size-[26px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 8.6h3.2L8.2 6.5h7.6l1.5 2.1h3.2a1 1 0 0 1 1 1v7.9a1 1 0 0 1-1 1H3.5a1 1 0 0 1-1-1V9.6a1 1 0 0 1 1-1z"/><circle cx="12" cy="13.4" r="3.2"/></svg>
+      </a>
+    </div>
+    <a href="/drafts" aria-current="page" class="tabm tabm-on no-underline">
+      <svg class="size-[21px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4.2" y="3.5" width="13.5" height="17" rx="2.4"/><path d="M7.6 8.4h6.7M7.6 12h6.7M7.6 15.6h3.6"/></svg>
+      <span class="lbl text-2xs tracking-[0.05em] text-current">Drafts</span>
+    </a>
+    <button type="button" class="tabm border-0 bg-transparent" data-action="open-more">
+      <svg class="size-[21px]" viewBox="0 0 24 24" fill="currentColor"><circle cx="5.5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="18.5" cy="12" r="1.8"/></svg>
+      <span class="lbl text-2xs tracking-[0.05em] text-current">More</span>
+    </button>
+  </nav>
+
+  <!-- ══ DELETE CONFIRM ═════════════════════════════════════════════════════
+       Deleting is the one destructive action reachable in one tap from a
+       scrolling list, so it always confirms. The same dialog serves every row;
+       it is not repeated per row. -->
+  <div id="delete-scrim" class="scrim hidden">
+    <div class="dialog" role="alertdialog" aria-modal="true" aria-labelledby="del-h">
+      <p id="del-h" class="m-0 text-3xl font-semibold">Delete this draft?</p>
+      <p class="hint mt-[7px]">This cannot be undone.</p>
+      <div class="mt-4 flex gap-2">
+        <button type="button" class="btn btn-touch flex-1" data-action="close-delete">Cancel</button>
+        <button type="button" class="btn btn-danger btn-touch flex-1" data-action="confirm-delete">Delete</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  const shell = document.querySelector('.app-shell');
+
+  // Theme: follow the device setting until the user chooses in the More sheet,
+  // then remember their choice and stop following. Same key as every other
+  // screen — the choice is per user, not per page.
+  const THEME_KEY = 'lister.theme';
+  const media = window.matchMedia('(prefers-color-scheme: dark)');
+  let chosen = null;
+  try { chosen = localStorage.getItem(THEME_KEY); } catch {}
+  shell.classList.toggle('dark', chosen ? chosen === 'dark' : media.matches);
+  media.addEventListener('change', e => { if (!chosen) shell.classList.toggle('dark', e.matches); });
+
+  // Delete. The row button opens the dialog; only the dialog deletes. The row
+  // whose delete was tapped is held here so the dialog stays generic.
+  const scrim = document.getElementById('delete-scrim');
+  let pending = null;
+  const closeDelete = () => { scrim.classList.add('hidden'); pending = null; };
+
+  document.querySelectorAll('.rdel').forEach(b => b.addEventListener('click', () => {
+    pending = b.closest('.lrow');
+    scrim.classList.remove('hidden');
+    scrim.querySelector('[data-action="close-delete"]').focus();
+  }));
+  scrim.addEventListener('click', e => { if (e.target === scrim) closeDelete(); });
+  scrim.querySelector('[data-action="close-delete"]').addEventListener('click', closeDelete);
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDelete(); });
+
+  // Wire to the real endpoint: DELETE the draft, then re-fetch the list and
+  // re-render the count. Do not remove the row optimistically — if the delete
+  // fails the row must still be there.
+  scrim.querySelector('[data-action="confirm-delete"]').addEventListener('click', closeDelete);
+
+  // Refresh: re-fetch and re-render. Nothing else triggers a fetch — no
+  // interval, no visibility handler, no focus handler.
+  document.querySelector('[data-action="open-more"]'); // see nav.html
+</script>
+</body>
+</html>

@@ -32,3 +32,5 @@ Pass 2 sends up to 200 allowed values per item specific. Cutting to ~50 could sa
 - Resilience for Claude "overloaded" (529) errors during analysis.
 - EPS audit / re-upload tool (Phase 2 of [[Photo Hosting (EPS)]]).
 - Full UI design pass once features are done.
+- **Dark mode toggle** (later): the new desktop Create Listing follows the device's light/dark setting for now. Add the nav-rail toggle (remembers the user's choice) later.
+- **Laptop widths** (later): the new desktop Create Listing is for big windows only; smaller windows keep the old layout. Tune it for laptops later if needed.

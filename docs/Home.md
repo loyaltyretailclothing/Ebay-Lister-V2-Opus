@@ -11,6 +11,9 @@ Open this `docs` folder in Obsidian with **"Open folder as vault."**
 
 ## Plans and recent features
 - [[Title Keywords Plan]] — SEO-ranked keyword tiers, clickable chips, re-analyze redo (live)
+- [[Design Brief]] — brief for Claude Design: redesign every screen for less scrolling
+- [[Draft Queue Plan]] — desktop Photos | Drafts panel, work through drafts oldest-first with Skip Draft
+- [[Redesign Build Plan]] — step-by-step plan to build the finished redesign (design files in `design/`)
 
 ## How the app works
 - [[Overview]] — the big picture and where things live

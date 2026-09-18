@@ -1,0 +1,389 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Camera — phone</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+
+  <!-- Built by Tailwind v4 from lister-theme.css. See README.md. -->
+  <link rel="stylesheet" href="./lister-theme.css">
+</head>
+
+<!--
+  PHONE — CAMERA.  Designed at 390×844 (Android, Chrome).
+  PHONE ONLY. There is no desktop camera and no rail entry for it.
+
+  FULL SCREEN, NO BOTTOM NAV — on both the capture and the review step. The
+  camera is a flow, not a tab: you leave it with the close ✕ or by creating a
+  draft, and a nav bar here would be an accidental way to lose a shoot.
+
+  CAPTURE CHROME IS ALWAYS DARK and does NOT follow the theme — .cap is a
+  literal #06080b, not a token. It sits over a live viewfinder, where a light
+  surface both washes out the preview and stops being readable. REVIEW is an
+  ordinary app surface and does theme: add class="dark" to .app-shell.
+
+  Layout order top to bottom: bar · square viewfinder · exposure and white
+  balance · the strip of what you have shot · shutter row. Every control ends
+  up in the lower two thirds, inside thumb reach, and the viewfinder keeps the
+  full width.
+-->
+
+<body class="font-sans text-lg antialiased">
+
+<div class="app-shell relative mx-auto flex h-screen w-full max-w-[430px] flex-col overflow-hidden bg-bg text-ink">
+
+  <!-- ══════════════════════════════════════════════════════════════════════
+       CAPTURE
+       ══════════════════════════════════════════════════════════════════════ -->
+  <div class="cap flex min-h-0 grow flex-col" data-screen="capture">
+
+    <!-- ── TOP BAR ─────────────────────────────────────────────────────────
+         Close · photo count · torch. Three things, because everything else
+         belongs near the thumb. -->
+    <div class="flex h-14 shrink-0 items-center gap-2.5 px-2.5">
+      <button type="button" class="icobtn" aria-label="Close camera">
+        <svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>
+      </button>
+
+      <div class="flex grow justify-center">
+        <!-- "9 photos" / "1 photo" / "0 photos". Always rendered: the count is
+             part of the fixed chrome, so it cannot shift the layout when the
+             first shot lands. -->
+        <span class="mono rounded-[14px] px-3 py-[5px] text-base font-semibold" style="background:rgb(255 255 255 / .10)">9 photos</span>
+      </div>
+
+      <!-- TORCH, not a flash. A web app cannot fire a real flash on the
+           shutter, so there is NO Auto state — it is a plain Off ↔ On toggle
+           that starts Off, because constant light on fabric blows out
+           highlights and shifts colour. The slash marks Off, so the state
+           reads without relying on the fill colour alone. -->
+      <button type="button" class="icobtn" aria-pressed="false" aria-label="Torch">
+        <svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M13.2 2.5 5.5 13.4h5.1l-.8 8.1 7.7-10.9h-5.1z"/>
+          <!-- Drop this slash and add .icobtn-on to the button when On. -->
+          <path d="M3.6 3.6 20.4 20.4"/>
+        </svg>
+      </button>
+    </div>
+
+    <!-- ── VIEWFINDER ──────────────────────────────────────────────────────
+         SQUARE, and the full width of the phone: 390×390. eBay crops to
+         square, so shooting square is shooting what will be published —
+         anything else means re-framing every photo later.
+
+         Replace the banded placeholder with the <video> preview. Keep the
+         wrapper's aspect-square: the grid, reticle and zoom pills are
+         positioned against it. -->
+    <div class="relative aspect-square w-full shrink-0 overflow-hidden bg-[#14181e]">
+
+      <!-- ICON placeholder preview — swap for <video autoplay playsinline muted> -->
+      <span class="absolute inset-x-0 top-0 h-[34%] bg-[#1b2129]"></span>
+      <span class="absolute inset-x-0 top-[34%] h-[9%] bg-[#222a33]"></span>
+      <span class="absolute inset-x-0 top-[43%] h-[31%] bg-[#1e242c]"></span>
+      <span class="absolute inset-x-0 top-[74%] h-[26%] bg-[#171c23]"></span>
+      <span class="absolute left-1/2 top-1/2 h-[172px] w-[132px] -translate-x-1/2 -translate-y-1/2 rounded-[10px] bg-[rgb(226_232_240_/_.30)]"></span>
+
+      <!-- 3×3 FRAMING GRID. Always on, no toggle, 20% white — visible enough
+           to square a garment against, faint enough not to read as part of the
+           picture. It is drawn OVER the preview and is never captured. -->
+      <span aria-hidden="true" class="absolute inset-y-0 left-1/3 w-px bg-white/20"></span>
+      <span aria-hidden="true" class="absolute inset-y-0 left-2/3 w-px bg-white/20"></span>
+      <span aria-hidden="true" class="absolute inset-x-0 top-1/3 h-px bg-white/20"></span>
+      <span aria-hidden="true" class="absolute inset-x-0 top-2/3 h-px bg-white/20"></span>
+
+      <!-- FOCUS RETICLE — centred until the user taps, then moved to the tap
+           point. Amber, because every other overlay here is white or grey. -->
+      <span aria-hidden="true" class="absolute left-1/2 top-1/2 size-[78px] -translate-x-1/2 -translate-y-1/2 rounded-md border-[1.5px] border-[rgb(255_214_102_/_.95)]"></span>
+      <span aria-hidden="true" class="absolute left-1/2 top-1/2 h-[1.5px] w-3.5 -translate-x-1/2 -translate-y-1/2 bg-[rgb(255_214_102_/_.95)]"></span>
+
+      <span class="absolute left-3 top-3 rounded-xl px-[9px] py-1 text-sm font-medium text-[#f2f4f7]" style="background:rgb(6 8 11 / .5)">Tap to focus</span>
+
+      <!-- ZOOM sits ON the viewfinder, bottom-centre, the way every phone
+           camera puts it. Overlaying costs no vertical space and keeps the
+           control next to the thing it changes. -->
+      <div class="absolute inset-x-0 bottom-3 flex justify-center gap-[7px]">
+        <button type="button" class="cpill cpill-on" aria-pressed="true">1x</button>
+        <button type="button" class="cpill" aria-pressed="false">2x</button>
+        <button type="button" class="cpill" aria-pressed="false">3x</button>
+      </div>
+    </div>
+
+    <!-- ── CONTROLS ────────────────────────────────────────────────────────
+         justify-between, so the shutter row stays pinned to the bottom on a
+         tall phone and the rows breathe rather than bunching under the
+         viewfinder. -->
+    <div class="flex min-h-0 grow flex-col justify-between gap-[11px] px-3 pt-[15px]">
+
+      <!-- ISO and SHUTTER exist only on phones that expose manual exposure.
+           The app already checks that and hides BOTH rows where it is not
+           available; nothing here duplicates the check.
+
+           Auto is shown twice on purpose — a pressed pill AND a dimmed slider
+           (.slider-off). One without the other gives you two controls that
+           appear to disagree. -->
+      <div class="slider-off flex items-center gap-2.5">
+        <span class="lbl w-[52px] shrink-0 text-[rgb(242_244_247_/_.66)]">ISO</span>
+        <span class="track"><span class="fill" style="width:50%"></span><span class="knob" style="left:50%"></span></span>
+        <span class="mono w-11 shrink-0 text-right text-base text-[rgb(242_244_247_/_.45)]">Auto</span>
+        <button type="button" class="cpill cpill-on" aria-pressed="true">Auto</button>
+      </div>
+      <!-- Manual: drop .slider-off, the value goes solid #f2f4f7 and reads
+           "400", and the Auto pill loses .cpill-on. -->
+
+      <div class="slider-off flex items-center gap-2.5">
+        <span class="lbl w-[52px] shrink-0 text-[rgb(242_244_247_/_.66)]">Shutter</span>
+        <span class="track"><span class="fill" style="width:50%"></span><span class="knob" style="left:50%"></span></span>
+        <span class="mono w-11 shrink-0 text-right text-base text-[rgb(242_244_247_/_.45)]">Auto</span>
+        <button type="button" class="cpill cpill-on" aria-pressed="true">Auto</button>
+      </div>
+
+      <!-- WHITE BALANCE: five presets, equal width, one row. A dropdown would
+           be one tap cheaper to build and one tap more expensive to use, on
+           the control most likely to be changed mid-shoot. -->
+      <div class="flex items-center gap-1.5">
+        <span class="lbl w-[52px] shrink-0 text-[rgb(242_244_247_/_.66)]">White</span>
+        <div class="flex min-w-0 flex-1 gap-[5px]">
+          <button type="button" class="cpill cpill-on min-w-0 flex-1 px-1" aria-pressed="true">Auto</button>
+          <button type="button" class="cpill min-w-0 flex-1 px-1" aria-pressed="false">Indoor</button>
+          <button type="button" class="cpill min-w-0 flex-1 px-1" aria-pressed="false">Cool</button>
+          <button type="button" class="cpill min-w-0 flex-1 px-1" aria-pressed="false">Daylight</button>
+          <button type="button" class="cpill min-w-0 flex-1 px-1" aria-pressed="false">Cloudy</button>
+        </div>
+      </div>
+
+      <!-- ── THUMBNAIL STRIP ───────────────────────────────────────────────
+           FIXED 64px HIGH WHETHER OR NOT IT HOLDS ANYTHING. Render it empty;
+           do not remove it when there are no photos.
+
+           This is not tidiness. When the strip appeared on the first shot, the
+           whole layout moved, people re-aimed the phone between shots, and the
+           perspective changed from photo to photo across a single item.
+           NOTHING on this screen may move when the first photo is taken.
+
+           It swipes sideways, and it never shows a scrollbar or arrows on any
+           engine — see .strip in the theme. -->
+      <div class="strip">
+        <span class="cthumb" style="background:#dfe3ea">
+          <svg class="size-[22px]" viewBox="0 0 24 24" fill="none" stroke="rgba(30,38,50,.34)" stroke-width="1.4" stroke-linejoin="round"><path d="M9.5 3.5 4.5 6.2 6 9.4l2-.9V20h8V8.5l2 .9 1.5-3.2-5-2.7a3 3 0 0 1-5 0z"/></svg>
+          <button type="button" class="thumbx" aria-label="Remove photo 1">
+            <svg class="size-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>
+          </button>
+        </span>
+        <span class="cthumb" style="background:#e6e1da">
+          <svg class="size-[22px]" viewBox="0 0 24 24" fill="none" stroke="rgba(30,38,50,.34)" stroke-width="1.4" stroke-linejoin="round"><path d="M9.5 3.5 4.5 6.2 6 9.4l2-.9V20h8V8.5l2 .9 1.5-3.2-5-2.7a3 3 0 0 1-5 0z"/></svg>
+          <button type="button" class="thumbx" aria-label="Remove photo 2">
+            <svg class="size-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>
+          </button>
+        </span>
+        <!-- Repeat per shot, newest last. With zero shots the div stays
+             exactly as it is, empty — same 64px, same gap above and below. -->
+      </div>
+
+      <!-- ── SHUTTER ROW ───────────────────────────────────────────────────
+           Flip · shutter · Done. The shutter is 72px and centred so it is
+           hittable without looking; the other two are at the edges where a
+           thumb rests. -->
+      <div class="flex items-center gap-3 pb-[26px]">
+        <button type="button" class="icobtn size-[52px] rounded-2xl" aria-label="Flip camera">
+          <svg class="size-[22px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3.6 9.2a8.6 8.6 0 0 1 14.2-3.3l2.6 2.4"/><path d="M20.4 14.8a8.6 8.6 0 0 1-14.2 3.3l-2.6-2.4"/><path d="M20.5 3.6v4.7h-4.7M3.5 20.4v-4.7h4.7"/></svg>
+        </button>
+        <div class="flex grow justify-center">
+          <button type="button" aria-label="Take photo"
+                  class="size-[72px] cursor-pointer rounded-full border-4 border-white/[0.28] bg-[#f2f4f7] p-0 shadow-[0_0_0_2px_rgba(6,8,11,.4)]"></button>
+        </div>
+        <!-- "Done (9)" → review. With no photos it reads plain "Done" and
+             loses .cpill-on: there is nothing to review yet, but it is still
+             the way out to an empty review rather than a dead control. -->
+        <button type="button" class="cpill cpill-lg cpill-on min-w-[92px]">Done (9)</button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════════════
+       REVIEW
+       Still full screen, still no nav bar — this is part of the camera flow.
+
+       ← BACK RETURNS TO THE VIEWFINDER AND DISCARDS NOTHING. Photos, AI
+       selections and both notes all survive, and new shots are appended to
+       the end. Starting over is the close ✕, or removing photos one at a
+       time. (This was a behaviour change from "← Retake", which discarded.)
+       ══════════════════════════════════════════════════════════════════════ -->
+  <div class="hidden min-h-0 grow flex-col bg-panel text-ink" data-screen="review">
+
+    <div class="flex h-14 shrink-0 items-center gap-2 border-b border-line pl-1 pr-1.5">
+      <button type="button" class="inline-flex h-11 cursor-pointer items-center gap-[5px] rounded-card border-0 bg-transparent px-2.5 font-sans text-lg font-medium text-accent">
+        <svg class="size-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M14 5.5 7.5 12l6.5 6.5"/></svg>
+        Back
+      </button>
+      <div class="min-w-0 grow text-center">
+        <p class="m-0 whitespace-nowrap text-xl font-semibold tracking-[-0.01em]">Review (9 photos)</p>
+      </div>
+      <!-- Live count of what is ticked. It updates as you tick, which is the
+           only feedback that the selection is doing anything. -->
+      <span class="shrink-0 rounded-[13px] bg-accent-weak px-2.5 py-[5px] text-base font-semibold text-accent">5 for AI</span>
+    </div>
+
+    <!-- The one sentence that explains the difference between the two things a
+         photo can be: every photo is published, only ticked photos are read. -->
+    <p class="hint shrink-0 px-3.5 py-2.5">Every photo goes on the listing in this order. Tap the ones the AI should read — those are the close-ups of tags, labels and flaws.</p>
+
+    <!-- 3 across, not 4: on this screen the job is judging a photo and hitting
+         a 22px tick, not scanning a library. -->
+    <div class="min-h-0 grow overflow-y-auto px-3 pb-3">
+      <div class="grid grid-cols-3 gap-2">
+
+        <!-- PICKED for AI -->
+        <div class="cell cell-on" style="background:#dfe3ea">
+          <svg class="size-[26px]" viewBox="0 0 24 24" fill="none" stroke="rgba(30,38,50,.32)" stroke-width="1.4" stroke-linejoin="round"><path d="M9.5 3.5 4.5 6.2 6 9.4l2-.9V20h8V8.5l2 .9 1.5-3.2-5-2.7a3 3 0 0 1-5 0z"/></svg>
+          <span class="tick tick-on size-[22px]" aria-hidden="true">
+            <svg class="size-[13px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 12.5 9.5 17.5 19.5 6.5"/></svg>
+          </span>
+          <!-- The number is the PUBLISH ORDER, which is why it is on every
+               cell and not only the picked ones. -->
+          <span class="num">#1</span>
+          <button type="button" class="cellx" aria-label="Delete photo 1">
+            <svg class="size-[11px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>
+          </button>
+        </div>
+
+        <!-- NOT picked — an empty checkbox, not an absent one. -->
+        <div class="cell" style="background:#e6e1da">
+          <svg class="size-[26px]" viewBox="0 0 24 24" fill="none" stroke="rgba(30,38,50,.32)" stroke-width="1.4" stroke-linejoin="round"><path d="M9.5 3.5 4.5 6.2 6 9.4l2-.9V20h8V8.5l2 .9 1.5-3.2-5-2.7a3 3 0 0 1-5 0z"/></svg>
+          <span class="tick tick-off size-[22px]" aria-hidden="true">
+            <svg class="size-[13px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 12.5 9.5 17.5 19.5 6.5"/></svg>
+          </span>
+          <span class="num">#2</span>
+          <button type="button" class="cellx" aria-label="Delete photo 2">
+            <svg class="size-[11px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>
+          </button>
+        </div>
+
+        <!-- Repeat per photo, in publish order. -->
+      </div>
+    </div>
+
+    <!-- ── REVIEW ACTION BAR ─────────────────────────────────────────────── -->
+    <div class="flex shrink-0 flex-col gap-[9px] border-t border-line bg-panel px-3 pb-[26px] pt-[11px]">
+
+      <!-- Two notes, two destinations. A note WITH CONTENT gets .btn-done —
+           green outline and a check — so you can see it is filled without
+           opening it. -->
+      <div class="flex gap-2">
+        <button type="button" class="btn btn-touch btn-done min-w-0 flex-1">
+          <svg class="size-[15px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 12.5 9.5 17.5 19.5 6.5"/></svg>
+          AI Note
+        </button>
+        <button type="button" class="btn btn-touch min-w-0 flex-1">Draft Note</button>
+      </div>
+
+      <!-- The label states both numbers, because they are the two things that
+           cannot be changed after this tap. -->
+      <button type="button" class="btn btn-primary btn-touch w-full">Create Draft (9 photos, 5 AI)</button>
+
+      <!--
+        UPLOADING — replaces the button above, in place, so nothing moves:
+
+          <div class="flex flex-col gap-[7px]">
+            <button type="button" class="btn btn-off btn-touch w-full">Uploading 3/9…</button>
+            <span class="prog"><span style="width:33%"></span></span>
+          </div>
+
+        "3/9" here counts PHOTOS BEING UPLOADED, which the app does know. It is
+        not analysis progress: every photo goes to the AI in ONE request, so
+        there is no per-photo AI count anywhere in the app.
+      -->
+    </div>
+  </div>
+
+  <!-- ══ NOTE EDITOR ════════════════════════════════════════════════════════
+       ONE popup serves both notes. Only the heading, the kind label, the
+       placeholder and the hint change — building two would guarantee they
+       drift apart.
+
+       Red ✕ discards, green ✓ saves. They are the app's own two buttons, and
+       they are 52px because they sit above the keyboard where a thumb is
+       least accurate. -->
+  <div id="note-scrim" class="scrim hidden">
+    <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="note-h">
+      <div class="mb-2.5 flex items-center gap-2">
+        <p id="note-h" class="m-0 text-2xl font-semibold">AI Note</p>
+        <div class="grow"></div>
+        <button type="button" class="roundbtn roundbtn-no size-[52px]" aria-label="Cancel" data-action="close-note">
+          <svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>
+        </button>
+        <button type="button" class="roundbtn roundbtn-yes size-[52px]" aria-label="Save" data-action="save-note">
+          <svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 12.5 9.5 17.5 19.5 6.5"/></svg>
+        </button>
+      </div>
+
+      <!-- The kind label says where the text GOES, above the box, before it is
+           typed rather than after. -->
+      <label class="lbl mb-1.5 block" for="note-box">Sent with the photos</label>
+      <textarea id="note-box" class="textarea-touch min-h-[132px]"
+                placeholder="Measurements, tag wording, flaws — anything the AI cannot read from the photos">Pit to pit 22in, length 29in, sleeve 9in. Tag reads Classic Fit, size L. Small pull on left cuff.</textarea>
+      <p class="hint mt-2">Goes to the AI with the photos you picked. It is the fastest way to fix a wrong size or catch a flaw.</p>
+
+      <!--
+        DRAFT NOTE — the same popup with four strings swapped:
+          heading      "Draft Note"
+          kind label   "Kept on the draft"
+          placeholder  "Notes for yourself — not sent to eBay"
+          hint         "Only you see this. It stays on the draft and is never
+                        sent to eBay."
+      -->
+    </div>
+  </div>
+
+</div>
+
+<script>
+  const shell = document.querySelector('.app-shell');
+
+  // Theme. Affects the REVIEW step only — capture chrome is hard-coded dark.
+  const THEME_KEY = 'lister.theme';
+  const media = window.matchMedia('(prefers-color-scheme: dark)');
+  let chosen = null;
+  try { chosen = localStorage.getItem(THEME_KEY); } catch {}
+  shell.classList.toggle('dark', chosen ? chosen === 'dark' : media.matches);
+  media.addEventListener('change', e => { if (!chosen) shell.classList.toggle('dark', e.matches); });
+
+  // Capture ⇄ review. Back does NOT clear anything; it only swaps which step
+  // is mounted. Keep the photo array, the AI set and both notes in one store
+  // that outlives the swap.
+  const capture = document.querySelector('[data-screen="capture"]');
+  const review = document.querySelector('[data-screen="review"]');
+  const show = el => { el.classList.remove('hidden'); el.classList.add('flex'); };
+  const hide = el => { el.classList.add('hidden'); el.classList.remove('flex'); };
+
+  // AI selection. The header count is the single source of truth for the
+  // "n for AI" chip and for the Create Draft label — derive both, never store
+  // them separately.
+  const aiPicked = new Set();
+  document.querySelectorAll('.cell').forEach(cell => {
+    cell.addEventListener('click', e => {
+      if (e.target.closest('.cellx')) return;   // the delete ✕ is not a tick
+      const on = !cell.classList.contains('cell-on');
+      cell.classList.toggle('cell-on', on);
+      const tick = cell.querySelector('.tick');
+      tick.classList.toggle('tick-on', on);
+      tick.classList.toggle('tick-off', !on);
+      on ? aiPicked.add(cell) : aiPicked.delete(cell);
+      // Update "n for AI" and "Create Draft (n photos, k AI)" here.
+    });
+  });
+
+  // Note editor — one dialog, two configurations.
+  const noteScrim = document.getElementById('note-scrim');
+  noteScrim.querySelectorAll('[data-action="close-note"], [data-action="save-note"]').forEach(b =>
+    b.addEventListener('click', () => noteScrim.classList.add('hidden')));
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') noteScrim.classList.add('hidden');
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,388 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Settings — phone</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+
+  <!-- Built by Tailwind v4 from lister-theme.css. See README.md. -->
+  <link rel="stylesheet" href="./lister-theme.css">
+</head>
+
+<!--
+  PHONE — SETTINGS.  Designed at 390×844 (Android, Chrome).
+
+  Same three sections and the same content as the desktop screen; the ONLY
+  differences are the ones 390px forces:
+
+    · the section list becomes a segmented control instead of a 236px column
+    · the specifics grid drops from 4 columns to 2
+    · a policy row becomes TWO lines (.polrow-touch) instead of one
+    · every control is 44px
+
+  The section control, like the desktop list, NEVER goes away — the eBay
+  connection happens inside the Account section, not on a screen that
+  replaces it.
+-->
+
+<body class="font-sans text-lg antialiased">
+
+<div class="app-shell relative mx-auto flex h-screen w-full max-w-[430px] flex-col overflow-hidden bg-panel text-ink">
+
+  <header class="flex h-14 shrink-0 items-center border-b border-line px-3.5">
+    <h1 class="m-0 text-3xl font-semibold tracking-[-0.01em]">Settings</h1>
+  </header>
+
+  <!-- Short labels here — "Account", not "eBay Account". Three segments have
+       to share 366px, and the desktop list's one-line descriptions have no
+       room on a phone. -->
+  <div class="shrink-0 px-3 py-2">
+    <div class="seg seg-touch">
+      <button type="button" aria-pressed="true">Categories</button>
+      <button type="button" aria-pressed="false">Policies</button>
+      <button type="button" aria-pressed="false">Account</button>
+    </div>
+  </div>
+
+  <!-- pb-[58px]: the camera FAB overhangs the nav bar, so the last control in
+       any section needs that much clearance to stay tappable at full scroll. -->
+  <main class="min-h-0 grow overflow-y-auto bg-panel px-3 pb-[58px] pt-1">
+
+    <!-- ══════════════════════════════════════════════════════════════════
+         CATEGORIES
+         ══════════════════════════════════════════════════════════════════ -->
+    <div class="flex flex-col gap-[18px]" data-section="categories">
+
+      <div>
+        <h2 class="lbl mb-[7px]">Add a category</h2>
+        <div class="flex gap-2">
+          <span class="relative min-w-0 flex-1">
+            <svg class="pointer-events-none absolute left-3 top-1/2 size-[15px] -translate-y-1/2 text-ink-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="11" cy="11" r="6.6"/><path d="M15.9 15.9 20.5 20.5"/></svg>
+            <input type="text" class="input h-touch w-full rounded-panel pl-9 text-lg" placeholder="Search eBay categories" value="polo">
+          </span>
+          <!-- Searching: swap for
+               <button class="btn btn-off btn-touch min-w-[104px] shrink-0">
+                 <svg class="size-3.5 animate-spin" …/>Searching…</button> -->
+          <button type="button" class="btn btn-primary btn-touch min-w-[104px] shrink-0">Search</button>
+        </div>
+
+        <!-- Results land under the field; TAPPING ONE ADDS IT. No Add button —
+             on a phone that would be a second 44px target for a decision the
+             tap already made. -->
+        <div class="card mt-1.5 overflow-hidden">
+          <button type="button" class="resrow min-h-touch text-md">
+            <span class="min-w-0 grow truncate">Men's Clothing &gt; Shirts &gt; Polos</span>
+            <span class="mono shrink-0 text-sm text-ink-3">57990</span>
+          </button>
+          <button type="button" class="resrow min-h-touch text-md">
+            <span class="min-w-0 grow truncate">Women's Clothing &gt; Tops &gt; Polos</span>
+            <span class="mono shrink-0 text-sm text-ink-3">53159</span>
+          </button>
+          <button type="button" class="resrow min-h-touch border-b-0 text-md">
+            <span class="min-w-0 grow truncate">Boys' Clothing &gt; Shirts &gt; Polos</span>
+            <span class="mono shrink-0 text-sm text-ink-3">175521</span>
+          </button>
+        </div>
+        <p class="hint mt-1.5">Tap a result to add it.</p>
+      </div>
+
+      <div>
+        <div class="mb-2 flex items-center gap-2">
+          <h2 class="lbl">Saved categories</h2>
+          <span class="mono text-sm text-ink-3">3 saved</span>
+        </div>
+
+        <div class="flex flex-col gap-2">
+
+          <!-- EXPANDED -->
+          <div class="card">
+            <!-- The disclosure button is 44px tall; Remove is its own 44px
+                 target beside it. Two buttons, never nested. -->
+            <div class="cathead py-2 pl-3 pr-2">
+              <button type="button" class="catbtn min-h-touch" aria-expanded="true">
+                <svg class="size-3.5 shrink-0 rotate-90 text-ink-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5.5 15.5 12 9 18.5"/></svg>
+                <span class="min-w-0 grow">
+                  <span class="cattitle text-lg">Men's Clothing &gt; Shirts &gt; Polos</span>
+                  <span class="hint mt-0.5 block">30 specifics · 6 multi-value</span>
+                </span>
+              </button>
+              <button type="button" class="btn btn-dq size-11 shrink-0 p-0" aria-label="Remove category" data-action="ask-remove">
+                <svg class="size-[17px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4.8 6.6h14.4"/><path d="M9.3 6.6V4.9h5.4v1.7"/><path d="M6.6 6.6 7.5 20h9l.9-13.4"/><path d="M10.4 10.2v6M13.6 10.2v6"/></svg>
+              </button>
+            </div>
+
+            <!-- 2 up, not 4: "Sleeve Length" plus a checkbox does not fit a
+                 quarter of 390px, and a truncated specific name is useless
+                 when the whole task is ticking the right one. -->
+            <div class="catbody">
+              <p class="hint mb-2.5">Tick the item specifics eBay lets you give more than one value.</p>
+              <div class="specgrid specgrid-touch">
+                <label class="speccheck min-h-touch"><input type="checkbox"><span>Brand</span></label>
+                <label class="speccheck min-h-touch"><input type="checkbox"><span>Department</span></label>
+                <label class="speccheck min-h-touch"><input type="checkbox"><span>Size</span></label>
+                <label class="speccheck min-h-touch"><input type="checkbox"><span>Size Type</span></label>
+                <label class="speccheck min-h-touch"><input type="checkbox"><span>Color</span></label>
+                <label class="speccheck min-h-touch"><input type="checkbox"><span>Type</span></label>
+                <label class="speccheck min-h-touch"><input type="checkbox"><span>Style</span></label>
+                <label class="speccheck min-h-touch"><input type="checkbox"><span>Sleeve Length</span></label>
+                <label class="speccheck min-h-touch"><input type="checkbox" checked><span>Material</span></label>
+                <label class="speccheck min-h-touch"><input type="checkbox"><span>Fit</span></label>
+                <label class="speccheck min-h-touch"><input type="checkbox"><span>Neckline</span></label>
+                <label class="speccheck min-h-touch"><input type="checkbox"><span>Pattern</span></label>
+                <label class="speccheck min-h-touch"><input type="checkbox" checked><span>Occasion</span></label>
+                <label class="speccheck min-h-touch"><input type="checkbox" checked><span>Season</span></label>
+                <label class="speccheck min-h-touch"><input type="checkbox"><span>Closure</span></label>
+                <label class="speccheck min-h-touch"><input type="checkbox" checked><span>Features</span></label>
+                <label class="speccheck min-h-touch"><input type="checkbox" checked><span>Accents</span></label>
+                <label class="speccheck min-h-touch"><input type="checkbox" checked><span>Theme</span></label>
+              </div>
+            </div>
+          </div>
+
+          <!-- COLLAPSED -->
+          <div class="card">
+            <div class="cathead py-2 pl-3 pr-2">
+              <button type="button" class="catbtn min-h-touch" aria-expanded="false">
+                <svg class="size-3.5 shrink-0 text-ink-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5.5 15.5 12 9 18.5"/></svg>
+                <span class="min-w-0 grow">
+                  <span class="cattitle text-lg">Men's Clothing &gt; Jeans</span>
+                  <span class="hint mt-0.5 block">28 specifics · 4 multi-value</span>
+                </span>
+              </button>
+              <button type="button" class="btn btn-dq size-11 shrink-0 p-0" aria-label="Remove category" data-action="ask-remove">
+                <svg class="size-[17px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4.8 6.6h14.4"/><path d="M9.3 6.6V4.9h5.4v1.7"/><path d="M6.6 6.6 7.5 20h9l.9-13.4"/><path d="M10.4 10.2v6M13.6 10.2v6"/></svg>
+              </button>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════════════════
+         POLICIES
+         This is the section the phone got wrong before: a star, a 20-character
+         id, a long label and a Remove cannot all be 44px on one 390px line, so
+         they were all squeezed instead. .polrow-touch puts the label over the
+         id in the middle column and spans the star and Remove across both
+         rows — every target full size, nothing truncated but the label.
+         ══════════════════════════════════════════════════════════════════ -->
+    <div class="hidden flex-col gap-3.5" data-section="policies">
+      <p class="hint">The starred policy in each group is the one a new listing starts with. Policy IDs come from eBay; the label is yours.</p>
+
+      <div class="card">
+        <div class="grouphead">
+          <h2 class="lbl">Shipping</h2>
+          <span class="mono text-sm text-ink-3">3 policies</span>
+          <div class="grow"></div>
+          <button type="button" class="btn btn-touch px-3">
+            <svg class="size-[13px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 6v12M6 12h12"/></svg>
+            Add
+          </button>
+        </div>
+
+        <div class="polrow polrow-touch">
+          <button type="button" class="star star-on" aria-label="Default policy">
+            <svg class="size-[19px]" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="m12 3.6 2.6 5.3 5.8.8-4.2 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8-4.2-4.1 5.8-.8z"/></svg>
+          </button>
+          <span class="pollabel">Free Shipping — USPS Ground Advantage</span>
+          <span class="polid mono">6083...7714</span>
+          <!-- The word "Remove" is hidden by .polrow-touch; the bin alone is
+               unambiguous next to a policy, and the aria-label names it. -->
+          <button type="button" class="btn btn-dq polremove" aria-label="Remove policy Free Shipping — USPS Ground Advantage" data-action="ask-remove">
+            <svg class="size-[17px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4.8 6.6h14.4"/><path d="M9.3 6.6V4.9h5.4v1.7"/><path d="M6.6 6.6 7.5 20h9l.9-13.4"/><path d="M10.4 10.2v6M13.6 10.2v6"/></svg>
+            <span class="polremove-txt">Remove</span>
+          </button>
+        </div>
+
+        <div class="polrow polrow-touch">
+          <button type="button" class="star" aria-label="Make default">
+            <svg class="size-[19px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="m12 3.6 2.6 5.3 5.8.8-4.2 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8-4.2-4.1 5.8-.8z"/></svg>
+          </button>
+          <span class="pollabel">Buyer Pays — Calculated</span>
+          <span class="polid mono">6083...7715</span>
+          <button type="button" class="btn btn-dq polremove" aria-label="Remove policy Buyer Pays — Calculated" data-action="ask-remove">
+            <svg class="size-[17px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4.8 6.6h14.4"/><path d="M9.3 6.6V4.9h5.4v1.7"/><path d="M6.6 6.6 7.5 20h9l.9-13.4"/><path d="M10.4 10.2v6M13.6 10.2v6"/></svg>
+            <span class="polremove-txt">Remove</span>
+          </button>
+        </div>
+
+        <!-- Repeat per policy; repeat the card for Payment and Return. -->
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════════════════
+         eBAY ACCOUNT — the same three steps, inside the same section control.
+         ══════════════════════════════════════════════════════════════════ -->
+    <div class="hidden flex-col gap-3.5" data-section="account">
+
+      <div class="card flex items-center gap-3 border-ok-line bg-ok-weak p-3.5">
+        <span class="flex size-[34px] shrink-0 items-center justify-center rounded-full bg-panel text-ok">
+          <svg class="size-[19px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 12.5 9.5 17.5 19.5 6.5"/></svg>
+        </span>
+        <span class="min-w-0 grow">
+          <span class="block text-lg font-semibold text-ok">Connected to eBay</span>
+          <span class="hint mt-0.5 block text-ok opacity-85">shannon_and_aaron_resale · token refreshed automatically</span>
+        </span>
+      </div>
+
+      <p class="hint">A one-time setup. Do it once per eBay account; the app refreshes the token on its own after that.</p>
+
+      <div class="card overflow-hidden">
+        <div class="steprow p-3">
+          <span class="step-n step-done">1</span>
+          <span class="min-w-0 grow">
+            <span class="steptitle">Authorize with eBay</span>
+            <span class="hint mt-[3px] block">Opens eBay in a new tab and asks you to grant access. Sign in as the selling account.</span>
+            <span class="mt-[9px] block">
+              <button type="button" class="btn btn-primary btn-touch">
+                Authorize with eBay
+                <svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4.5h5.5V10"/><path d="M19.5 4.5 11 13"/><path d="M18.5 14v5.5h-14v-14H10"/></svg>
+              </button>
+            </span>
+          </span>
+        </div>
+
+        <div class="steprow p-3">
+          <span class="step-n step-now">2</span>
+          <span class="min-w-0 grow">
+            <span class="steptitle">Exchange the code</span>
+            <span class="hint mt-[3px] block">eBay sends you back with a code in the address bar. Paste it here.</span>
+            <!-- Field over button on a phone: side by side, a pasted OAuth
+                 code shows about six characters. -->
+            <span class="mt-[9px] flex flex-col gap-2">
+              <input type="text" class="input h-touch w-full rounded-panel text-lg" placeholder="Paste the code from the eBay URL" value="v%5EB1...QQ%3D%3D">
+              <button type="button" class="btn btn-primary btn-touch">Exchange</button>
+            </span>
+          </span>
+        </div>
+
+        <div class="steprow p-3">
+          <span class="step-n">3</span>
+          <span class="min-w-0 grow">
+            <span class="steptitle">Copy the refresh token</span>
+            <span class="hint mt-[3px] block">Keep a copy somewhere safe. You only need it again if you reconnect.</span>
+            <span class="mt-[9px] flex flex-col gap-2">
+              <input type="text" readonly class="input mono h-touch w-full rounded-panel border-ro-line bg-ro text-base text-ink-2" value="">
+              <button type="button" class="btn btn-off btn-touch">
+                <svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="8.5" y="8.5" width="12" height="12" rx="2"/><path d="M15.5 5.5h-11a1 1 0 0 0-1 1v11"/></svg>
+                Copy
+              </button>
+            </span>
+          </span>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- ══ BOTTOM BAR ═════════════════════════════════════════════════════════
+       Settings is reached from the More sheet, so NO tab is current here.
+       Canonical copy in nav.html. -->
+  <nav aria-label="Main" class="flex h-16 shrink-0 items-start border-t border-line bg-panel px-1">
+    <a href="/library" class="tabm no-underline">
+      <svg class="size-[21px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><rect x="3.5" y="3.5" width="7.2" height="7.2" rx="1.6"/><rect x="13.3" y="3.5" width="7.2" height="7.2" rx="1.6"/><rect x="3.5" y="13.3" width="7.2" height="7.2" rx="1.6"/><rect x="13.3" y="13.3" width="7.2" height="7.2" rx="1.6"/></svg>
+      <span class="lbl text-2xs tracking-[0.05em] text-current">Library</span>
+    </a>
+    <a href="/create" class="tabm no-underline">
+      <svg class="size-[21px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="3.5" width="17" height="17" rx="3.5"/><path d="M12 8.4v7.2M8.4 12h7.2"/></svg>
+      <span class="lbl text-2xs tracking-[0.05em] text-current">Create</span>
+    </a>
+    <div class="flex flex-1 justify-center">
+      <a href="/camera" aria-label="Open camera" class="fab no-underline">
+        <svg class="size-[26px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 8.6h3.2L8.2 6.5h7.6l1.5 2.1h3.2a1 1 0 0 1 1 1v7.9a1 1 0 0 1-1 1H3.5a1 1 0 0 1-1-1V9.6a1 1 0 0 1 1-1z"/><circle cx="12" cy="13.4" r="3.2"/></svg>
+      </a>
+    </div>
+    <a href="/drafts" class="tabm no-underline">
+      <svg class="size-[21px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="4.2" y="3.5" width="13.5" height="17" rx="2.4"/><path d="M7.6 8.4h6.7M7.6 12h6.7M7.6 15.6h3.6"/></svg>
+      <span class="lbl text-2xs tracking-[0.05em] text-current">Drafts</span>
+    </a>
+    <button type="button" class="tabm tabm-on border-0 bg-transparent" data-action="open-more">
+      <svg class="size-[21px]" viewBox="0 0 24 24" fill="currentColor"><circle cx="5.5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="18.5" cy="12" r="1.8"/></svg>
+      <span class="lbl text-2xs tracking-[0.05em] text-current">More</span>
+    </button>
+  </nav>
+
+  <!-- ══ REMOVE CONFIRM ═════════════════════════════════════════════════════
+       One dialog for every Remove, category or policy — identical wording to
+       the desktop screen. -->
+  <div id="remove-scrim" class="scrim hidden">
+    <div class="dialog">
+      <p class="m-0 text-2xl font-semibold">Remove this?</p>
+      <p class="hint mt-1.5">It goes from Settings only. Listings already using it are untouched.</p>
+      <div class="mt-4 flex gap-2">
+        <button type="button" class="btn btn-touch flex-1" data-action="close-remove">Cancel</button>
+        <button type="button" class="btn btn-danger btn-touch flex-1" data-action="confirm-remove">Remove</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  const shell = document.querySelector('.app-shell');
+
+  // Theme: follow the device until the user chooses in the More sheet.
+  const THEME_KEY = 'lister.theme';
+  const media = window.matchMedia('(prefers-color-scheme: dark)');
+  let chosen = null;
+  try { chosen = localStorage.getItem(THEME_KEY); } catch {}
+  shell.classList.toggle('dark', chosen ? chosen === 'dark' : media.matches);
+  media.addEventListener('change', e => { if (!chosen) shell.classList.toggle('dark', e.matches); });
+
+  // Sections. The segmented control stays mounted on all three, the Account
+  // connection included.
+  const segs = document.querySelectorAll('.seg button');
+  const panes = document.querySelectorAll('[data-section]');
+  segs.forEach((b, i) => b.addEventListener('click', () => {
+    segs.forEach((s, j) => s.setAttribute('aria-pressed', String(i === j)));
+    panes.forEach((p, j) => {
+      p.classList.toggle('hidden', i !== j);
+      p.classList.toggle('flex', i === j);
+    });
+    // Scroll back to the top: the previous section's scroll position means
+    // nothing in the new one.
+    document.querySelector('main').scrollTop = 0;
+  }));
+
+  // Category disclosure — chevron rotates, body toggles.
+  document.querySelectorAll('.catbtn').forEach(btn => btn.addEventListener('click', () => {
+    const open = btn.getAttribute('aria-expanded') !== 'true';
+    btn.setAttribute('aria-expanded', String(open));
+    btn.querySelector('svg').classList.toggle('rotate-90', open);
+    btn.closest('.card').querySelector('.catbody')?.classList.toggle('hidden', !open);
+  }));
+
+  // Default policy: one star per group, so pressing one clears the rest.
+  document.querySelectorAll('.star').forEach(star => star.addEventListener('click', () => {
+    const card = star.closest('.card');
+    card.querySelectorAll('.star').forEach(s => {
+      s.classList.remove('star-on');
+      s.querySelector('svg').setAttribute('fill', 'none');
+      s.setAttribute('aria-label', 'Make default');
+    });
+    star.classList.add('star-on');
+    star.querySelector('svg').setAttribute('fill', 'currentColor');
+    star.setAttribute('aria-label', 'Default policy');
+  }));
+
+  // One confirm for every Remove.
+  const scrim = document.getElementById('remove-scrim');
+  let pending = null;
+  const closeRemove = () => { scrim.classList.add('hidden'); pending = null; };
+  document.querySelectorAll('[data-action="ask-remove"]').forEach(b => b.addEventListener('click', () => {
+    pending = b;
+    scrim.classList.remove('hidden');
+    scrim.querySelector('[data-action="close-remove"]').focus();
+  }));
+  scrim.addEventListener('click', e => { if (e.target === scrim) closeRemove(); });
+  scrim.querySelector('[data-action="close-remove"]').addEventListener('click', closeRemove);
+  scrim.querySelector('[data-action="confirm-remove"]').addEventListener('click', closeRemove);
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeRemove(); });
+</script>
+</body>
+</html>

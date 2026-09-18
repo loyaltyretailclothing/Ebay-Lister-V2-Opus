@@ -2,6 +2,8 @@
 
 Tracks the **buy side**: which stores actually produce. Fully separate from listing, AI and eBay. See [[Overview]].
 
+> **Redesign (2026-09-17):** taken out of the menu for now and not redesigned. The page and all data stay; open it at `/sourcing`. See [[Decision Log]].
+
 ## Data
 One raw JSON file in Cloudinary, `ebay-listings/config/sourcing`, loaded and saved all at once:
 - **stores:** id, name, address, lat, lng, createdAt

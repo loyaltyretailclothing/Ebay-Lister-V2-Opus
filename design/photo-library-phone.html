@@ -1,0 +1,427 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Photo Library — phone</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+
+  <!-- Built by Tailwind v4 from lister-theme.css. See README.md. -->
+  <link rel="stylesheet" href="./lister-theme.css">
+</head>
+
+<!--
+  PHONE — PHOTO LIBRARY.  Designed at 390×844 (Android, Chrome).
+
+  The grid IS the page. Everything else — header, folder tabs, upload strip,
+  selection rows — is held to ONE line each so the photos get the width. Four
+  tiles across at 390px works out at 91px a tile, which is the largest that
+  still shows a usable number of photos at once.
+
+  Two things are deliberately absent, because the app does not have them:
+    · a photo TOTAL anywhere (the library loads in batches, so no count is
+      ever correct — that is why "Load older photos" exists instead of paging)
+    · a CANCEL on the upload strip (the app cannot cancel an upload in flight)
+-->
+
+<body class="font-sans text-lg antialiased">
+
+<div class="app-shell relative mx-auto flex h-screen w-full max-w-[430px] flex-col overflow-hidden bg-panel text-ink">
+
+  <!-- ══ HEADER ═════════════════════════════════════════════════════════════
+       Title and Upload. No count: see the note above. -->
+  <header class="flex h-14 shrink-0 items-center gap-2.5 border-b border-line pl-3.5 pr-2">
+    <h1 class="m-0 text-3xl font-semibold tracking-[-0.01em]">Photo Library</h1>
+    <div class="grow"></div>
+    <button type="button" class="btn btn-ghost btn-touch px-2.5 text-accent" data-action="upload">
+      <svg class="size-[17px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16.5V4.2M7.4 8.8 12 4.2l4.6 4.6"/><path d="M4.5 15.5v3.2a1.3 1.3 0 0 0 1.3 1.3h12.4a1.3 1.3 0 0 0 1.3-1.3v-3.2"/></svg>
+      Upload
+    </button>
+  </header>
+
+  <!-- ══ FOLDER TABS ════════════════════════════════════════════════════════
+       All / Shannon / Aaron — the two sellers plus everything. A segmented
+       control, not a dropdown: three options that are switched between
+       constantly should cost one tap, not two. -->
+  <div class="shrink-0 px-2 pb-1.5 pt-2">
+    <div class="seg seg-touch">
+      <button type="button" aria-pressed="true">All</button>
+      <button type="button" aria-pressed="false">Shannon</button>
+      <button type="button" aria-pressed="false">Aaron</button>
+    </div>
+  </div>
+
+  <!-- ══ UPLOAD STRIP ═══════════════════════════════════════════════════════
+       Shown only while an upload is running. "Uploading 4/12…" plus a
+       determinate bar, and NOTHING ELSE — no Cancel, because the app has no
+       way to stop an upload once it has started, and a button that lies is
+       worse than no button. -->
+  <div class="hidden shrink-0 flex-col gap-1 px-3 pb-2" data-state="uploading">
+    <div class="flex items-center gap-2">
+      <svg class="size-3.5 animate-spin text-accent" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 3.6a8.4 8.4 0 1 1-5.9 2.5"/></svg>
+      <span class="text-base font-medium text-ink-2">Uploading 4/12…</span>
+    </div>
+    <span class="prog"><span style="width:33%"></span></span>
+  </div>
+
+  <!-- ══ GRID ═══════════════════════════════════════════════════════════════
+       pb-[58px] on the scroller is not decoration: the camera FAB in the nav
+       bar overhangs the content by 12px plus its 4px ring, and without this
+       padding "Load older photos" sits underneath it at full scroll and
+       cannot be tapped. -->
+  <div class="min-h-0 grow overflow-y-auto px-2 pb-[58px]">
+    <div class="pgrid4">
+
+      <!-- The Add tile is the FIRST cell, not a floating button: it sits where
+           the eye already is, and on a tablet or desktop browser the same tile
+           is the drag-and-drop target. -->
+      <button type="button" class="drop" aria-label="Add photos" data-action="upload">
+        <svg class="size-[17px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M12 6v12M6 12h12"/></svg>
+        <span class="text-2xs">Add</span>
+      </button>
+
+      <!-- SELECTED tile: accent border plus a 2px inset ring, so the selection
+           reads at a glance across a dense grid without shrinking the photo. -->
+      <button type="button" class="tile tile-on" aria-pressed="true" style="background:#dfe3ea">
+        <svg class="size-[22px]" viewBox="0 0 24 24" fill="none" stroke="rgba(30,38,50,.30)" stroke-width="1.4" stroke-linejoin="round"><path d="M9.5 3.5 4.5 6.2 6 9.4l2-.9V20h8V8.5l2 .9 1.5-3.2-5-2.7a3 3 0 0 1-5 0z"/></svg>
+        <span class="tick tick-on">
+          <svg class="size-[11px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 12.5 9.5 17.5 19.5 6.5"/></svg>
+        </span>
+        <!-- A photo carrying a note keeps its badge whether or not it is
+             selected — the badge is about the photo, the tick about the
+             selection, which is why they sit in opposite corners. -->
+        <span class="notebadge" aria-label="Has a note">
+          <svg class="size-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M5.5 7h13M5.5 12h13M5.5 17h8"/></svg>
+        </span>
+      </button>
+
+      <!-- UNSELECTED tile, with a note -->
+      <button type="button" class="tile" aria-pressed="false" style="background:#e6e1da">
+        <svg class="size-[22px]" viewBox="0 0 24 24" fill="none" stroke="rgba(30,38,50,.30)" stroke-width="1.4" stroke-linejoin="round"><path d="M9.5 3.5 4.5 6.2 6 9.4l2-.9V20h8V8.5l2 .9 1.5-3.2-5-2.7a3 3 0 0 1-5 0z"/></svg>
+        <span class="notebadge" aria-label="Has a note">
+          <svg class="size-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M5.5 7h13M5.5 12h13M5.5 17h8"/></svg>
+        </span>
+      </button>
+
+      <!-- UNSELECTED tile, no note — the ordinary case -->
+      <button type="button" class="tile" aria-pressed="false" style="background:#dce5e1">
+        <svg class="size-[22px]" viewBox="0 0 24 24" fill="none" stroke="rgba(30,38,50,.30)" stroke-width="1.4" stroke-linejoin="round"><path d="M9.5 3.5 4.5 6.2 6 9.4l2-.9V20h8V8.5l2 .9 1.5-3.2-5-2.7a3 3 0 0 1-5 0z"/></svg>
+      </button>
+
+      <!-- Repeat for every photo in the batch. -->
+    </div>
+
+    <!-- Batch loading, not paging: there is no page number and no total,
+         because the library grows from the top while you look at it. -->
+    <button type="button" class="btn btn-touch mt-2.5 w-full">Load older photos</button>
+    <p class="hint mt-2.5">Tap to select. Double-tap a photo to open it full screen.</p>
+  </div>
+
+  <!-- ══ EMPTY STATE ════════════════════════════════════════════════════════ -->
+  <div class="hidden min-h-0 grow flex-col items-center justify-center gap-3.5 p-6" data-state="empty">
+    <span class="flex size-[60px] items-center justify-center rounded-full border border-line bg-sunken text-ink-3">
+      <svg class="size-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><rect x="3.5" y="3.5" width="7.2" height="7.2" rx="1.6"/><rect x="13.3" y="3.5" width="7.2" height="7.2" rx="1.6"/><rect x="3.5" y="13.3" width="7.2" height="7.2" rx="1.6"/><rect x="13.3" y="13.3" width="7.2" height="7.2" rx="1.6"/></svg>
+    </span>
+    <p class="m-0 text-3xl font-semibold">No photos yet</p>
+    <p class="hint max-w-[250px] text-center">Shoot with the camera, or upload from this phone.</p>
+    <button type="button" class="btn btn-primary btn-touch" data-action="upload">Upload photos</button>
+  </div>
+
+  <!-- ══ SELECTION ══════════════════════════════════════════════════════════
+       Raised only while photos are selected, and split into THREE short rows
+       rather than one crowded one. They are ordered by how often the thumb
+       goes there: the destination buttons — the whole point of selecting —
+       sit lowest, nearest the thumb; the count and Clear sit highest.
+
+       The rows push the grid up rather than covering it, so the tiles you
+       just picked stay visible. -->
+  <div class="shrink-0 border-t border-line bg-panel-2" data-state="selection">
+
+    <!-- Row 1 — what is selected, and the way out. -->
+    <div class="flex items-center gap-2 px-3 pt-0.5" data-part="sel-rows">
+      <span class="text-md font-semibold text-accent">3 selected</span>
+      <div class="grow"></div>
+      <button type="button" class="btn btn-ghost btn-touch px-2 text-accent" data-action="clear">Clear</button>
+    </div>
+
+    <!-- Row 2 — what to do WITH them, here.
+         Delete is destructive, so it is the only red control and it always
+         confirms. The two move buttons are the two folders you are NOT in:
+         moving a photo into the folder it is already in is not an action, and
+         showing it as one is how you get a no-op that looks like a bug. -->
+    <div class="flex gap-1.5 px-3 pt-1" data-part="sel-rows">
+      <button type="button" class="btn btn-danger h-10 px-2.5" data-action="ask-delete">Delete (3)</button>
+
+      <!-- NOTE is single-photo, always. A note belongs to one photo; applying
+           one across a selection would silently overwrite notes you cannot see
+           from here. With 0 or 2+ selected it is .btn-off — GREYED, not merely
+           inert. A control that behaves as disabled but looks enabled is the
+           same bug as one that does nothing. -->
+      <button type="button" class="btn btn-off h-10 px-2.5" aria-disabled="true" data-action="note">Note</button>
+
+      <div class="grow"></div>
+
+      <button type="button" class="btn h-10 px-[9px]" aria-label="Move to Shannon">
+        <svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 6.5h6l1.6 2h9.4v9.5a1 1 0 0 1-1 1H4.5a1 1 0 0 1-1-1z"/></svg>
+        Shannon
+      </button>
+      <button type="button" class="btn h-10 px-[9px]" aria-label="Move to Aaron">
+        <svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 6.5h6l1.6 2h9.4v9.5a1 1 0 0 1-1 1H4.5a1 1 0 0 1-1-1z"/></svg>
+        Aaron
+      </button>
+    </div>
+
+    <!-- Row 3 — where the photos GO. Full 44px, lowest on the screen.
+         Each button fills with a 22% accent wash as its own send progresses:
+         progress belongs on the control that was pressed, not in a bar
+         somewhere else. On completion the check replaces the fill and holds
+         for about a second while the selection clears underneath it. -->
+    <div class="flex items-center gap-2 px-3 pb-2.5 pt-2">
+      <span class="lbl shrink-0">Send to</span>
+
+      <!-- SENDING -->
+      <button type="button" class="btn send send-on h-11">
+        <span class="send-fill" style="width:62%"></span>
+        <span class="send-txt">eBay Listing</span>
+      </button>
+
+      <!-- IDLE -->
+      <button type="button" class="btn send h-11">
+        <span class="send-txt">AI Analysis</span>
+      </button>
+
+      <!--
+        DONE — the same button for ~1s after the send finishes:
+          <button type="button" class="btn btn-primary send h-11">
+            <span class="send-txt">
+              <svg class="size-[15px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 12.5 9.5 17.5 19.5 6.5"/></svg>
+              eBay Listing
+            </span>
+          </button>
+        The selection clears at the MOMENT the check appears, so rows 1 and 2
+        disappear and the tiles drop their ticks while the check is still up.
+        Nothing stays selected underneath a finished send.
+      -->
+    </div>
+  </div>
+
+  <!-- ══ BOTTOM BAR ═════════════════════════════════════════════════════════
+       Canonical copy in nav.html. Library is current here. -->
+  <nav aria-label="Main" class="flex h-16 shrink-0 items-start border-t border-line bg-panel px-1">
+    <a href="/library" aria-current="page" class="tabm tabm-on no-underline">
+      <svg class="size-[21px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="3.5" y="3.5" width="7.2" height="7.2" rx="1.6"/><rect x="13.3" y="3.5" width="7.2" height="7.2" rx="1.6"/><rect x="3.5" y="13.3" width="7.2" height="7.2" rx="1.6"/><rect x="13.3" y="13.3" width="7.2" height="7.2" rx="1.6"/></svg>
+      <span class="lbl text-2xs tracking-[0.05em] text-current">Library</span>
+    </a>
+    <a href="/create" class="tabm no-underline">
+      <svg class="size-[21px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="3.5" width="17" height="17" rx="3.5"/><path d="M12 8.4v7.2M8.4 12h7.2"/></svg>
+      <span class="lbl text-2xs tracking-[0.05em] text-current">Create</span>
+    </a>
+    <div class="flex flex-1 justify-center">
+      <a href="/camera" aria-label="Open camera" class="fab no-underline">
+        <svg class="size-[26px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 8.6h3.2L8.2 6.5h7.6l1.5 2.1h3.2a1 1 0 0 1 1 1v7.9a1 1 0 0 1-1 1H3.5a1 1 0 0 1-1-1V9.6a1 1 0 0 1 1-1z"/><circle cx="12" cy="13.4" r="3.2"/></svg>
+      </a>
+    </div>
+    <a href="/drafts" class="tabm no-underline">
+      <svg class="size-[21px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="4.2" y="3.5" width="13.5" height="17" rx="2.4"/><path d="M7.6 8.4h6.7M7.6 12h6.7M7.6 15.6h3.6"/></svg>
+      <span class="lbl text-2xs tracking-[0.05em] text-current">Drafts</span>
+    </a>
+    <button type="button" class="tabm border-0 bg-transparent" data-action="open-more">
+      <svg class="size-[21px]" viewBox="0 0 24 24" fill="currentColor"><circle cx="5.5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="18.5" cy="12" r="1.8"/></svg>
+      <span class="lbl text-2xs tracking-[0.05em] text-current">More</span>
+    </button>
+  </nav>
+
+  <!-- ══ NOTE POPUP ═════════════════════════════════════════════════════════
+       Titled with the file name, because it is a note on ONE photo and the
+       user needs to know which. Cancel and Save are the two round targets, in
+       the header where a thumb reaches them without leaving the keyboard.
+
+       The help text says exactly where the note does and does not go. Photo
+       notes are NOT sent to the AI — only the AI Note on Create Listing is. -->
+  <div id="note-scrim" class="scrim hidden">
+    <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="note-h">
+      <div class="mb-2.5 flex items-center gap-2">
+        <p id="note-h" class="m-0 text-2xl font-semibold">Note on IMG_4813</p>
+        <div class="grow"></div>
+        <button type="button" class="roundbtn roundbtn-no" aria-label="Cancel" data-action="close-note">
+          <svg class="size-[19px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>
+        </button>
+        <button type="button" class="roundbtn roundbtn-yes" aria-label="Save" data-action="save-note">
+          <svg class="size-[19px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 12.5 9.5 17.5 19.5 6.5"/></svg>
+        </button>
+      </div>
+      <textarea class="textarea-touch" placeholder="Measurements, tag wording, flaws">Pit to pit 22in, length 29in. Tag reads Classic Fit, size L.</textarea>
+      <p class="hint mt-2">A reminder on this photo. Shows as a badge and in the enlarged view. Not sent to eBay or the AI.</p>
+    </div>
+  </div>
+
+  <!-- ══ DELETE CONFIRM ═════════════════════════════════════════════════════
+       Title counts what will go: "Delete 1 photo?" / "Delete 3 photos?" -->
+  <div id="delete-scrim" class="scrim hidden">
+    <div class="dialog" role="alertdialog" aria-modal="true" aria-labelledby="del-h">
+      <p id="del-h" class="m-0 text-2xl font-semibold">Delete 3 photos?</p>
+      <p class="hint mt-[7px]">This cannot be undone.</p>
+      <div class="mt-4 flex gap-2">
+        <button type="button" class="btn btn-touch flex-1" data-action="close-delete">Cancel</button>
+        <button type="button" class="btn btn-danger btn-touch flex-1 font-semibold" data-action="confirm-delete">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ LIGHTBOX ═══════════════════════════════════════════════════════════
+       Opened by DOUBLE-TAP, so a single tap can stay "select" — the thing
+       done hundreds of times a day.
+
+       Chrome is fixed dark whatever the theme: a photo judged for colour and
+       flaws must be judged against black, not against a white page.
+
+       Prev / next are on-screen buttons AND a swipe. The buttons exist because
+       a swipe is invisible, and both are 44px. There is NO "14 / 248" counter:
+       the app has no total, so the second number would be a guess. -->
+  <div id="lightbox" class="absolute inset-0 z-50 hidden flex-col bg-[#06080b]">
+    <div class="flex h-14 shrink-0 items-center gap-2.5 px-2.5">
+      <button type="button" class="flex size-11 cursor-pointer items-center justify-center rounded-xl border-0 bg-white/10 p-0 text-[#f2f4f7]" aria-label="Close" data-action="close-lightbox">
+        <svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>
+      </button>
+      <div class="grow"></div>
+      <span class="mono text-base text-[#f2f4f7]/80">IMG_4813</span>
+    </div>
+
+    <div class="relative flex min-h-0 grow items-center justify-center px-3">
+      <span class="flex aspect-[3/4] w-full items-center justify-center rounded-xl bg-[#e6e1da]">
+        <svg class="size-[72px]" viewBox="0 0 24 24" fill="none" stroke="rgba(30,38,50,.30)" stroke-width="1.2" stroke-linejoin="round"><path d="M9.5 3.5 4.5 6.2 6 9.4l2-.9V20h8V8.5l2 .9 1.5-3.2-5-2.7a3 3 0 0 1-5 0z"/></svg>
+      </span>
+      <button type="button" aria-label="Previous photo" class="absolute left-[18px] top-1/2 -mt-[22px] flex size-11 cursor-pointer items-center justify-center rounded-full border-0 bg-[#06080b]/55 p-0 text-[#f2f4f7]">
+        <svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 5.5 7.5 12l6.5 6.5"/></svg>
+      </button>
+      <button type="button" aria-label="Next photo" class="absolute right-[18px] top-1/2 -mt-[22px] flex size-11 cursor-pointer items-center justify-center rounded-full border-0 bg-[#06080b]/55 p-0 text-[#f2f4f7]">
+        <svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 5.5 16.5 12 10 18.5"/></svg>
+      </button>
+    </div>
+
+    <!-- The note is shown here in full. This and the grid badge are the two
+         places a note is ever visible — it never travels with the photo. -->
+    <div class="shrink-0 px-4 pb-7 pt-3.5">
+      <p class="lbl text-[#f2f4f7]/55">Note on this photo</p>
+      <p class="mt-1.5 text-lg leading-5 text-[#f2f4f7]">Pit to pit 22in, length 29in. Tag reads Classic Fit, size L.</p>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  const shell = document.querySelector('.app-shell');
+
+  // Theme: follow the device until the user chooses in the More sheet.
+  const THEME_KEY = 'lister.theme';
+  const media = window.matchMedia('(prefers-color-scheme: dark)');
+  let chosen = null;
+  try { chosen = localStorage.getItem(THEME_KEY); } catch {}
+  shell.classList.toggle('dark', chosen ? chosen === 'dark' : media.matches);
+  media.addEventListener('change', e => { if (!chosen) shell.classList.toggle('dark', e.matches); });
+
+  // --- Selection -----------------------------------------------------------
+  // One tap toggles selection. Double-tap opens the lightbox, so a tap is held
+  // briefly before it commits — 260ms is short enough not to feel laggy and
+  // long enough for a real double-tap to land.
+  const selBar = document.querySelector('[data-state="selection"]');
+  const selRows = selBar.querySelectorAll('[data-part="sel-rows"]');
+  const noteBtn = selBar.querySelector('[data-action="note"]');
+  // True for the ~1s a finished send holds its check. During that second the
+  // selection is already empty, so the count and action rows are gone but the
+  // Send row must stay on screen to show the check.
+  let sendHold = false;
+
+  // Seeded from the markup, so whatever ships as selected server-side is what
+  // the bar reports on first paint.
+  const selected = new Set(document.querySelectorAll('.tile[aria-pressed="true"]'));
+  let tapTimer = null;
+
+  const countEl = selBar.querySelector('[data-part="sel-rows"] span');
+  const delBtn = selBar.querySelector('[data-action="ask-delete"]');
+
+  const render = () => {
+    const n = selected.size;
+    // Note is live only at exactly one photo — and it must LOOK it. Setting
+    // aria-disabled without .btn-off is the bug this line exists to prevent.
+    noteBtn.classList.toggle('btn-off', n !== 1);
+    noteBtn.setAttribute('aria-disabled', String(n !== 1));
+    countEl.textContent = n === 1 ? '1 selected' : n + ' selected';
+    delBtn.textContent = 'Delete (' + n + ')';
+    selRows.forEach(r => r.classList.toggle('hidden', n === 0));
+    selBar.classList.toggle('hidden', n === 0 && !sendHold);
+  };
+
+  document.querySelectorAll('.tile').forEach(tile => {
+    tile.addEventListener('click', () => {
+      if (tapTimer) {  // second tap → lightbox, and the first tap is undone
+        clearTimeout(tapTimer); tapTimer = null;
+        openLightbox(tile);
+        return;
+      }
+      tapTimer = setTimeout(() => {
+        tapTimer = null;
+        const on = tile.getAttribute('aria-pressed') !== 'true';
+        tile.setAttribute('aria-pressed', String(on));
+        tile.classList.toggle('tile-on', on);
+        on ? selected.add(tile) : selected.delete(tile);
+        render();
+      }, 260);
+    });
+  });
+
+  selBar.querySelector('[data-action="clear"]').addEventListener('click', () => {
+    selected.forEach(t => { t.setAttribute('aria-pressed', 'false'); t.classList.remove('tile-on'); });
+    selected.clear();
+    render();
+  });
+
+  // --- Send to -------------------------------------------------------------
+  // Clear the selection the MOMENT the check appears, then drop the check ~1s
+  // later. This order matters: a finished send must never leave tiles ticked
+  // under a check, and the next batch starts from nothing.
+  function sendDone(btn) {
+    sendHold = true;
+    btn.classList.add('btn-primary');                      // check state
+    selBar.querySelector('[data-action="clear"]').click(); // clears + re-renders
+    setTimeout(() => {
+      btn.classList.remove('btn-primary');
+      sendHold = false;
+      render();
+    }, 1000);
+  }
+
+  // --- Overlays ------------------------------------------------------------
+  const noteScrim = document.getElementById('note-scrim');
+  const delScrim = document.getElementById('delete-scrim');
+  const lightbox = document.getElementById('lightbox');
+
+  const close = el => el.classList.add('hidden');
+  const open = el => el.classList.remove('hidden');
+
+  noteBtn.addEventListener('click', () => { if (selected.size === 1) open(noteScrim); });
+  noteScrim.querySelectorAll('[data-action^="close-"], [data-action="save-note"]').forEach(b =>
+    b.addEventListener('click', () => close(noteScrim)));
+
+  selBar.querySelector('[data-action="ask-delete"]').addEventListener('click', () => open(delScrim));
+  delScrim.querySelectorAll('[data-action="close-delete"], [data-action="confirm-delete"]').forEach(b =>
+    b.addEventListener('click', () => close(delScrim)));
+
+  function openLightbox(tile) { lightbox.classList.remove('hidden'); lightbox.classList.add('flex'); }
+  lightbox.querySelector('[data-action="close-lightbox"]').addEventListener('click', () => {
+    lightbox.classList.add('hidden'); lightbox.classList.remove('flex');
+  });
+
+  document.addEventListener('keydown', e => {
+    if (e.key !== 'Escape') return;
+    close(noteScrim); close(delScrim);
+    lightbox.classList.add('hidden'); lightbox.classList.remove('flex');
+  });
+
+  render();
+</script>
+</body>
+</html>
