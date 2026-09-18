@@ -25,6 +25,22 @@ import { cachedCategories, cachedSpecifics, getCategories, getSpecifics } from "
 // `onUser` is for changes the user makes; `onAuto` for changes the form
 // makes by itself. Both drop changes from an old session (see
 // useListingEditor), so this hook must be mounted once per session.
+// Minimum offer = 25% off the price, rounded to cents. Only while the user
+// hasn't typed their own: a draft that already has a minimum offer (saved
+// before this existed) keeps it.
+const MIN_OFFER_FACTOR = 0.75;
+function autoMinOffer(listing, price) {
+  const manual =
+    listing.minOfferManual === true ||
+    (listing.minOfferManual === undefined && String(listing.minOffer || "").trim() !== "");
+  if (manual) return {};
+  const p = parseFloat(price);
+  return {
+    minOffer: Number.isFinite(p) && p > 0 ? (Math.round(p * MIN_OFFER_FACTOR * 100) / 100).toFixed(2) : "",
+    minOfferManual: false,
+  };
+}
+
 export default function useListingForm(listing, { onUser, onAuto, getSettings, peekSettings }) {
   // Start from whatever is already cached (the editor fetches a draft's
   // item specifics before swapping it in), so the form appears complete in
@@ -280,6 +296,16 @@ export default function useListingForm(listing, { onUser, onAuto, getSettings, p
   }, [targetShipping, targetPayment, targetReturn]);
 
   function handleChange(field, value) {
+    // Minimum offer follows the price (25% off) until the user types their
+    // own. Clearing the box hands it back to the automatic value.
+    if (field === "price") {
+      onUser({ ...listing, price: value, ...autoMinOffer(listing, value) });
+      return;
+    }
+    if (field === "minOffer") {
+      onUser({ ...listing, minOffer: value, minOfferManual: String(value).trim() !== "" });
+      return;
+    }
     onUser({ ...listing, [field]: value });
   }
 
