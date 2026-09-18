@@ -49,6 +49,39 @@ export function hasTitleParts(listing) {
   return !!(p && (cleanPart(p.brand) || cleanPart(p.type)));
 }
 
+// Brand + Style Name + Item Type from the TITLE verbatim, dropping NWT, size,
+// gender, color and extras (the eBay research search and the page heading).
+//   1. Type-anchor — find observations.type in the title (case- and
+//      dash-insensitive) and cut everything after it.
+//   2. Stop-word fallback — cut at the first gender word or size.
+// "" when there is no title.
+export function shortItemName(title, observations) {
+  let working = String(title || "").trim().replace(/^NWT\s+/i, "");
+  if (!working) return "";
+
+  const type = observations?.type;
+  if (type) {
+    const typeWords = String(type)
+      .toLowerCase()
+      .split(/[\s-]+/)
+      .filter(Boolean)
+      .map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+    if (typeWords.length) {
+      const typePattern = new RegExp(`\\b${typeWords.join("[\\s-]+")}\\b`, "i");
+      const typeMatch = working.match(typePattern);
+      if (typeMatch) return working.substring(0, typeMatch.index + typeMatch[0].length).trim();
+    }
+  }
+
+  // Not inside initials or possessives: "L.L. Bean" isn't size L, "Levi's"
+  // isn't size S.
+  const stopRegex =
+    /(?<![.'’])\b(?:Mens|Womens|Boys|Girls|Unisex|XS|XXS|S|M|L|XL|XXL|XXXL|2XL|3XL|4XL|5XL|6XL|7XL|Small|Medium|Large|X-Small|X-Large|XX-Large|XXX-Large|\d{2}x\d{2}\*?)\b(?![.'’])/i;
+  const stopMatch = working.match(stopRegex);
+  if (stopMatch) working = working.substring(0, stopMatch.index).trim();
+  return working;
+}
+
 // Fixed part of the title: [NWT] Brand [Style Name] Item Type Gender Size Color
 export function buildBaseTitle(parts, observations) {
   if (!parts) return "";

@@ -18,9 +18,11 @@ Work through drafts one after another on the desktop Create Listing screen witho
   - **Sticks** until unchecked (stored on the draft).
   - **Saves immediately** when checked or unchecked (no Save click, no unsaved-changes prompt for it).
   - The Drafts list shows a small grey **"Skipped"** label.
-- **After a successful List on eBay:**
-  - Success message (no confetti; users removed it).
-  - A **"Next draft"** button. It **only moves on when clicked** (no automatic jump).
+- **After a successful List on eBay** (changed 2026-09-18; before, it waited for a Next draft click):
+  - The app **moves on automatically**: it opens the oldest eligible draft, or a **blank new listing** if none is waiting (not the "all caught up" screen).
+  - "Listed on eBay! Item … · promotion result" with **View on eBay** and ✕. No photo, no Next draft / New listing buttons. Desktop: centered in the top action bar so nothing below moves. Phone: pinned above the action buttons.
+  - It disappears after **10 seconds**. A promotion problem (amber) stays until dismissed.
+- **Desktop top bar:** the heading shows the item's short name, Brand + Style + Type cut from the title (e.g. "Ariat Long Sleeve T-Shirt"); "Create Listing" when there's no title. The "Title, category, price and SKU complete/needed" text was removed. Short messages (listed, analyzing, draft deleted, style lookup) show centered in the top bar; errors stay in the lane under it.
 - **No drafts left:** show **"You're all caught up 🎉"** only.
 - **Unsaved changes:** switching drafts (by clicking a draft or Next) asks **"Save changes? Save / Discard / Cancel."**
 - **Cloudinary rate limit:** the Drafts list loads once and refreshes **only** after save/publish, when Next draft is clicked, or via the **Refresh** button. **No automatic polling at all** (users chose manual refresh; Processing drafts update when Refresh is clicked). See [[Photos and Cloudinary]].
@@ -30,10 +32,10 @@ Work through drafts one after another on the desktop Create Listing screen witho
 - **Count label:** "12 drafts" (total), not "in queue".
 - **Design status:** mocked up in Claude Design 2026-09-17 (panel, spine, dark, Skip Draft, save prompt, empty state, success bar with Next draft) and approved with the clarifications above.
 - **New listing** button (desktop action bar; phone ••• menu): clears the form and both photo zones, deselects the draft, uses the Save / Discard / Cancel prompt if there are unsaved edits. Does not create a draft; Save Draft does.
-- **Delete Draft** (desktop draft area; phone ••• menu) with a confirm reading "Deletes this draft. Its photos stay in your Photo Library. Nothing on eBay changes." After deleting, the form goes blank; nothing auto-opens (tap Next draft), same as after publishing. Decided 2026-09-18. Skip Draft and Delete Draft are hidden on a blank, unsaved listing.
+- **Delete Draft** (desktop draft area; phone ••• menu) with a confirm reading "Deletes this draft. Its photos stay in your Photo Library. Nothing on eBay changes." After deleting, the form goes blank; nothing auto-opens (tap Next draft). Decided 2026-09-18. Skip Draft and Delete Draft are hidden on a blank, unsaved listing.
 - **Error drafts** show their error message in the status lane when opened.
-- **Phone:** keeps Next draft (in the success bar) and Skip Draft (under Draft Note), decided 2026-09-17.
-- **Success = pinned bar only, no popup** (both devices): photo, item number, promotion result, View on eBay · Next draft · New listing.
+- **Phone:** keeps Skip Draft (under Draft Note), decided 2026-09-17; after listing it moves to the next draft automatically like desktop.
+- **Success = message only, no popup** (both devices): see "After a successful List on eBay" above.
 - **Published drafts** are removed from the panel immediately; no row stays highlighted and the count drops by one (the app already deletes them on publish).
 - **Two users at once:** not handled for now (users' call). The SKU check still prevents posting the same item twice.
 - **Cost:** $0, no AI.

@@ -5,6 +5,8 @@ import { usePhotoTransfer } from "@/contexts/PhotoTransferContext";
 import { applyDescriptionTemplate } from "@/lib/descriptionTemplate";
 import { INITIAL_LISTING, blankListingKeepingDefaults } from "@/lib/listingDefaults";
 import { getCategories, getSpecifics } from "@/lib/ebayCache";
+import { promoInfo } from "@/components/create/status";
+import { shortItemName } from "@/lib/titleKeywords";
 
 // Everything Create Listing does, shared by the desktop and phone layouts:
 // the listing and its photos, Analyze, Save / Update Draft, List on eBay,
@@ -57,7 +59,11 @@ export default function useListingEditor() {
   const [notice, setNotice] = useState(null); // { kind: "deleted" }
 
   const [submitting, setSubmitting] = useState(false);
-  const [submitStatus, setSubmitStatus] = useState(null);
+  const [submitStatus, setSubmitStatus] = useState(null); // failures only
+  // "Listed on eBay!" — outlives the switch to the next draft and clears
+  // itself after 10 seconds (a promotion problem stays until dismissed).
+  const [listed, setListed] = useState(null);
+  const listedTimer = useRef(null);
 
   const [savingDraft, setSavingDraft] = useState(false);
   const [saveFlash, setSaveFlash] = useState(false);
@@ -514,6 +520,21 @@ export default function useListingEditor() {
   }, [listing.title, listing.aiNote, aiPhotos, updateListing]);
 
   // --- List on eBay --------------------------------------------------------
+  const dismissListed = useCallback(() => {
+    clearTimeout(listedTimer.current);
+    setListed(null);
+  }, []);
+
+  const showListed = useCallback((info) => {
+    clearTimeout(listedTimer.current);
+    setListed(info);
+    if (!promoInfo(info.promoResult).warn) {
+      listedTimer.current = setTimeout(() => setListed(null), 10000);
+    }
+  }, []);
+
+  useEffect(() => () => clearTimeout(listedTimer.current), []);
+
   const submit = useCallback(async () => {
     // SKU is required — never post without one (the server checks too).
     if (!String(listing.sku || "").trim()) {
@@ -535,17 +556,14 @@ export default function useListingEditor() {
       });
       const data = await res.json();
       if (data.success) {
-        setSubmitStatus({
-          type: "success",
+        showListed({
           listingId: data.listingId,
           url: data.url,
           promoResult: data.promoResult || "",
-          thumbnailUrl: listingPhotos[0]?.secure_url || "",
         });
         setDraftError("");
         setNotice(null);
-        // The draft has been published — delete it, then refresh the list so
-        // its row disappears.
+        // The draft has been published — delete it.
         setDraftId(null);
         setDraftInUrl(null);
         setDirty(false);
@@ -558,7 +576,15 @@ export default function useListingEditor() {
             // Non-fatal — listing already published
           }
         }
-        refreshDrafts();
+        // Straight on to the next draft (same order as Next draft), or a
+        // blank listing when none is waiting. `submitting` stays on until
+        // then, so the listed item can't be sent twice.
+        const list = await refreshDrafts();
+        const next = (list || []).find(
+          (d) => !d.skipped && d.status !== "processing" && d.id !== publishedDraft
+        );
+        setCaughtUp(false);
+        if (!next || !(await loadDraft(next.id))) clearToBlank();
       } else {
         setSubmitStatus({ type: "error", message: `Failed: ${data.error}`, step: data.step });
       }
@@ -567,7 +593,7 @@ export default function useListingEditor() {
     } finally {
       setSubmitting(false);
     }
-  }, [listing, listingPhotos, draftId, setDirty, refreshDrafts]);
+  }, [listing, listingPhotos, draftId, setDirty, refreshDrafts, showListed, loadDraft, clearToBlank]);
 
   // --- research ------------------------------------------------------------
   const toggleGoogleMode = useCallback(() => {
@@ -587,41 +613,8 @@ export default function useListingEditor() {
   }, []);
 
   const ebaySearch = useCallback(() => {
-    // Brand + Style Name + Item Type from the TITLE verbatim, dropping size,
-    // gender, color and extras.
-    //   1. Type-anchor — find observations.type in the title (case- and
-    //      dash-insensitive) and cut everything after it.
-    //   2. Stop-word fallback — cut at the first gender word or size.
-    const title = listing.title?.trim();
-    if (!title) return;
-
-    let working = title.replace(/^NWT\s+/i, "");
-    let cutDone = false;
-
-    const type = listing.observations?.type;
-    if (type) {
-      const typeWords = type
-        .toLowerCase()
-        .split(/[\s-]+/)
-        .filter(Boolean)
-        .map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
-      if (typeWords.length) {
-        const typePattern = new RegExp(`\\b${typeWords.join("[\\s-]+")}\\b`, "i");
-        const typeMatch = working.match(typePattern);
-        if (typeMatch) {
-          working = working.substring(0, typeMatch.index + typeMatch[0].length).trim();
-          cutDone = true;
-        }
-      }
-    }
-
-    if (!cutDone) {
-      const stopRegex =
-        /\b(?:Mens|Womens|Boys|Girls|Unisex|XS|XXS|S|M|L|XL|XXL|XXXL|2XL|3XL|4XL|5XL|6XL|7XL|Small|Medium|Large|X-Small|X-Large|XX-Large|XXX-Large|\d{2}x\d{2}\*?)\b/i;
-      const stopMatch = working.match(stopRegex);
-      if (stopMatch) working = working.substring(0, stopMatch.index).trim();
-    }
-
+    // Brand + Style Name + Item Type from the title (see shortItemName).
+    const working = shortItemName(listing.title, listing.observations);
     if (!working) return;
     window.open(
       `https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent(working)}`,
@@ -655,6 +648,8 @@ export default function useListingEditor() {
     submitting,
     submitStatus,
     dismissSubmitStatus: () => setSubmitStatus(null),
+    listed,
+    dismissListed,
     savingDraft,
     saveFlash,
     saveError,

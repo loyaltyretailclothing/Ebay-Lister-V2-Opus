@@ -40,7 +40,6 @@ export default function PhoneCreate({ editor }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const mainRef = useRef(null);
   const missing = missingRequired(e.listing);
-  const published = e.submitStatus?.type === "success";
   const saveLabel = e.savingDraft ? "Saving…" : e.draftId ? "Update Draft" : "Save Draft";
   const canAnalyze = e.aiPhotos.length > 0 && !e.analyzing && !e.loadingDraft;
 
@@ -53,7 +52,7 @@ export default function PhoneCreate({ editor }) {
     <div className="mx-auto flex h-full w-full max-w-[640px] flex-col bg-bg">
       <header className="flex h-12 shrink-0 items-center gap-2 border-b border-line bg-panel px-3">
         <h1 className="m-0 whitespace-nowrap text-2xl font-semibold tracking-[-0.01em]">Create Listing</h1>
-        {e.draftId || published ? (
+        {e.draftId ? (
           <span className="badge mono min-w-0 truncate">{e.listing.sku?.trim() || "No SKU"}</span>
         ) : (
           <span className="badge border-dashed border-line-strong bg-sunken font-medium text-ink-3">
@@ -111,7 +110,7 @@ export default function PhoneCreate({ editor }) {
         <button
           type="button"
           className="btn btn-touch min-w-[106px] shrink-0 px-3 text-md"
-          disabled={e.savingDraft || e.loadingDraft || e.submitStatus?.type === "success"}
+          disabled={e.savingDraft || e.loadingDraft || e.submitting}
           onClick={e.saveDraft}
         >
           {e.savingDraft && <Spinner className="size-3.5" />}
@@ -120,7 +119,7 @@ export default function PhoneCreate({ editor }) {
         <button
           type="button"
           className="btn btn-primary btn-touch min-w-0 grow"
-          disabled={missing || e.submitting || e.submitStatus?.type === "success"}
+          disabled={missing || e.submitting || e.loadingDraft}
           onClick={e.submit}
         >
           {e.submitting && <Spinner className="size-3.5" />}

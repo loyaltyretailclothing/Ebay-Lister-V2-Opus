@@ -20,9 +20,9 @@ Ideas we want to come back to. Nothing here is built or agreed in detail yet. Se
 - Profit per item, store and brand, and days to sell. Gives [[Sourcing]] real money numbers.
 - Biggest effort: needs a way to tie each item to where it came from (SKU prefix per store, or a tap in the camera).
 
-## 4. Faster draft finishing
-- Optionally move to the next draft automatically after a successful listing (result bar stays pinned).
-- A "ready to list" mark for a quick pass over complete drafts.
+## 4. Faster draft finishing — BUILT 2026-09-18
+- After a successful listing the app opens the next draft by itself (or a blank listing when none is waiting). The "Listed on eBay!" message shows centered in the top bar for 10 seconds (on the phone, pinned above the buttons). See [[Draft Queue Plan]].
+- "Ready to list" mark — not wanted.
 
 ## 5. Shipping weight and box size filled in automatically (no AI)
 - Save a typical weight and box size per item type once (e.g. tee 8 oz, jeans 1 lb 8 oz, hoodie 1 lb 12 oz).
@@ -36,7 +36,7 @@ Ideas we want to come back to. Nothing here is built or agreed in detail yet. Se
 
 ## Not wanted (decided 2026-09-18)
 - Bin location / pick list — pulling orders isn't a problem.
-- Duplicate listing warning, daily scoreboard.
+- Duplicate listing warning, daily scoreboard, blurry/dark photo warning.
 - Bulk changes to several drafts — not right now.
 
 ## Smaller items already noted elsewhere

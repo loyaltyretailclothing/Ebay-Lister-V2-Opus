@@ -2,11 +2,11 @@
 
 import { AlertIcon, CheckCircleIcon, CheckIcon, Spinner } from "@/components/ui/Icons";
 import { DismissX } from "@/components/create/parts";
-import { thumbUrl } from "@/lib/resizeImage";
 
-// The status lane (desktop, under the action bar) and the phone's two strips.
-// Results of List on eBay live here — never inside a scrolling pane, where
-// they could be scrolled out of sight. Messages are the app's own, verbatim.
+// Status messages: desktop shows short ones centered in the action bar and
+// errors in a lane under it; the phone has two strips. Results of List on
+// eBay live here — never inside a scrolling pane, where they could be
+// scrolled out of sight. Messages are the app's own, verbatim.
 
 // Promotion result → text, and whether it deserves amber. A listing that
 // went live is never red: if only the promotion failed it is amber.
@@ -38,48 +38,98 @@ function lookupText(lookup) {
   return `Style lookup failed for style number ${lookup.styleNumber}`;
 }
 
-// Success content shared by desktop and phone.
-function Listed({ status, touch, onNext, onNew }) {
-  const promo = promoInfo(status.promoResult);
+// Desktop: short messages sit centered in the action bar, so nothing below
+// moves when one appears or goes. One at a time: listed > analyzing >
+// draft deleted > style lookup.
+const PILL = {
+  ok: "border-ok-line bg-ok-weak text-ok",
+  warn: "border-warn-line bg-warn-weak text-warn",
+  info: "border-line-strong bg-sunken text-ink-2",
+  bad: "border-bad-line bg-bad-weak text-bad",
+};
+
+function Pill({ tone, icon, children, actions, onDismiss }) {
   return (
-    <>
-      {status.thumbnailUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={thumbUrl(status.thumbnailUrl, 120)}
-          alt=""
-          className={`shrink-0 rounded-bar border border-current/30 object-cover ${touch ? "size-[38px]" : "size-9"}`}
-        />
-      ) : (
-        <CheckCircleIcon className="size-3.5" />
-      )}
-      <p className="!font-semibold">
-        Listed on eBay!
-        <span className="block font-normal">
-          Item <span className="mono">{status.listingId}</span>
-          {promo.text ? ` · ${promo.text}` : ""}
-        </span>
-      </p>
-      {!touch && (
-        <div className="acts">
-          {status.url && (
-            <a href={status.url} target="_blank" rel="noopener noreferrer" className="btn btn-sm">
-              View on eBay
-            </a>
-          )}
-          <button type="button" className="btn btn-sm" onClick={onNext}>
-            Next draft
-          </button>
-          <button type="button" className="btn btn-sm" onClick={onNew}>
-            New listing
-          </button>
-        </div>
-      )}
-    </>
+    <div
+      role="status"
+      className={`flex h-9 min-w-0 max-w-full items-center gap-2 rounded-chip border pl-3 ${onDismiss ? "pr-1" : "pr-3"} text-sm font-medium ${PILL[tone]}`}
+    >
+      {icon}
+      <p className="m-0 min-w-0 truncate">{children}</p>
+      {actions}
+      {onDismiss && <DismissX onClick={onDismiss} />}
+    </div>
   );
 }
 
-// ONE lane on desktop, one state at a time.
+export function TopMessage({ editor }) {
+  const e = editor;
+  if (e.listed) {
+    const promo = promoInfo(e.listed.promoResult);
+    return (
+      <Pill
+        tone={promo.warn ? "warn" : "ok"}
+        icon={<CheckCircleIcon className="size-3.5 shrink-0" />}
+        onDismiss={e.dismissListed}
+        actions={
+          e.listed.url && (
+            <a href={e.listed.url} target="_blank" rel="noopener noreferrer" className="btn btn-sm shrink-0">
+              View on eBay
+            </a>
+          )
+        }
+      >
+        <span className="font-semibold">Listed on eBay!</span> Item{" "}
+        <span className="mono">{e.listed.listingId}</span>
+        {promo.text ? ` · ${promo.text}` : ""}
+      </Pill>
+    );
+  }
+  if (e.analyzing) {
+    return (
+      <Pill tone="info" icon={<Spinner className="size-3.5 shrink-0" />}>
+        {e.analysisStep || "Analyzing photos…"}
+      </Pill>
+    );
+  }
+  if (e.notice?.kind === "deleted") {
+    return (
+      <Pill
+        tone="info"
+        icon={<CheckCircleIcon className="size-3.5 shrink-0" />}
+        onDismiss={e.dismissNotice}
+        actions={
+          <button type="button" className="btn btn-sm shrink-0" onClick={e.nextDraft}>
+            Next draft
+          </button>
+        }
+      >
+        Draft deleted. Its photos are still in your Photo Library.
+      </Pill>
+    );
+  }
+  if (e.lookup) {
+    const tone = e.lookup.kind === "found" ? "ok" : e.lookup.kind === "failed" ? "bad" : "info";
+    return (
+      <Pill
+        tone={tone}
+        icon={
+          e.lookup.kind === "failed" ? (
+            <AlertIcon className="size-3.5 shrink-0" />
+          ) : (
+            <CheckCircleIcon className="size-3.5 shrink-0" />
+          )
+        }
+        onDismiss={e.dismissLookup}
+      >
+        {lookupText(e.lookup)}
+      </Pill>
+    );
+  }
+  return null;
+}
+
+// Desktop lane under the action bar: errors only (they can run long).
 export function DesktopLane({ editor }) {
   const e = editor;
   const s = e.submitStatus;
@@ -100,23 +150,6 @@ export function DesktopLane({ editor }) {
       </div>
     );
   }
-  if (s?.type === "success") {
-    const warn = promoInfo(s.promoResult).warn;
-    return (
-      <div className={`lane ${warn ? "lane-warn" : "lane-ok"} shrink-0 items-center`}>
-        <Listed status={s} onNext={e.nextDraft} onNew={e.newListing} />
-        <DismissX onClick={e.dismissSubmitStatus} />
-      </div>
-    );
-  }
-  if (e.analyzing) {
-    return (
-      <div className="lane lane-info shrink-0">
-        <Spinner className="size-3.5" />
-        <p>{e.analysisStep || "Analyzing photos…"}</p>
-      </div>
-    );
-  }
   if (e.error || e.saveError) {
     return (
       <div className="lane lane-bad shrink-0">
@@ -130,30 +163,6 @@ export function DesktopLane({ editor }) {
       <div className="lane lane-bad shrink-0">
         <AlertIcon className="size-3.5" />
         <p>{e.draftError}</p>
-      </div>
-    );
-  }
-  if (e.notice?.kind === "deleted") {
-    return (
-      <div className="lane lane-info shrink-0 items-center">
-        <CheckCircleIcon className="size-3.5" />
-        <p>Draft deleted. Its photos are still in your Photo Library.</p>
-        <div className="acts">
-          <button type="button" className="btn btn-sm" onClick={e.nextDraft}>
-            Next draft
-          </button>
-          <DismissX onClick={e.dismissNotice} />
-        </div>
-      </div>
-    );
-  }
-  if (e.lookup) {
-    const cls = e.lookup.kind === "found" ? "lane-ok" : e.lookup.kind === "failed" ? "lane-bad" : "lane-info";
-    return (
-      <div className={`lane ${cls} shrink-0`}>
-        {e.lookup.kind === "failed" ? <AlertIcon className="size-3.5" /> : <CheckCircleIcon className="size-3.5" />}
-        <p>{lookupText(e.lookup)}</p>
-        <DismissX onClick={e.dismissLookup} />
       </div>
     );
   }
@@ -239,32 +248,29 @@ export function PhonePin({ editor, missing }) {
       </div>
     );
   }
-  if (s?.type === "success") {
-    const warn = promoInfo(s.promoResult).warn;
+  if (e.listed) {
+    const promo = promoInfo(e.listed.promoResult);
     return (
-      <div className={`pin ${warn ? "pin-warn" : "pin-ok"} flex-col gap-[9px]`}>
-        <div className="flex w-full items-start gap-[9px]">
-          <Listed status={s} touch />
-          <DismissX onClick={e.dismissSubmitStatus} />
-        </div>
-        <div className="flex w-full gap-[7px]">
-          {s.url && (
-            <a
-              href={s.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="btn h-[38px] min-w-0 flex-1 border-current/40 px-2 text-base text-current"
-            >
-              View on eBay
-            </a>
-          )}
-          <button type="button" className="btn h-[38px] min-w-0 flex-1 border-current/40 px-2 text-base text-current" onClick={e.nextDraft}>
-            Next draft
-          </button>
-          <button type="button" className="btn h-[38px] min-w-0 flex-1 border-current/40 px-2 text-base text-current" onClick={e.newListing}>
-            New listing
-          </button>
-        </div>
+      <div className={`pin ${promo.warn ? "pin-warn" : "pin-ok"} items-center`}>
+        <CheckCircleIcon className="size-3.5 shrink-0" />
+        <p className="!font-semibold">
+          Listed on eBay!
+          <span className="block font-normal">
+            Item <span className="mono">{e.listed.listingId}</span>
+            {promo.text ? ` · ${promo.text}` : ""}
+          </span>
+        </p>
+        {e.listed.url && (
+          <a
+            href={e.listed.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="btn h-[38px] shrink-0 border-current/40 px-2.5 text-base text-current"
+          >
+            View on eBay
+          </a>
+        )}
+        <DismissX onClick={e.dismissListed} />
       </div>
     );
   }

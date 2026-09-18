@@ -7,7 +7,8 @@ import { AnalyzeIcon, CheckIcon, PlusIcon, Spinner, TrashIcon } from "@/componen
 import LibraryPanel from "@/components/create/LibraryPanel";
 import PhotoZone from "@/components/create/PhotoZone";
 import Notes from "@/components/create/Notes";
-import { DesktopLane } from "@/components/create/status";
+import { DesktopLane, TopMessage } from "@/components/create/status";
+import { shortItemName } from "@/lib/titleKeywords";
 import { LeaveDialog, DeleteDraftDialog } from "@/components/create/dialogs";
 import {
   CategoryField,
@@ -56,14 +57,16 @@ export default function DesktopCreate({ editor }) {
 }
 
 function ActionBar({ editor: e, missing }) {
-  const published = e.submitStatus?.type === "success";
   const saveLabel = e.savingDraft ? "Saving…" : e.draftId ? "Update Draft" : "Save Draft";
   const canAnalyze = e.aiPhotos.length > 0 && !e.analyzing && !e.loadingDraft;
+  const heading = shortItemName(e.listing.title, e.listing.observations) || "Create Listing";
 
   return (
     <header className="flex h-13 shrink-0 items-center gap-3 border-b border-line bg-panel px-4">
-      <h1 className="m-0 whitespace-nowrap text-xl font-semibold tracking-[-0.01em]">Create Listing</h1>
-      {e.draftId || published ? (
+      <h1 title={heading} className="m-0 min-w-0 max-w-[320px] shrink truncate text-xl font-semibold tracking-[-0.01em]">
+        {heading}
+      </h1>
+      {e.draftId ? (
         <span className="badge font-mono">{e.listing.sku?.trim() || "No SKU"}</span>
       ) : (
         <span className="badge border-dashed text-ink-3">New listing · not saved</span>
@@ -86,18 +89,11 @@ function ActionBar({ editor: e, missing }) {
         New listing
       </button>
 
-      <div className="grow" />
+      <div className="flex min-w-0 grow justify-center">
+        <TopMessage editor={e} />
+      </div>
 
-      {missing ? (
-        <p className="m-0 whitespace-nowrap text-sm text-ink-3">Title, category, price and SKU needed</p>
-      ) : (
-        <p className="m-0 flex items-center gap-1.5 whitespace-nowrap text-sm text-ok">
-          <CheckIcon className="size-3" />
-          Title, category, price and SKU complete
-        </p>
-      )}
-
-      <div className="flex items-center gap-2">
+      <div className="flex shrink-0 items-center gap-2">
         <button type="button" className="btn" disabled={!canAnalyze} onClick={e.analyze}>
           {e.analyzing ? <Spinner className="size-3.5" /> : <AnalyzeIcon className="size-3.5" />}
           {e.analyzing ? "Analyzing…" : "Analyze Photos"}
@@ -105,7 +101,7 @@ function ActionBar({ editor: e, missing }) {
         <button
           type="button"
           className="btn min-w-[104px]"
-          disabled={e.savingDraft || e.loadingDraft || e.submitStatus?.type === "success"}
+          disabled={e.savingDraft || e.loadingDraft || e.submitting}
           onClick={e.saveDraft}
         >
           {e.savingDraft && <Spinner className="size-3.5" />}
@@ -119,7 +115,7 @@ function ActionBar({ editor: e, missing }) {
 
 function ListButton({ editor: e, missing, className }) {
   return (
-    <button type="button" className={className} disabled={missing || e.submitting || e.submitStatus?.type === "success"} onClick={e.submit}>
+    <button type="button" className={className} disabled={missing || e.submitting || e.loadingDraft} onClick={e.submit}>
       {e.submitting && <Spinner className="size-3.5" />}
       {e.submitting ? "Listing on eBay…" : listButtonLabel(e.listing)}
     </button>
