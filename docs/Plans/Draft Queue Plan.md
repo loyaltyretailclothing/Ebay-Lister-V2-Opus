@@ -22,7 +22,7 @@ Work through drafts one after another on the desktop Create Listing screen witho
   - The app **moves on automatically**: it opens the oldest eligible draft, or a **blank new listing** if none is waiting (not the "all caught up" screen).
   - "Listed on eBay! Item … · promotion result" with **View on eBay** and ✕. No photo, no Next draft / New listing buttons. Desktop: centered in the top action bar so nothing below moves. Phone: pinned above the action buttons.
   - It disappears after **10 seconds**. A promotion problem (amber) stays until dismissed.
-- **Desktop top bar:** the heading shows the item's short name, Brand + Style + Type cut from the title (e.g. "Ariat Long Sleeve T-Shirt"); "Create Listing" when there's no title. The "Title, category, price and SKU complete/needed" text was removed. Short messages (listed, analyzing, draft deleted, style lookup) show centered in the top bar; errors stay in the lane under it.
+- **Desktop top bar:** the heading shows the item's short name, Brand + Style + Type cut from the title (e.g. "Ariat Long Sleeve T-Shirt"); "Create Listing" when there's no title. The "Title, category, price and SKU complete/needed" text was removed. All messages show centered in the top bar (one at a time: listed > errors > analyzing > draft deleted > style lookup); there is no bar under it anymore, so nothing pushes the page down. Errors are red, wrap to 2 lines (hover for the full text), and stay until ✕; a SKU error keeps its Change SKU button. Phone unchanged.
 - **No drafts left:** show **"You're all caught up 🎉"** only.
 - **Unsaved changes:** switching drafts (by clicking a draft or Next) asks **"Save changes? Save / Discard / Cancel."**
 - **Cloudinary rate limit:** the Drafts list loads once and refreshes **only** after save/publish, when Next draft is clicked, or via the **Refresh** button. **No automatic polling at all** (users chose manual refresh; Processing drafts update when Refresh is clicked). See [[Photos and Cloudinary]].
@@ -33,7 +33,7 @@ Work through drafts one after another on the desktop Create Listing screen witho
 - **Design status:** mocked up in Claude Design 2026-09-17 (panel, spine, dark, Skip Draft, save prompt, empty state, success bar with Next draft) and approved with the clarifications above.
 - **New listing** button (desktop action bar; phone ••• menu): clears the form and both photo zones, deselects the draft, uses the Save / Discard / Cancel prompt if there are unsaved edits. Does not create a draft; Save Draft does.
 - **Delete Draft** (desktop draft area; phone ••• menu) with a confirm reading "Deletes this draft. Its photos stay in your Photo Library. Nothing on eBay changes." After deleting, the form goes blank; nothing auto-opens (tap Next draft). Decided 2026-09-18. Skip Draft and Delete Draft are hidden on a blank, unsaved listing.
-- **Error drafts** show their error message in the status lane when opened.
+- **Error drafts** show their error message when opened (desktop: top bar; phone: top strip).
 - **Phone:** keeps Skip Draft (under Draft Note), decided 2026-09-17; after listing it moves to the next draft automatically like desktop.
 - **Success = message only, no popup** (both devices): see "After a successful List on eBay" above.
 - **Published drafts** are removed from the panel immediately; no row stays highlighted and the count drops by one (the app already deletes them on publish).

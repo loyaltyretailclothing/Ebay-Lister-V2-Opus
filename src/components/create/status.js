@@ -3,8 +3,8 @@
 import { AlertIcon, CheckCircleIcon, CheckIcon, Spinner } from "@/components/ui/Icons";
 import { DismissX } from "@/components/create/parts";
 
-// Status messages: desktop shows short ones centered in the action bar and
-// errors in a lane under it; the phone has two strips. Results of List on
+// Status messages: desktop shows them all centered in the action bar; the
+// phone has two strips. Results of List on
 // eBay live here — never inside a scrolling pane, where they could be
 // scrolled out of sight. Messages are the app's own, verbatim.
 
@@ -38,9 +38,9 @@ function lookupText(lookup) {
   return `Style lookup failed for style number ${lookup.styleNumber}`;
 }
 
-// Desktop: short messages sit centered in the action bar, so nothing below
-// moves when one appears or goes. One at a time: listed > analyzing >
-// draft deleted > style lookup.
+// Desktop: every message sits centered in the action bar, so nothing below
+// moves when one appears or goes. One at a time: listed > errors >
+// analyzing > draft deleted > style lookup.
 const PILL = {
   ok: "border-ok-line bg-ok-weak text-ok",
   warn: "border-warn-line bg-warn-weak text-warn",
@@ -48,29 +48,46 @@ const PILL = {
   bad: "border-bad-line bg-bad-weak text-bad",
 };
 
-function Pill({ tone, icon, children, actions, onDismiss }) {
+// Errors may wrap to two lines (the bar is 52px tall); anything longer is
+// cut with "…" and the full text shows on hover.
+function Pill({ tone, icon, children, actions, onDismiss, full }) {
   return (
     <div
-      role="status"
-      className={`flex h-9 min-w-0 max-w-full items-center gap-2 rounded-chip border pl-3 ${onDismiss ? "pr-1" : "pr-3"} text-sm font-medium ${PILL[tone]}`}
+      role={tone === "bad" ? "alert" : "status"}
+      title={full}
+      className={`flex min-h-9 min-w-0 max-w-full items-center gap-2 rounded-chip border py-1 pl-3 ${onDismiss ? "pr-1" : "pr-3"} text-sm font-medium ${PILL[tone]}`}
     >
       {icon}
-      <p className="m-0 min-w-0 truncate">{children}</p>
+      <p className={`m-0 min-w-0 ${full ? "line-clamp-2 leading-4" : "truncate"}`}>{children}</p>
       {actions}
       {onDismiss && <DismissX onClick={onDismiss} />}
     </div>
   );
 }
 
+function ErrorPill({ message, actions, onDismiss }) {
+  return (
+    <Pill tone="bad" icon={<AlertIcon className="size-3.5 shrink-0" />} full={message} actions={actions} onDismiss={onDismiss}>
+      {message}
+    </Pill>
+  );
+}
+
 export function TopMessage({ editor }) {
   const e = editor;
+  const s = e.submitStatus;
+  // Listed first: it only lives 10 seconds, and a problem on the draft that
+  // opens next is still there after it goes. (A new List on eBay clears it,
+  // so it never hides a listing failure.)
   if (e.listed) {
     const promo = promoInfo(e.listed.promoResult);
+    const text = `Listed on eBay! Item ${e.listed.listingId}${promo.text ? ` · ${promo.text}` : ""}`;
     return (
       <Pill
         tone={promo.warn ? "warn" : "ok"}
         icon={<CheckCircleIcon className="size-3.5 shrink-0" />}
         onDismiss={e.dismissListed}
+        full={promo.warn ? text : undefined}
         actions={
           e.listed.url && (
             <a href={e.listed.url} target="_blank" rel="noopener noreferrer" className="btn btn-sm shrink-0">
@@ -84,6 +101,27 @@ export function TopMessage({ editor }) {
         {promo.text ? ` · ${promo.text}` : ""}
       </Pill>
     );
+  }
+  if (s?.type === "error") {
+    return (
+      <ErrorPill
+        message={s.message}
+        onDismiss={e.dismissSubmitStatus}
+        actions={
+          s.step === "sku_check" && (
+            <button type="button" className="btn btn-sm btn-danger shrink-0" onClick={focusSku}>
+              Change SKU
+            </button>
+          )
+        }
+      />
+    );
+  }
+  if (e.error || e.saveError) {
+    return <ErrorPill message={e.error || e.saveError} onDismiss={e.dismissError} />;
+  }
+  if (e.draftError) {
+    return <ErrorPill message={e.draftError} onDismiss={e.dismissDraftError} />;
   }
   if (e.analyzing) {
     return (
@@ -124,46 +162,6 @@ export function TopMessage({ editor }) {
       >
         {lookupText(e.lookup)}
       </Pill>
-    );
-  }
-  return null;
-}
-
-// Desktop lane under the action bar: errors only (they can run long).
-export function DesktopLane({ editor }) {
-  const e = editor;
-  const s = e.submitStatus;
-
-  if (s?.type === "error") {
-    return (
-      <div className="lane lane-bad shrink-0">
-        <AlertIcon className="size-3.5" />
-        <p>{s.message}</p>
-        <div className="acts">
-          {s.step === "sku_check" && (
-            <button type="button" className="btn btn-sm btn-danger" onClick={focusSku}>
-              Change SKU
-            </button>
-          )}
-          <DismissX onClick={e.dismissSubmitStatus} />
-        </div>
-      </div>
-    );
-  }
-  if (e.error || e.saveError) {
-    return (
-      <div className="lane lane-bad shrink-0">
-        <AlertIcon className="size-3.5" />
-        <p>{e.error || e.saveError}</p>
-      </div>
-    );
-  }
-  if (e.draftError) {
-    return (
-      <div className="lane lane-bad shrink-0">
-        <AlertIcon className="size-3.5" />
-        <p>{e.draftError}</p>
-      </div>
     );
   }
   return null;

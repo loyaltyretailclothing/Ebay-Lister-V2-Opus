@@ -547,6 +547,7 @@ export default function useListingEditor() {
     }
     setSubmitting(true);
     setSubmitStatus(null);
+    dismissListed();
     const publishedDraft = draftId;
     try {
       const res = await fetch("/api/ebay/list", {
@@ -593,7 +594,7 @@ export default function useListingEditor() {
     } finally {
       setSubmitting(false);
     }
-  }, [listing, listingPhotos, draftId, setDirty, refreshDrafts, showListed, loadDraft, clearToBlank]);
+  }, [listing, listingPhotos, draftId, setDirty, refreshDrafts, showListed, dismissListed, loadDraft, clearToBlank]);
 
   // --- research ------------------------------------------------------------
   const toggleGoogleMode = useCallback(() => {
@@ -642,7 +643,12 @@ export default function useListingEditor() {
     lookup,
     dismissLookup: () => setLookup(null),
     error,
+    dismissError: () => {
+      setError("");
+      setSaveError("");
+    },
     draftError,
+    dismissDraftError: () => setDraftError(""),
     notice,
     dismissNotice: () => setNotice(null),
     submitting,

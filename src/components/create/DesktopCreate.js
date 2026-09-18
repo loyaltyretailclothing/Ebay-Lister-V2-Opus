@@ -7,7 +7,7 @@ import { AnalyzeIcon, CheckIcon, PlusIcon, Spinner, TrashIcon } from "@/componen
 import LibraryPanel from "@/components/create/LibraryPanel";
 import PhotoZone from "@/components/create/PhotoZone";
 import Notes from "@/components/create/Notes";
-import { DesktopLane, TopMessage } from "@/components/create/status";
+import { TopMessage } from "@/components/create/status";
 import { shortItemName } from "@/lib/titleKeywords";
 import { LeaveDialog, DeleteDraftDialog } from "@/components/create/dialogs";
 import {
@@ -33,7 +33,6 @@ export default function DesktopCreate({ editor }) {
   return (
     <div className="relative flex h-full min-h-0 flex-col">
       <ActionBar editor={e} missing={missing} />
-      <DesktopLane editor={e} />
 
       <div className="flex min-h-0 grow">
         <LibraryPanel editor={e} />
@@ -63,7 +62,7 @@ function ActionBar({ editor: e, missing }) {
 
   return (
     <header className="flex h-13 shrink-0 items-center gap-3 border-b border-line bg-panel px-4">
-      <h1 title={heading} className="m-0 min-w-0 max-w-[320px] shrink truncate text-xl font-semibold tracking-[-0.01em]">
+      <h1 title={heading} className="m-0 max-w-[320px] shrink-0 truncate text-xl font-semibold tracking-[-0.01em]">
         {heading}
       </h1>
       {e.draftId ? (
