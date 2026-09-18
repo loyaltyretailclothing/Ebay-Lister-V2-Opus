@@ -146,7 +146,7 @@ function PhotosColumn({ editor: e }) {
   const hasTitle = !!e.listing.title?.trim();
 
   return (
-    <section className="photos flex shrink-0 flex-col gap-3 overflow-y-auto border-r border-line bg-panel p-3">
+    <section className="photos relative flex shrink-0 flex-col gap-3 overflow-y-auto border-r border-line bg-panel p-3">
       <div ref={zoneRef} className="pzone flex flex-col">
         <PhotoZone
           title="eBay Listing Photos"
@@ -271,7 +271,7 @@ function FormPanes({ editor: e, missing }) {
 
   return (
     <section className="flex min-w-0 grow overflow-hidden bg-panel">
-      <div className="form-pane-a flex min-h-0 flex-col gap-3.5 overflow-y-auto px-4 py-3.5">
+      <div className="form-pane-a relative flex min-h-0 flex-col gap-3.5 overflow-y-auto px-4 py-3.5">
         <TitleField {...p} />
         <Keywords {...p} />
         <div className="row">
@@ -286,7 +286,7 @@ function FormPanes({ editor: e, missing }) {
         </div>
       </div>
 
-      <div className="form-pane-b flex min-h-0 flex-col gap-3.5 overflow-y-auto border-l border-line px-4 py-3.5">
+      <div className="form-pane-b relative flex min-h-0 flex-col gap-3.5 overflow-y-auto border-l border-line px-4 py-3.5">
         <ConditionFields {...p} />
         <DescriptionField {...p} />
         <PricingFields {...p} />

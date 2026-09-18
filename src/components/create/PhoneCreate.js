@@ -80,7 +80,7 @@ export default function PhoneCreate({ editor }) {
         ))}
       </nav>
 
-      <main ref={mainRef} className="flex min-h-0 grow flex-col overflow-y-auto bg-panel p-3">
+      <main ref={mainRef} className="relative flex min-h-0 grow flex-col overflow-y-auto bg-panel p-3">
         {e.caughtUp ? (
           <div className="flex grow items-center justify-center">
             <p className="m-0 text-[20px] font-semibold tracking-[-0.01em]">You&apos;re all caught up 🎉</p>
