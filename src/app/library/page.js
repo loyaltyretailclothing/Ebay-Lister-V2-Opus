@@ -28,7 +28,7 @@ export default function LibraryPage() {
   const lib = usePhotoLibrary();
   const { addToTransfer } = usePhotoTransfer();
   const fileRef = useRef(null);
-  const tapTimer = useRef(null);
+  const lastTap = useRef(null); // { id, at } of the last tile tap
   const [lightbox, setLightbox] = useState(null);
   const [noteFor, setNoteFor] = useState(null);
   const [noteText, setNoteText] = useState("");
@@ -41,18 +41,20 @@ export default function LibraryPage() {
   const n = lib.selected.length;
   const uploading = lib.upload && lib.upload.total !== undefined;
 
-  // One tap selects; a second tap within 260ms opens the photo instead.
+  // A tap selects straight away. A second tap on the SAME photo within
+  // 300ms is a double-tap: it undoes that selection and opens the photo.
+  // Quick taps on different photos just select them.
   function onTileTap(photo, index) {
-    if (tapTimer.current) {
-      clearTimeout(tapTimer.current);
-      tapTimer.current = null;
+    const now = Date.now();
+    const last = lastTap.current;
+    if (last && last.id === photo.public_id && now - last.at < 300) {
+      lastTap.current = null;
+      lib.toggleSelect(photo.public_id); // undo the first tap's select
       setLightbox(index);
       return;
     }
-    tapTimer.current = setTimeout(() => {
-      tapTimer.current = null;
-      lib.toggleSelect(photo.public_id);
-    }, 260);
+    lastTap.current = { id: photo.public_id, at: now };
+    lib.toggleSelect(photo.public_id);
   }
 
   function sendTo(target) {
