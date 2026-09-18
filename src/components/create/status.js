@@ -117,14 +117,6 @@ export function DesktopLane({ editor }) {
       </div>
     );
   }
-  if (e.loadingDraft) {
-    return (
-      <div className="lane lane-info shrink-0">
-        <Spinner className="size-3.5" />
-        <p>Opening draft…</p>
-      </div>
-    );
-  }
   if (e.error || e.saveError) {
     return (
       <div className="lane lane-bad shrink-0">
@@ -171,11 +163,11 @@ export function DesktopLane({ editor }) {
 // Phone TOP lane: what the app just did to the draft.
 export function PhoneTopLane({ editor }) {
   const e = editor;
-  if (e.analyzing || e.loadingDraft) {
+  if (e.analyzing) {
     return (
       <div className="lane lane-info shrink-0 px-3">
         <Spinner className="size-[13px]" />
-        <p>{e.loadingDraft ? "Opening draft…" : e.analysisStep || "Analyzing photos…"}</p>
+        <p>{e.analysisStep || "Analyzing photos…"}</p>
       </div>
     );
   }

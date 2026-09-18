@@ -15,6 +15,7 @@ import {
   moveKeywordToTitle,
   syncDescriptionTitle,
 } from "@/lib/titleKeywords";
+import { cachedCategories, cachedSpecifics, getCategories, getSpecifics } from "@/lib/ebayCache";
 
 // The listing form's logic (moved unchanged out of the old ListingForm so
 // the desktop and phone layouts share it): category suggestions, item
@@ -24,20 +25,29 @@ import {
 // `onUser` is for changes the user makes; `onAuto` for changes the form
 // makes by itself. Both drop changes from an old session (see
 // useListingEditor), so this hook must be mounted once per session.
-export default function useListingForm(listing, { onUser, onAuto, getSettings }) {
-  const [categories, setCategories] = useState([]);
-  const [specifics, setSpecifics] = useState([]);
+export default function useListingForm(listing, { onUser, onAuto, getSettings, peekSettings }) {
+  // Start from whatever is already cached (the editor fetches a draft's
+  // item specifics before swapping it in), so the form appears complete in
+  // one step instead of filling in piece by piece.
+  const initSpec = cachedSpecifics(listing?.categoryId);
+  const initSettings = peekSettings?.();
+  const [categories, setCategories] = useState(
+    () => cachedCategories(listing?.category_keywords)?.categories || []
+  );
+  const [specifics, setSpecifics] = useState(() => initSpec?.specifics || []);
   // Conditions the current category allows. Defaults to all conditions so
   // the dropdown is fully populated before a category is chosen and as a
   // graceful fallback if the eBay condition lookup fails.
-  const [allowedConditions, setAllowedConditions] = useState(CONDITIONS);
+  const [allowedConditions, setAllowedConditions] = useState(() =>
+    initSpec ? allowedConditionsForCategory(initSpec.conditionIds || []) : CONDITIONS
+  );
   const [loadingCategories, setLoadingCategories] = useState(false);
-  const [loadingSpecifics, setLoadingSpecifics] = useState(false);
+  const [loadingSpecifics, setLoadingSpecifics] = useState(() => !!listing?.categoryId && !initSpec);
   const [fillingSpecifics, setFillingSpecifics] = useState(false);
-  const [settingsConfig, setSettingsConfig] = useState({});
-  const [initialSettingsConfig, setInitialSettingsConfig] = useState({});
-  const [settingsLoaded, setSettingsLoaded] = useState(false);
-  const [policies, setPolicies] = useState({});
+  const [settingsConfig, setSettingsConfig] = useState(() => initSettings?.categories || {});
+  const [initialSettingsConfig, setInitialSettingsConfig] = useState(() => initSettings?.categories || {});
+  const [settingsLoaded, setSettingsLoaded] = useState(() => !!initSettings?.success);
+  const [policies, setPolicies] = useState(() => initSettings?.policies || {});
   const [keywordNotice, setKeywordNotice] = useState("");
 
   // Settings (saved categories + policies) are loaded once per page by the
@@ -62,13 +72,11 @@ export default function useListingForm(listing, { onUser, onAuto, getSettings })
     if (!listing?.category_keywords) return;
 
     async function fetchCategories() {
-      setLoadingCategories(true);
+      const cached = !!cachedCategories(listing.category_keywords);
+      if (!cached) setLoadingCategories(true);
       try {
-        const res = await fetch(
-          `/api/ebay/categories?q=${encodeURIComponent(listing.category_keywords)}`
-        );
-        const data = await res.json();
-        if (data.success) {
+        const data = await getCategories(listing.category_keywords);
+        if (data?.success) {
           setCategories(data.categories);
           if (data.categories.length > 0 && !listing.categoryId) {
             onAuto({
@@ -98,13 +106,10 @@ export default function useListingForm(listing, { onUser, onAuto, getSettings })
     const currentListing = listing;
 
     async function fetchSpecifics() {
-      setLoadingSpecifics(true);
+      if (!cachedSpecifics(currentListing.categoryId)) setLoadingSpecifics(true);
       try {
-        const res = await fetch(
-          `/api/ebay/specifics?categoryId=${currentListing.categoryId}`
-        );
-        const data = await res.json();
-        if (data.success) {
+        const data = await getSpecifics(currentListing.categoryId);
+        if (data?.success) {
           setSpecifics(data.specifics);
 
           // Filter the condition dropdown to what this category supports,

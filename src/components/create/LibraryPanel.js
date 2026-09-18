@@ -399,6 +399,7 @@ function DraftsBody({ editor }) {
           const processing = d.status === "processing";
           const isError = d.status === "error";
           const current = d.id === e.draftId;
+          const opening = d.id === e.openingId;
           const inner = (
             <>
               <span className="dthumb">
@@ -409,7 +410,12 @@ function DraftsBody({ editor }) {
               </span>
               <span className="min-w-0 grow">
                 <span className="dtitle">{d.title || "Untitled"}</span>
-                {processing ? (
+                {opening ? (
+                  <span className="dstat text-accent">
+                    <Spinner className="size-[11px]" />
+                    Opening…
+                  </span>
+                ) : processing ? (
                   <span className="dstat text-ink-3">
                     <Spinner className="size-[11px]" />
                     Processing
@@ -439,7 +445,7 @@ function DraftsBody({ editor }) {
             <button
               key={d.id}
               type="button"
-              className={`drow ${current ? "drow-on" : ""}`}
+              className={`drow ${current || opening ? "drow-on" : ""}`}
               aria-current={current ? "true" : undefined}
               title={e.busy ? "Wait for the current action to finish" : undefined}
               onClick={() => e.openDraft(d.id)}

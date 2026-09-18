@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { usePhotoTransfer } from "@/contexts/PhotoTransferContext";
 import { applyDescriptionTemplate } from "@/lib/descriptionTemplate";
 import { INITIAL_LISTING, blankListingKeepingDefaults } from "@/lib/listingDefaults";
+import { getCategories, getSpecifics } from "@/lib/ebayCache";
 
 // Everything Create Listing does, shared by the desktop and phone layouts:
 // the listing and its photos, Analyze, Save / Update Draft, List on eBay,
@@ -62,6 +63,7 @@ export default function useListingEditor() {
   const [saveFlash, setSaveFlash] = useState(false);
   const [saveError, setSaveError] = useState("");
   const [loadingDraft, setLoadingDraft] = useState(false);
+  const [openingId, setOpeningId] = useState(null); // draft being opened
 
   const [skipSaving, setSkipSaving] = useState(false);
   const [skipFlash, setSkipFlash] = useState(false);
@@ -104,20 +106,27 @@ export default function useListingEditor() {
   // Saved settings (categories + policies), loaded once per page and shared
   // by every session's form.
   const settingsRef = useRef(null);
+  const settingsResolvedRef = useRef(null);
   const getSettings = useCallback(() => {
     if (!settingsRef.current) {
       settingsRef.current = fetch("/api/settings", { cache: "no-store" })
         .then((r) => r.json())
+        .then((data) => {
+          settingsResolvedRef.current = data;
+          return data;
+        })
         .catch(() => null);
     }
     return settingsRef.current;
   }, []);
+  const peekSettings = useCallback(() => settingsResolvedRef.current, []);
 
   // Setters handed to the form for one session. Late changes from an old
   // session are dropped.
   const formSetters = useCallback(
     (s) => ({
       getSettings,
+      peekSettings,
       onUser: (next) => {
         if (s !== sessionRef.current) return;
         updateListing(next);
@@ -127,7 +136,7 @@ export default function useListingEditor() {
         setListing(next);
       },
     }),
-    [updateListing, getSettings]
+    [updateListing, getSettings, peekSettings]
   );
 
   const setAiPhotos = useCallback(
@@ -182,9 +191,14 @@ export default function useListingEditor() {
     setResearchMode(null);
   }, []);
 
+  // Opening a draft is ONE visible step: the current listing stays on screen
+  // (faded) while the draft and everything its form needs — saved settings,
+  // the category's item specifics, category suggestions — are fetched; then
+  // the new draft is swapped in complete. No strip appears and nothing jumps.
   const loadDraft = useCallback(
     async (id) => {
       setLoadingDraft(true);
+      setOpeningId(id);
       setError("");
       try {
         const res = await fetch(`/api/drafts/${encodeURIComponent(id)}`, {
@@ -192,6 +206,12 @@ export default function useListingEditor() {
         });
         const data = await res.json();
         if (data.success && data.draft) {
+          const l = data.draft.listing || {};
+          await Promise.all([
+            getSettings(),
+            getSpecifics(l.categoryId).catch(() => null),
+            getCategories(l.category_keywords).catch(() => null),
+          ]);
           clearStatus();
           setListing({ ...INITIAL_LISTING, ...(data.draft.listing || {}) });
           setAiPhotosState(data.draft.aiPhotos || []);
@@ -211,10 +231,11 @@ export default function useListingEditor() {
         setError("Could not load draft: " + err.message);
       } finally {
         setLoadingDraft(false);
+        setOpeningId(null);
       }
       return false;
     },
-    [clearStatus, newSession, setDirty]
+    [clearStatus, newSession, setDirty, getSettings]
   );
 
   const clearToBlank = useCallback(
@@ -632,6 +653,7 @@ export default function useListingEditor() {
     saveFlash,
     saveError,
     loadingDraft,
+    openingId,
     skipSaving,
     skipFlash,
     // queue
