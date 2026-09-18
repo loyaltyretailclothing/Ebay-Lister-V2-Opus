@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import useListingForm from "@/hooks/useListingForm";
 import { listButtonLabel, missingRequired } from "@/lib/listingDefaults";
+import { shortItemName } from "@/lib/titleKeywords";
 import { MoreIcon, PlusIcon, SearchIcon, Spinner, TrashIcon } from "@/components/ui/Icons";
 import PhotoZone from "@/components/create/PhotoZone";
 import Notes from "@/components/create/Notes";
@@ -40,6 +41,7 @@ export default function PhoneCreate({ editor }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const mainRef = useRef(null);
   const missing = missingRequired(e.listing);
+  const heading = shortItemName(e.listing.title, e.listing.observations) || "Create Listing";
   const saveLabel = e.savingDraft ? "Saving…" : e.draftId ? "Update Draft" : "Save Draft";
   const canAnalyze = e.aiPhotos.length > 0 && !e.analyzing && !e.loadingDraft;
 
@@ -51,9 +53,9 @@ export default function PhoneCreate({ editor }) {
   return (
     <div className="mx-auto flex h-full w-full max-w-[640px] flex-col bg-bg">
       <header className="flex h-12 shrink-0 items-center gap-2 border-b border-line bg-panel px-3">
-        <h1 className="m-0 whitespace-nowrap text-2xl font-semibold tracking-[-0.01em]">Create Listing</h1>
+        <h1 className="m-0 min-w-0 truncate text-2xl font-semibold tracking-[-0.01em]">{heading}</h1>
         {e.draftId ? (
-          <span className="badge mono min-w-0 truncate">{e.listing.sku?.trim() || "No SKU"}</span>
+          <span className="badge mono shrink-0">{e.listing.sku?.trim() || "No SKU"}</span>
         ) : (
           <span className="badge border-dashed border-line-strong bg-sunken font-medium text-ink-3">
             New · not saved
