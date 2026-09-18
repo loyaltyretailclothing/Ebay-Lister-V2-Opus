@@ -36,12 +36,11 @@ const ISO_PRESETS = [
 // after applyConstraints. These presets match the values our test device
 // actually produces: a slider would have dead zones between them and feel
 // broken; tapping a button you know maps to a real driver value is honest.
-const WB_PRESETS = [
-  { label: "Indoor", k: 2850 },
-  { label: "Cool", k: 4250 },
-  { label: "Daylight", k: 5000 },
-  { label: "Cloudy", k: 6000 },
-];
+// Only Daylight is offered (it's the one used), and the camera STARTS on it;
+// Auto is one tap away. Android's other presets: Incandescent 2850,
+// Fluorescent 4250, Cloudy 6000, Shade 7000.
+const DAYLIGHT_K = 5000;
+const WB_PRESETS = [{ label: "Daylight", k: DAYLIGHT_K }];
 
 export default function Camera({ initialPhotos = [], onDone, onClose }) {
   const videoRef = useRef(null);
@@ -67,8 +66,11 @@ export default function Camera({ initialPhotos = [], onDone, onClose }) {
   const iso = isoStops[isoIndex] ?? 400;
   const [shutterMode, setShutterMode] = useState("auto"); // "auto" | "manual"
   const [shutter, setShutter] = useState(100); // exposureTime units (100µs typically)
-  const [wbMode, setWbMode] = useState("auto"); // "auto" | "manual"
-  const [wbTemp, setWbTemp] = useState(5000); // colorTemperature in Kelvin
+  const [wbMode, setWbMode] = useState("manual"); // "auto" | "manual" — starts on Daylight
+  const [wbTemp, setWbTemp] = useState(DAYLIGHT_K); // colorTemperature in Kelvin
+  // Bumped each time a camera stream starts, so the white balance is applied
+  // to the new stream even though the chosen setting didn't change.
+  const [streamVersion, setStreamVersion] = useState(0);
   const [focusPoint, setFocusPoint] = useState(null); // { x, y } in viewfinder px, for the animated indicator
 
   // Start / restart the camera stream whenever facingMode changes.
@@ -108,7 +110,10 @@ export default function Camera({ initialPhotos = [], onDone, onClose }) {
       setFlashOn(false);
       setIsoMode("auto");
       setShutterMode("auto");
-      setWbMode("auto");
+      // White balance starts on Daylight (Auto is one tap away).
+      setWbMode("manual");
+      setWbTemp(DAYLIGHT_K);
+      setStreamVersion((v) => v + 1);
       // Seed each manual slider at the midpoint of its supported range so
       // the first user tap lands somewhere sensible.
       if (caps.iso) {
@@ -128,11 +133,6 @@ export default function Camera({ initialPhotos = [], onDone, onClose }) {
         const min = caps.exposureTime.min ?? 1;
         const max = caps.exposureTime.max ?? 1000;
         setShutter(Math.round((min + max) / 2));
-      }
-      if (caps.colorTemperature) {
-        const min = caps.colorTemperature.min ?? 2850;
-        const max = caps.colorTemperature.max ?? 7000;
-        setWbTemp(Math.round((min + max) / 2));
       }
     } catch (err) {
       console.error("Camera start error:", err);
@@ -244,7 +244,7 @@ export default function Camera({ initialPhotos = [], onDone, onClose }) {
     return () => {
       cancelled = true;
     };
-  }, [wbMode, wbTemp]);
+  }, [wbMode, wbTemp, streamVersion]);
 
   const hasHardwareZoom = !!capabilities?.zoom;
   const hasTorch = !!capabilities?.torch;
