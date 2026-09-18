@@ -1,6 +1,6 @@
 # Redesign Build Plan
 
-**Status: BUILT on 2026-09-18 (steps 1–9), saved locally, NOT live.** Waiting for the users to look it over and test on their own computer before it goes live. Design export lives in `design/` (9 screen files, `lister-theme_3.css`, `README_2.md`). See [[Design Brief]], [[Draft Queue Plan]], [[Decision Log]].
+**Status: LIVE on 2026-09-18 for real-world testing** (users are testing save, skip, delete, publish, analyze and the phone camera). Undo = revert the redesign commits and push. Design export lives in `design/` (9 screen files, `lister-theme_3.css`, `README_2.md`). See [[Design Brief]], [[Draft Queue Plan]], [[Decision Log]].
 
 ## Ground rules
 - Nothing goes live until the users say so.
@@ -31,6 +31,9 @@
 - Drafts list: oldest first, no 5-second auto-refresh.
 - Settings: eBay Account stays inside Settings. Category changes are saved one category at a time (fixes the wipe bug, see [[Open Issues]] #0).
 - Front page opens Create Listing; Sourcing unlinked.
+
+## Changed from the design after testing
+- 2026-09-18: with the library panel collapsed, the design stretched photo tiles to fill the column height, which squashed them into odd rectangles (e.g. 138 × 92). Tiles now always stay square and the photos column scrolls instead; collapsing still makes the photos bigger.
 
 ## Not done / later
 - Dark mode toggle (follows device for now).

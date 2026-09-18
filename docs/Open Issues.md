@@ -2,7 +2,7 @@
 
 Unresolved items, most important first. Last updated 2026-09-16. See [[Home]].
 
-## 0. Saved categories can be wiped (found 2026-09-18, fixed in the redesign build, NOT live yet)
+## 0. Saved categories could be wiped (found 2026-09-18, fix LIVE 2026-09-18)
 - **Bug (live app too):** opening a draft auto-adds its category to Settings. If that happened before Settings had loaded, the app saved a category list containing ONLY that one category, wiping the others and their multi-value ticks. Likely why Settings only ever had one saved category.
 - **Happened during redesign testing on 2026-09-18:** the saved "Sweaters" category (and its ticks) was replaced by "T-Shirts". No Cloudinary backup exists. Sweaters will be re-added automatically the next time a sweater draft opens; its multi-value ticks need re-doing in Settings.
 - **Fix (in the redesign build):** the server now changes one category at a time (add / set / remove) and rejects whole-list saves; the form waits for Settings before deciding.
