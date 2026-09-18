@@ -14,7 +14,7 @@ Open this `docs` folder in Obsidian with **"Open folder as vault."**
 - [[Design Brief]] — brief for Claude Design: redesign every screen for less scrolling
 - [[Draft Queue Plan]] — desktop Photos | Drafts panel, work through drafts oldest-first with Skip Draft
 - [[Future Features]] — ideas to come back to: offers to watchers + markdowns, pre-post check, profit tracking, faster draft finishing
-- [[AI Notes Plan]] — AI leaves a read-only "check this" note; Draft Note / AI Note / AI Read boxes that hide when empty (built, not live)
+- [[AI Notes Plan]] — AI leaves a read-only "check this" note; Draft Note / AI Note / AI Read boxes that hide when empty (live)
 - [[Redesign Build Plan]] — step-by-step plan to build the finished redesign (design files in `design/`)
 
 ## How the app works

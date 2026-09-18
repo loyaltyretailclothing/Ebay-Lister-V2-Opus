@@ -1,6 +1,6 @@
 # AI Notes Plan
 
-**Status: BUILT 2026-09-18, tested locally, NOT live.** Real test: a clear NWT shirt got no notes; Greyson pants got "No measurements visible — confirm waist and inseam…". See [[AI Pipeline]], [[Decision Log]], [[Redesign Build Plan]].
+**Status: LIVE 2026-09-18.** Real test: a clear NWT shirt got no notes; Greyson pants got "No measurements visible — confirm waist and inseam…". See [[AI Pipeline]], [[Decision Log]], [[Redesign Build Plan]].
 
 ## Goal
 Let the AI leave a short "check this" message on a listing when it is genuinely unsure, so wrong sizes and missed flaws are caught before listing.
