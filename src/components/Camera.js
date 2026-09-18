@@ -268,8 +268,18 @@ export default function Camera({ initialPhotos = [], onDone, onClose }) {
     const pointer = e.changedTouches?.[0] || e;
     const localX = pointer.clientX - rect.left;
     const localY = pointer.clientY - rect.top;
-    const normX = Math.max(0, Math.min(1, localX / rect.width));
-    const normY = Math.max(0, Math.min(1, localY / rect.height));
+    const tapX = Math.max(0, Math.min(1, localX / rect.width));
+    const tapY = Math.max(0, Math.min(1, localY / rect.height));
+
+    // The viewfinder shows only the centre square of the camera frame (and
+    // less when digital zoom is on), but the camera wants focus points
+    // relative to its WHOLE frame. Map the tap from the square onto the frame
+    // so it focuses where the finger actually is.
+    const vw = videoRef.current.videoWidth || 1;
+    const vh = videoRef.current.videoHeight || 1;
+    const shown = Math.min(vw, vh) / (hasHardwareZoom ? 1 : zoom);
+    const normX = Math.max(0, Math.min(1, ((vw - shown) / 2 + tapX * shown) / vw));
+    const normY = Math.max(0, Math.min(1, ((vh - shown) / 2 + tapY * shown) / vh));
 
     // Animated indicator.
     setFocusPoint({ x: localX, y: localY, at: Date.now() });
@@ -478,17 +488,18 @@ export default function Camera({ initialPhotos = [], onDone, onClose }) {
               <span aria-hidden="true" className="pointer-events-none absolute inset-y-0 left-2/3 w-px bg-white/20" />
               <span aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-1/3 h-px bg-white/20" />
               <span aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-2/3 h-px bg-white/20" />
-              {/* Focus reticle: centred until you tap, then at the tap point. */}
-              <span
-                key={focusPoint?.at || "centre"}
-                aria-hidden="true"
-                className="pointer-events-none absolute size-[78px] -translate-x-1/2 -translate-y-1/2 rounded-md border-[1.5px] border-[rgb(255_214_102/.95)]"
-                style={{
-                  left: focusPoint ? focusPoint.x : "50%",
-                  top: focusPoint ? focusPoint.y : "50%",
-                  animation: focusPoint ? "focusPulse 600ms ease-out" : undefined,
-                }}
-              />
+              {/* Focus box: only after a tap, centred exactly on the finger
+                  (placed with left/top offsets, so the shrink animation can't
+                  shift it), then fades out like a phone's own camera. */}
+              {focusPoint && (
+                <span
+                  key={focusPoint.at}
+                  aria-hidden="true"
+                  className="focus-box pointer-events-none absolute size-[78px] rounded-md border-[1.5px] border-[rgb(255_214_102/.95)]"
+                  style={{ left: focusPoint.x - 39, top: focusPoint.y - 39 }}
+                  onAnimationEnd={() => setFocusPoint((p) => (p?.at === focusPoint.at ? null : p))}
+                />
+              )}
               <span className="pointer-events-none absolute left-3 top-3 rounded-xl bg-[rgb(6_8_11/.5)] px-[9px] py-1 text-sm font-medium">
                 Tap to focus
               </span>
@@ -517,21 +528,6 @@ export default function Camera({ initialPhotos = [], onDone, onClose }) {
             </>
           )}
         </div>
-        <style jsx>{`
-          @keyframes focusPulse {
-            0% {
-              transform: translate(-50%, -50%) scale(1.4);
-              opacity: 0;
-            }
-            30% {
-              opacity: 1;
-            }
-            100% {
-              transform: translate(-50%, -50%) scale(1);
-              opacity: 1;
-            }
-          }
-        `}</style>
 
         <div className="flex min-h-0 grow flex-col justify-between gap-[11px] px-3 pt-[15px]">
           {/* ISO and Shutter only on phones that expose manual exposure. */}

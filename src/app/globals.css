@@ -466,6 +466,16 @@ body {
   .btn-done  { @apply border-ok-line bg-ok-weak text-ok; }
 }
 
+/* Camera tap-to-focus box: appears under the finger, shrinks in, holds,
+   then fades (about 1.5s) — like a phone's own camera app. */
+.focus-box { animation: lister-focus 1500ms ease-out forwards; }
+@keyframes lister-focus {
+  0%   { transform: scale(1.4); opacity: 0; }
+  15%  { transform: scale(1);   opacity: 1; }
+  75%  { transform: scale(1);   opacity: 1; }
+  100% { transform: scale(1);   opacity: 0; }
+}
+
 /* ---------------------------------------------------------------------------
    Desktop Create Listing layout: CONTAINER queries on the app shell.
      >= 1600  four columns, library 300, two independent form panes
