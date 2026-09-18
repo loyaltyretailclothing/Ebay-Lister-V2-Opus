@@ -3,37 +3,40 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Camera from "@/components/Camera";
+import { CheckIcon, ChevronLeftIcon, XIcon } from "@/components/ui/Icons";
 
-// /camera
+// /camera — phone only, full screen, no nav bar.
 //
 // Two phases:
-//   1. Camera — live viewfinder. User snaps any number of photos, then taps Done.
-//   2. Review — grid of captured photos. User taps photos to select a subset
-//      for AI analysis (typically 2-3 strong front/tag/detail shots), can
-//      delete any photo they don't want, and taps Create Draft to kick off
-//      the background pipeline.
+//   1. Capture — live viewfinder. Snap any number of photos, then Done.
+//   2. Review — grid of the photos. Tap the ones the AI should read,
+//      delete any you don't want, and Create Draft to kick off the
+//      background pipeline.
+//
+// ← Back (Review → Capture) KEEPS every photo, the AI picks and both notes;
+// new shots are added to the end. The close ✕ is the way to start over
+// (it asks before throwing photos away).
 //
 // On Create Draft:
 //   - Upload every photo to Cloudinary under the "All Photos" library folder.
 //   - Fire-and-forget POST /api/drafts/process with the full listingPhotos
 //     array + aiPhotoIndices subset.
-//   - Navigate to /drafts so the user can see the in-flight row and keep
-//     shooting more items from a fresh /camera session.
+//   - Navigate to /drafts so the in-flight row shows.
 export default function CameraPage() {
   const router = useRouter();
   const [phase, setPhase] = useState("capture"); // "capture" | "review"
   const [photos, setPhotos] = useState([]); // [{ blob, url }]
-  const [aiSelected, setAiSelected] = useState(new Set()); // indices selected for AI
+  // AI picks are kept by photo (its blob URL), not by position, so removing
+  // a shot in the camera strip can't shift the picks onto other photos.
+  const [aiPicked, setAiPicked] = useState(new Set());
+  const [aiInitialized, setAiInitialized] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(null); // { done, total }
   const [error, setError] = useState("");
-  // Notes: aiNote is read by Claude during analysis, draftNote is internal
-  // only (never sent to the AI or eBay). noteModal tracks which note's
-  // editor is open ("ai" | "draft" | null); noteDraft holds the in-progress
-  // text so a Cancel (red X) can discard without touching the saved value.
+  // aiNote is read by Claude during analysis; draftNote is internal only.
   const [aiNote, setAiNote] = useState("");
   const [draftNote, setDraftNote] = useState("");
-  const [noteModal, setNoteModal] = useState(null);
+  const [noteModal, setNoteModal] = useState(null); // "ai" | "draft" | null
   const [noteDraft, setNoteDraft] = useState("");
 
   function openNoteModal(which) {
@@ -51,53 +54,62 @@ export default function CameraPage() {
     setNoteDraft("");
   }
 
+  function releaseAll(list) {
+    list.forEach((p) => p.url && URL.revokeObjectURL(p.url));
+  }
+
   function handleCameraDone(captured) {
+    // Photos removed in the camera strip: release them and drop their picks.
+    const keep = new Set(captured.map((p) => p.url));
+    photos.forEach((p) => {
+      if (!keep.has(p.url)) URL.revokeObjectURL(p.url);
+    });
     setPhotos(captured);
-    // Default: first 3 photos are the AI analysis subset (user can adjust).
-    const defaultAi = new Set(captured.slice(0, 3).map((_, i) => i));
-    setAiSelected(defaultAi);
+    setAiPicked((prev) => {
+      if (!aiInitialized) {
+        // First time in Review: the first 3 photos are picked for the AI.
+        return new Set(captured.slice(0, 3).map((p) => p.url));
+      }
+      return new Set([...prev].filter((u) => keep.has(u)));
+    });
+    setAiInitialized(true);
     setPhase("review");
   }
 
-  function handleCameraCancel() {
+  function handleCameraClose(current) {
+    if (
+      current.length > 0 &&
+      !window.confirm(
+        `Discard ${current.length === 1 ? "this photo" : `all ${current.length} photos`} and close the camera?`
+      )
+    ) {
+      return;
+    }
+    releaseAll(current);
     router.push("/drafts");
   }
 
-  function toggleAi(index) {
-    setAiSelected((prev) => {
+  function toggleAi(url) {
+    setAiPicked((prev) => {
       const next = new Set(prev);
-      if (next.has(index)) next.delete(index);
-      else next.add(index);
+      if (next.has(url)) next.delete(url);
+      else next.add(url);
       return next;
     });
   }
 
   function removePhoto(index) {
-    setPhotos((prev) => {
-      const next = [...prev];
-      const [removed] = next.splice(index, 1);
-      if (removed?.url) URL.revokeObjectURL(removed.url);
-      return next;
-    });
-    // Rebuild the AI selection set with shifted indices.
-    setAiSelected((prev) => {
-      const next = new Set();
-      for (const i of prev) {
-        if (i < index) next.add(i);
-        else if (i > index) next.add(i - 1);
-        // i === index is dropped
-      }
+    const removed = photos[index];
+    if (removed?.url) URL.revokeObjectURL(removed.url);
+    setPhotos((prev) => prev.filter((_, i) => i !== index));
+    setAiPicked((prev) => {
+      const next = new Set(prev);
+      next.delete(removed?.url);
       return next;
     });
   }
 
-  function backToCamera() {
-    // Discard review state and go back to shoot more (existing photos lost).
-    photos.forEach((p) => p.url && URL.revokeObjectURL(p.url));
-    setPhotos([]);
-    setAiSelected(new Set());
-    setPhase("capture");
-  }
+  const aiCount = photos.filter((p) => aiPicked.has(p.url)).length;
 
   async function handleCreateDraft() {
     if (photos.length === 0 || submitting) return;
@@ -143,20 +155,18 @@ export default function CameraPage() {
         listingPhotos.push(data.photos[0]);
         setUploadProgress({ done: i + 1, total: photos.length });
       }
-      const aiPhotoIndices = [...aiSelected].sort((a, b) => a - b);
+      const aiPhotoIndices = photos
+        .map((p, i) => (aiPicked.has(p.url) ? i : -1))
+        .filter((i) => i >= 0);
 
       // Client-generated draft id makes the POST idempotent. This request is
       // fire-and-forget and we navigate away immediately, which tears down
       // the long-running connection (the pipeline takes 30-50s to respond);
       // the platform then retries the request. Carrying a stable id means the
       // retry overwrites the SAME draft instead of creating a duplicate.
-      const draftId = `draft_${Date.now()}_${Math.random()
-        .toString(36)
-        .slice(2, 8)}`;
+      const draftId = `draft_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
-      // 2. Fire-and-forget the background pipeline. We don't await the
-      //    response — the draft row appears as "processing" immediately and
-      //    the Drafts page polls for updates.
+      // 2. Fire-and-forget the background pipeline.
       fetch("/api/drafts/process", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -173,7 +183,7 @@ export default function CameraPage() {
       });
 
       // 3. Release blob URLs and navigate away.
-      photos.forEach((p) => p.url && URL.revokeObjectURL(p.url));
+      releaseAll(photos);
       router.push("/drafts");
     } catch (err) {
       console.error("Create draft error:", err);
@@ -184,174 +194,166 @@ export default function CameraPage() {
   }
 
   if (phase === "capture") {
-    return <Camera onDone={handleCameraDone} onCancel={handleCameraCancel} />;
+    return <Camera initialPhotos={photos} onDone={handleCameraDone} onClose={handleCameraClose} />;
   }
 
-  // Review phase — fixed full-screen so it escapes the root layout's
-  // BottomNav padding. Internal flex column: sticky header, scrollable
-  // grid, sticky action bar.
+  // Review — an ordinary app surface (it follows the theme), still full
+  // screen with no nav bar because it's part of the camera flow.
   return (
-    <div className="fixed inset-0 z-40 flex flex-col bg-zinc-950 text-white">
-      {/* Header */}
-      <div className="flex flex-shrink-0 items-center justify-between border-b border-zinc-800 bg-zinc-950/90 px-4 py-3 backdrop-blur pt-[max(0.75rem,env(safe-area-inset-top))]">
-        <button
-          onClick={backToCamera}
-          className="text-sm text-zinc-300 hover:text-white"
-        >
-          ← Retake
-        </button>
-        <h1 className="text-sm font-semibold">
-          Review ({photos.length} photo{photos.length === 1 ? "" : "s"})
-        </h1>
-        <span className="text-xs text-zinc-400">
-          {aiSelected.size} for AI
-        </span>
-      </div>
-
-      {/* Scrollable body */}
-      <div className="flex-1 overflow-y-auto">
-        <div className="px-4 py-3">
-          <p className="text-xs text-zinc-400">
-            Tap photos to mark them for AI analysis (use your strongest front /
-            tag / detail shots). All photos go on the listing.
-          </p>
-        </div>
-
-        {/* Grid */}
-        <div className="grid grid-cols-3 gap-1 px-1 pb-4 sm:gap-2 sm:px-2">
-          {photos.map((p, i) => {
-          const selected = aiSelected.has(i);
-          return (
-            <div key={i} className="relative aspect-square">
-              <button
-                onClick={() => toggleAi(i)}
-                className={`relative block h-full w-full overflow-hidden rounded-md border-2 transition-colors ${
-                  selected ? "border-blue-500" : "border-transparent"
-                }`}
-              >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={p.url} alt="" className="h-full w-full object-cover" />
-                {selected && (
-                  <div className="absolute left-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-blue-500 text-white shadow">
-                    <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                    </svg>
-                  </div>
-                )}
-                <div className="absolute bottom-1 right-1 rounded bg-black/60 px-1.5 py-0.5 text-[10px] font-medium">
-                  #{i + 1}
-                </div>
-              </button>
-              <button
-                onClick={() => removePhoto(i)}
-                aria-label={`Delete photo ${i + 1}`}
-                className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/70 text-white hover:bg-red-600"
-              >
-                <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-          );
-        })}
-        </div>
-
-        {error && (
-          <div className="mx-4 mt-4 rounded border border-red-700 bg-red-950/60 px-3 py-2 text-sm text-red-200">
-            {error}
+    <div className="fixed inset-0 z-40 flex justify-center bg-panel text-ink">
+      <div className="flex h-full w-full max-w-[640px] flex-col">
+        <div className="flex h-14 shrink-0 items-center gap-2 border-b border-line pl-1 pr-1.5 pt-[env(safe-area-inset-top)]">
+          <button
+            type="button"
+            onClick={() => setPhase("capture")}
+            disabled={submitting}
+            className="inline-flex h-11 cursor-pointer items-center gap-[5px] rounded-card border-0 bg-transparent px-2.5 font-sans text-lg font-medium text-accent disabled:opacity-50"
+          >
+            <ChevronLeftIcon className="size-[18px]" strokeWidth={2.1} />
+            Back
+          </button>
+          <div className="min-w-0 grow text-center">
+            <p className="m-0 whitespace-nowrap text-xl font-semibold tracking-[-0.01em]">
+              Review ({photos.length} photo{photos.length === 1 ? "" : "s"})
+            </p>
           </div>
-        )}
-      </div>
-
-      {/* Bottom action bar — flex item, not fixed, since the parent is a
-          full-screen flex column. Avoids stacking under anything. */}
-      <div className="flex-shrink-0 border-t border-zinc-800 bg-zinc-950/95 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur">
-        {/* Note buttons — tap to open the editor. A check appears once the
-            note has text; the button stays tappable so you can edit it. */}
-        <div className="mb-3 flex gap-3">
-          <button
-            onClick={() => openNoteModal("ai")}
-            className="flex flex-1 items-center justify-center gap-1.5 rounded-full bg-blue-600 py-2.5 text-sm font-semibold text-white hover:bg-blue-700"
-          >
-            {aiNote.trim() && (
-              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-              </svg>
-            )}
-            AI Note
-          </button>
-          <button
-            onClick={() => openNoteModal("draft")}
-            className="flex flex-1 items-center justify-center gap-1.5 rounded-full bg-blue-600 py-2.5 text-sm font-semibold text-white hover:bg-blue-700"
-          >
-            {draftNote.trim() && (
-              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-              </svg>
-            )}
-            Draft Note
-          </button>
+          <span className="shrink-0 rounded-[13px] bg-accent-weak px-2.5 py-[5px] text-base font-semibold text-accent">
+            {aiCount} for AI
+          </span>
         </div>
-        <button
-          onClick={handleCreateDraft}
-          disabled={submitting || photos.length === 0}
-          className="w-full rounded-full bg-blue-600 py-3 text-sm font-semibold text-white hover:bg-blue-700 disabled:bg-zinc-700 disabled:text-zinc-400"
-        >
-          {submitting
-            ? uploadProgress
-              ? `Uploading ${uploadProgress.done}/${uploadProgress.total}…`
-              : "Uploading…"
-            : `Create Draft (${photos.length} photo${photos.length === 1 ? "" : "s"}, ${aiSelected.size} AI)`}
-        </button>
+
+        <p className="hint shrink-0 px-3.5 py-2.5">
+          Every photo goes on the listing in this order. Tap the ones the AI should read — your
+          strongest front, tag and detail shots.
+        </p>
+
+        <div className="min-h-0 grow overflow-y-auto px-3 pb-3">
+          <div className="grid grid-cols-3 gap-2">
+            {photos.map((p, i) => {
+              const on = aiPicked.has(p.url);
+              return (
+                <div
+                  key={p.url}
+                  role="button"
+                  tabIndex={0}
+                  aria-pressed={on}
+                  aria-label={`Photo ${i + 1}${on ? ", picked for AI" : ""}`}
+                  onClick={() => toggleAi(p.url)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") toggleAi(p.url);
+                  }}
+                  className={`cell ${on ? "cell-on" : ""}`}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={p.url} alt="" className="absolute inset-0 h-full w-full object-cover" />
+                  <span className={`tick size-[22px] ${on ? "tick-on" : "tick-off"}`} aria-hidden="true">
+                    <CheckIcon className="size-[13px]" strokeWidth={3.2} />
+                  </span>
+                  <span className="num">#{i + 1}</span>
+                  <button
+                    type="button"
+                    aria-label={`Delete photo ${i + 1}`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      removePhoto(i);
+                    }}
+                    className="cellx"
+                  >
+                    <XIcon className="size-[11px]" strokeWidth={3} />
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+          {error && (
+            <p className="mt-3 rounded-bar border border-bad-line bg-bad-weak px-3 py-2 text-md font-medium text-bad">
+              {error}
+            </p>
+          )}
+        </div>
+
+        <div className="flex shrink-0 flex-col gap-[9px] border-t border-line bg-panel px-3 pb-[max(26px,env(safe-area-inset-bottom))] pt-[11px]">
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => openNoteModal("ai")}
+              className={`btn btn-touch min-w-0 flex-1 ${aiNote.trim() ? "btn-done" : ""}`}
+            >
+              {aiNote.trim() && <CheckIcon className="size-[15px]" strokeWidth={2.6} />}
+              AI Note
+            </button>
+            <button
+              type="button"
+              onClick={() => openNoteModal("draft")}
+              className={`btn btn-touch min-w-0 flex-1 ${draftNote.trim() ? "btn-done" : ""}`}
+            >
+              {draftNote.trim() && <CheckIcon className="size-[15px]" strokeWidth={2.6} />}
+              Draft Note
+            </button>
+          </div>
+          {submitting ? (
+            <div className="flex flex-col gap-[7px]">
+              <button type="button" className="btn btn-off btn-touch w-full" disabled>
+                {uploadProgress ? `Uploading ${uploadProgress.done}/${uploadProgress.total}…` : "Uploading…"}
+              </button>
+              {uploadProgress && (
+                <span className="prog">
+                  <span style={{ width: `${(uploadProgress.done / uploadProgress.total) * 100}%` }} />
+                </span>
+              )}
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={handleCreateDraft}
+              disabled={photos.length === 0}
+              className="btn btn-primary btn-touch w-full"
+            >
+              Create Draft ({photos.length} photo{photos.length === 1 ? "" : "s"}, {aiCount} AI)
+            </button>
+          )}
+        </div>
       </div>
 
-      {/* Note editor modal — opened by the AI Note / Draft Note buttons.
-          Green check saves, red X discards. noteDraft holds the in-progress
-          text so cancel reverts cleanly. */}
+      {/* Note editor — one popup for both notes. Red ✕ discards, green ✓ saves. */}
       {noteModal && (
         <div
-          className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 p-4 sm:items-center"
-          onClick={cancelNoteModal}
+          className="scrim"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) cancelNoteModal();
+          }}
         >
-          <div
-            className="w-full max-w-md rounded-2xl bg-zinc-900 p-5 ring-1 ring-zinc-700"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h2 className="text-base font-semibold text-white">
-              {noteModal === "ai" ? "AI Note" : "Draft Note"}
-            </h2>
+          <div className="dialog" role="dialog" aria-modal="true">
+            <div className="mb-2.5 flex items-center gap-2">
+              <p className="m-0 text-2xl font-semibold">{noteModal === "ai" ? "AI Note" : "Draft Note"}</p>
+              <div className="grow" />
+              <button type="button" className="roundbtn roundbtn-no size-[52px]" aria-label="Cancel" onClick={cancelNoteModal}>
+                <XIcon className="size-5" />
+              </button>
+              <button type="button" className="roundbtn roundbtn-yes size-[52px]" aria-label="Save" onClick={saveNoteModal}>
+                <CheckIcon className="size-5" strokeWidth={2.8} />
+              </button>
+            </div>
+            <label className="lbl mb-1.5 block" htmlFor="note-box">
+              {noteModal === "ai" ? "Sent with the photos" : "Kept on the draft"}
+            </label>
             <textarea
+              id="note-box"
               autoFocus
               value={noteDraft}
               onChange={(e) => setNoteDraft(e.target.value)}
-              rows={4}
+              className="textarea-touch min-h-[132px]"
               placeholder={
                 noteModal === "ai"
                   ? "e.g. tag says 32 but it measures 30 — use the measured size"
-                  : "e.g. Shannon — double-check the stain on photo 4"
+                  : "Notes for yourself — not sent to eBay"
               }
-              className="mt-3 w-full resize-y rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-white placeholder-zinc-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
             />
-            <div className="mt-4 flex items-center justify-end gap-3">
-              <button
-                onClick={cancelNoteModal}
-                aria-label="Cancel"
-                className="flex h-11 w-11 items-center justify-center rounded-full bg-red-600 text-white hover:bg-red-700"
-              >
-                <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-              <button
-                onClick={saveNoteModal}
-                aria-label="Save"
-                className="flex h-11 w-11 items-center justify-center rounded-full bg-green-600 text-white hover:bg-green-700"
-              >
-                <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                </svg>
-              </button>
-            </div>
+            <p className="hint mt-2">
+              {noteModal === "ai"
+                ? "Goes to the AI with the photos you picked. It's the fastest way to fix a wrong size or catch a flaw."
+                : "Only you see this. It stays on the draft and is never sent to eBay."}
+            </p>
           </div>
         </div>
       )}

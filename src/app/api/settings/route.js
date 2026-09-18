@@ -53,21 +53,49 @@ export async function GET() {
   }
 }
 
-// POST — save config (accepts categories, policies, or both)
+// POST — change the saved config. Category changes are made ONE category at
+// a time against the stored file, so a change can never wipe out the other
+// saved categories (a whole-list save from a page that hadn't finished
+// loading used to replace every category with just one):
+//   { addCategory: { id, config } }  add it only if it isn't saved yet
+//   { setCategory: { id, config } }  replace that one category
+//   { removeCategory: id }           remove that one category
+//   { policies }                     replace the policies
 export async function POST(request) {
   try {
     const body = await request.json();
+    if (body.categories !== undefined) {
+      return NextResponse.json(
+        { success: false, error: "Whole-list category saves are no longer accepted" },
+        { status: 400 }
+      );
+    }
+
     const existing = (await loadConfig()) || { categories: {}, policies: {} };
+    const categories = { ...(existing.categories || {}) };
+    let changed = false;
+
+    if (body.addCategory?.id && !categories[body.addCategory.id]) {
+      categories[body.addCategory.id] = body.addCategory.config;
+      changed = true;
+    }
+    if (body.setCategory?.id) {
+      categories[body.setCategory.id] = body.setCategory.config;
+      changed = true;
+    }
+    if (body.removeCategory && categories[body.removeCategory]) {
+      delete categories[body.removeCategory];
+      changed = true;
+    }
 
     const updated = {
-      categories:
-        body.categories !== undefined ? body.categories : existing.categories,
-      policies:
-        body.policies !== undefined ? body.policies : existing.policies,
+      categories,
+      policies: body.policies !== undefined ? body.policies : existing.policies || {},
     };
+    if (body.policies !== undefined) changed = true;
 
-    await saveConfig(updated);
-    return NextResponse.json({ success: true });
+    if (changed) await saveConfig(updated);
+    return NextResponse.json({ success: true, categories: updated.categories });
   } catch (error) {
     console.error("Settings save error:", error);
     return NextResponse.json(

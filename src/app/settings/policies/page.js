@@ -1,119 +1,21 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import SettingsShell from "@/components/settings/SettingsShell";
+import Dialog from "@/components/ui/Dialog";
+import { PlusIcon, Spinner, StarIcon, TrashIcon } from "@/components/ui/Icons";
 
-function PolicySection({ title, policies, defaultId, onUpdate }) {
-  function add() {
-    onUpdate([...policies, { id: "", label: "" }], defaultId);
-  }
+const GROUPS = [
+  { type: "payment", title: "Payment" },
+  { type: "shipping", title: "Shipping" },
+  { type: "return", title: "Return" },
+];
+const defaultKey = (type) => `default${type.charAt(0).toUpperCase() + type.slice(1)}`;
 
-  function update(index, field, value) {
-    const updated = [...policies];
-    updated[index] = { ...updated[index], [field]: value };
-    onUpdate(updated, defaultId);
-  }
-
-  function remove(index) {
-    const removed = policies[index];
-    const updated = policies.filter((_, i) => i !== index);
-    // If we removed the default, clear it or pick first
-    let newDefault = defaultId;
-    if (removed.id === defaultId) {
-      newDefault = updated.length > 0 ? updated[0].id : "";
-    }
-    onUpdate(updated, newDefault);
-  }
-
-  function setDefault(id) {
-    onUpdate(policies, id);
-  }
-
-  return (
-    <div className="rounded-xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
-      <div className="flex items-center justify-between">
-        <h2 className="text-sm font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-          {title}
-        </h2>
-        <button
-          onClick={add}
-          className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700"
-        >
-          + Add
-        </button>
-      </div>
-      {policies.length === 0 && (
-        <p className="mt-3 text-sm text-zinc-400">
-          No policies added yet.
-        </p>
-      )}
-      <div className="mt-3 space-y-3">
-        {policies.map((p, i) => {
-          const isFav = p.id && p.id === defaultId;
-          return (
-            <div key={i} className="flex items-end gap-3">
-              {/* Favorite star */}
-              <button
-                type="button"
-                onClick={() => p.id && setDefault(p.id)}
-                title={isFav ? "Default policy" : "Set as default"}
-                className={`mb-1.5 flex-shrink-0 ${
-                  isFav
-                    ? "text-yellow-500"
-                    : "text-zinc-300 hover:text-yellow-400 dark:text-zinc-600"
-                }`}
-              >
-                <svg
-                  className="h-5 w-5"
-                  fill={isFav ? "currentColor" : "none"}
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M11.48 3.499a.562.562 0 011.04 0l2.125 5.111a.563.563 0 00.475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 00-.182.557l1.285 5.385a.562.562 0 01-.84.61l-4.725-2.885a.563.563 0 00-.586 0L6.982 20.54a.562.562 0 01-.84-.61l1.285-5.386a.562.562 0 00-.182-.557l-4.204-3.602a.563.563 0 01.321-.988l5.518-.442a.563.563 0 00.475-.345L11.48 3.5z"
-                  />
-                </svg>
-              </button>
-              <div className="flex-1">
-                <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                  Policy ID
-                </label>
-                <input
-                  type="text"
-                  value={p.id}
-                  onChange={(e) => update(i, "id", e.target.value)}
-                  placeholder="eBay policy ID"
-                  className="mt-1 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
-                />
-              </div>
-              <div className="flex-1">
-                <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                  Label
-                </label>
-                <input
-                  type="text"
-                  value={p.label}
-                  onChange={(e) => update(i, "label", e.target.value)}
-                  placeholder="Friendly name"
-                  className="mt-1 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
-                />
-              </div>
-              <button
-                onClick={() => remove(i)}
-                className="mb-0.5 rounded px-2 py-2 text-xs text-red-500 hover:bg-red-50 dark:hover:bg-red-950"
-              >
-                Remove
-              </button>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
+// Settings → Policies. Three fixed groups (eBay's). Each row: the default
+// star (exactly one per group — you set it by pressing it), the label, the
+// eBay policy ID, and Remove (with a confirm). Edits save when a field is
+// left; add, remove and star save straight away.
 export default function PoliciesPage() {
   const [policies, setPolicies] = useState({
     payment: [],
@@ -124,41 +26,27 @@ export default function PoliciesPage() {
     defaultReturn: "",
   });
   const [loading, setLoading] = useState(true);
-  const [saveStatus, setSaveStatus] = useState("");
-  const saveTimer = useState(null)[1];
+  const [status, setStatus] = useState("");
+  const [removeAt, setRemoveAt] = useState(null); // { type, index }
 
   useEffect(() => {
-    async function load() {
+    (async () => {
       try {
-        const res = await fetch("/api/settings");
+        const res = await fetch("/api/settings", { cache: "no-store" });
         const data = await res.json();
         if (data.success && data.policies) {
           const p = data.policies;
           // Migrate old single-object format to array format
-          const payment = Array.isArray(p.payment)
-            ? p.payment
-            : p.payment?.id
-              ? [p.payment]
-              : [];
+          const payment = Array.isArray(p.payment) ? p.payment : p.payment?.id ? [p.payment] : [];
           const shipping = Array.isArray(p.shipping) ? p.shipping : [];
-          const returnPolicies = Array.isArray(p.return)
-            ? p.return
-            : p.return?.id
-              ? [p.return]
-              : [];
-
+          const returnPolicies = Array.isArray(p.return) ? p.return : p.return?.id ? [p.return] : [];
           setPolicies({
             payment,
             shipping,
             return: returnPolicies,
-            defaultPayment:
-              p.defaultPayment || (payment.length > 0 ? payment[0].id : ""),
-            defaultShipping:
-              p.defaultShipping ||
-              (shipping.length > 0 ? shipping[0].id : ""),
-            defaultReturn:
-              p.defaultReturn ||
-              (returnPolicies.length > 0 ? returnPolicies[0].id : ""),
+            defaultPayment: p.defaultPayment || (payment.length > 0 ? payment[0].id : ""),
+            defaultShipping: p.defaultShipping || (shipping.length > 0 ? shipping[0].id : ""),
+            defaultReturn: p.defaultReturn || (returnPolicies.length > 0 ? returnPolicies[0].id : ""),
           });
         }
       } catch (err) {
@@ -166,12 +54,11 @@ export default function PoliciesPage() {
       } finally {
         setLoading(false);
       }
-    }
-    load();
+    })();
   }, []);
 
   async function save(updated) {
-    setSaveStatus("");
+    setStatus("");
     try {
       const res = await fetch("/api/settings", {
         method: "POST",
@@ -179,81 +66,147 @@ export default function PoliciesPage() {
         body: JSON.stringify({ policies: updated }),
       });
       const result = await res.json();
-      setSaveStatus(result.success ? "Saved" : "Save failed");
-      setTimeout(() => setSaveStatus(""), 2000);
+      setStatus(result.success ? "Saved" : "Save failed");
+      setTimeout(() => setStatus(""), 2000);
     } catch {
-      setSaveStatus("Save failed");
+      setStatus("Save failed");
     }
   }
 
-  // Debounced save on blur
-  function handleBlur() {
-    save(policies);
-  }
-
-  function updatePolicyType(type, list, defaultId) {
-    const defaultKey = `default${type.charAt(0).toUpperCase() + type.slice(1)}`;
-    const updated = { ...policies, [type]: list, [defaultKey]: defaultId };
+  function change(type, list, defaultId, persist = true) {
+    const updated = { ...policies, [type]: list, [defaultKey(type)]: defaultId };
     setPolicies(updated);
-    save(updated);
+    if (persist) save(updated);
   }
 
-  if (loading) {
-    return (
-      <div className="mx-auto max-w-4xl px-4 py-8 md:px-6 md:py-12">
-        <p className="text-sm text-zinc-400">Loading policies...</p>
-      </div>
-    );
+  function confirmRemove() {
+    const { type, index } = removeAt;
+    setRemoveAt(null);
+    const list = policies[type];
+    const removed = list[index];
+    const next = list.filter((_, i) => i !== index);
+    let def = policies[defaultKey(type)];
+    if (removed.id === def) def = next.length > 0 ? next[0].id : "";
+    change(type, next, def);
   }
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-6 md:px-6 md:py-8">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold text-zinc-900 dark:text-zinc-100">
-            Policies
-          </h1>
-          <p className="mt-1 text-sm text-zinc-500">
-            Manage your eBay business policies. Star a policy to set it as the
-            default for new listings.
+    <SettingsShell active="policies">
+      {({ touch }) =>
+        loading ? (
+          <p className="hint flex items-center gap-2 py-4">
+            <Spinner className="size-3.5" /> Loading…
           </p>
-        </div>
-        {saveStatus && (
-          <span
-            className={`rounded-full px-3 py-1 text-xs font-medium ${
-              saveStatus === "Saved"
-                ? "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300"
-                : "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300"
-            }`}
-          >
-            {saveStatus}
-          </span>
-        )}
-      </div>
+        ) : (
+          <div className="flex flex-col gap-3.5">
+            <div className="flex items-start gap-3">
+              <p className={`hint ${touch ? "" : "max-w-[640px]"}`}>
+                The starred policy in each group is the one a new listing starts with. Policy IDs come
+                from eBay; the label is yours.
+              </p>
+              <div className="grow" />
+              {status && (
+                <span className={`shrink-0 text-sm font-medium ${status === "Saved" ? "text-ok" : "text-bad"}`}>{status}</span>
+              )}
+            </div>
 
-      <div className="mt-6 space-y-6">
-        <PolicySection
-          title="Payment Policies"
-          policies={policies.payment}
-          defaultId={policies.defaultPayment}
-          onUpdate={(list, defId) => updatePolicyType("payment", list, defId)}
-        />
+            {GROUPS.map(({ type, title }) => {
+              const list = policies[type] || [];
+              const def = policies[defaultKey(type)];
+              return (
+                <div key={type} className="card">
+                  <div className="grouphead">
+                    <h2 className="lbl">{title}</h2>
+                    <span className="mono text-sm text-ink-3">
+                      {list.length} polic{list.length === 1 ? "y" : "ies"}
+                    </span>
+                    <div className="grow" />
+                    <button
+                      type="button"
+                      className={touch ? "btn h-9 px-3" : "btn btn-sm"}
+                      onClick={() => change(type, [...list, { id: "", label: "" }], def)}
+                    >
+                      <PlusIcon className="size-[13px]" />
+                      Add
+                    </button>
+                  </div>
+                  {list.length === 0 && <p className="hint px-3 py-2.5">No policies added yet.</p>}
+                  {list.map((p, i) => {
+                    const isDefault = !!p.id && p.id === def;
+                    const update = (field, value) => {
+                      const next = [...list];
+                      next[i] = { ...next[i], [field]: value };
+                      // A changed ID that was the default stays the default.
+                      const nextDef = field === "id" && def === p.id ? value : def;
+                      change(type, next, nextDef, false);
+                    };
+                    return (
+                      <div key={i} className={`polrow ${touch ? "polrow-touch" : ""}`}>
+                        <button
+                          type="button"
+                          className={`star ${isDefault ? "star-on" : ""}`}
+                          aria-label={isDefault ? "Default policy" : "Make default"}
+                          aria-pressed={isDefault}
+                          disabled={!p.id}
+                          onClick={() => p.id && change(type, list, p.id)}
+                        >
+                          <StarIcon filled={isDefault} />
+                        </button>
+                        <input
+                          type="text"
+                          value={p.label}
+                          onChange={(e) => update("label", e.target.value)}
+                          onBlur={() => save(policies)}
+                          placeholder="Label (yours)"
+                          aria-label="Policy label"
+                          className={`pollabel input ${touch ? "h-9" : ""}`}
+                        />
+                        <input
+                          type="text"
+                          value={p.id}
+                          onChange={(e) => update("id", e.target.value.trim())}
+                          onBlur={() => save(policies)}
+                          placeholder="eBay policy ID"
+                          aria-label="eBay policy ID"
+                          className={`polid input mono ${touch ? "h-9" : ""}`}
+                        />
+                        <button
+                          type="button"
+                          className="btn btn-dq polremove"
+                          aria-label={`Remove policy ${p.label || p.id}`}
+                          onClick={() => setRemoveAt({ type, index: i })}
+                        >
+                          <TrashIcon className="size-[15px]" />
+                          <span className="polremove-txt">Remove</span>
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })}
 
-        <PolicySection
-          title="Shipping Policies"
-          policies={policies.shipping}
-          defaultId={policies.defaultShipping}
-          onUpdate={(list, defId) => updatePolicyType("shipping", list, defId)}
-        />
-
-        <PolicySection
-          title="Return Policies"
-          policies={policies.return}
-          defaultId={policies.defaultReturn}
-          onUpdate={(list, defId) => updatePolicyType("return", list, defId)}
-        />
-
-      </div>
-    </div>
+            <Dialog
+              open={!!removeAt}
+              onCancel={() => setRemoveAt(null)}
+              title="Remove this?"
+              touch={touch}
+              actions={
+                <>
+                  <button type="button" className={touch ? "btn btn-touch flex-1" : "btn"} onClick={() => setRemoveAt(null)}>
+                    Cancel
+                  </button>
+                  <button type="button" className={`${touch ? "btn btn-touch flex-1" : "btn"} btn-danger`} onClick={confirmRemove}>
+                    Remove
+                  </button>
+                </>
+              }
+            >
+              <p className="hint mt-1.5">It goes from Settings only. Listings already using it are untouched.</p>
+            </Dialog>
+          </div>
+        )
+      }
+    </SettingsShell>
   );
 }

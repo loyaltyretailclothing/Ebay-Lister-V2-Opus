@@ -31,6 +31,9 @@ export async function saveDraft(draftId, payload) {
           updatedAt: new Date().toISOString(),
           status: payload.status || "ready",
           errorMessage: (payload.errorMessage || "").slice(0, 255),
+          // Skip Draft: Next draft passes over it. Mirrored here so the
+          // queue can show the grey "Skipped" label without opening the JSON.
+          skipped: payload.listing?.skipDraft ? "true" : "",
         },
       },
       (error, result) => {
@@ -67,10 +70,21 @@ export async function listDrafts() {
         updatedAt: ctx.updatedAt || r.created_at,
         status: ctx.status || "ready",
         errorMessage: ctx.errorMessage || "",
+        skipped: ctx.skipped === "true",
+        createdAt: draftCreatedAt(id, r.created_at),
         url: r.secure_url,
       };
     })
     .sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1));
+}
+
+// When a draft was created. Every draft id is `draft_<ms timestamp>_<rand>`
+// (see newDraftId and the camera page), and unlike updatedAt it never
+// changes when the draft is saved again — so the queue can be sorted
+// oldest-first without drafts jumping around after each save.
+export function draftCreatedAt(id, fallback) {
+  const ms = Number(/^draft_(\d{10,})_/.exec(id || "")?.[1]);
+  return Number.isFinite(ms) && ms > 0 ? new Date(ms).toISOString() : fallback || "";
 }
 
 // Fetch a single draft's full payload (downloads the JSON blob).

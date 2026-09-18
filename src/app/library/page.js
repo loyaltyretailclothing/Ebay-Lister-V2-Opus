@@ -1,413 +1,361 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { FOLDERS } from "@/lib/constants";
-import PhotoGrid from "@/components/PhotoGrid";
-import UploadZone from "@/components/UploadZone";
-import NoteModal from "@/components/NoteModal";
+import { useRef, useState } from "react";
+import usePhotoLibrary from "@/hooks/usePhotoLibrary";
 import { usePhotoTransfer } from "@/contexts/PhotoTransferContext";
+import { FOLDERS } from "@/lib/constants";
+import { photoName, thumbUrl } from "@/lib/resizeImage";
+import Dialog from "@/components/ui/Dialog";
+import Lightbox from "@/components/ui/Lightbox";
+import {
+  CheckIcon,
+  FolderIcon,
+  LibraryIcon,
+  NoteIcon,
+  PlusIcon,
+  Spinner,
+  UploadIcon,
+  XIcon,
+} from "@/components/ui/Icons";
 
+const folderLabel = (f) => (f === "All Photos" ? "All" : f);
+
+// Photo Library (phone, and any window smaller than the desktop layout).
+// The grid is the page: four across. Tap to select, double-tap to enlarge.
+// Selecting raises three short rows above the nav — the count, what to do
+// with the photos, and (nearest the thumb) where to send them.
 export default function LibraryPage() {
+  const lib = usePhotoLibrary();
   const { addToTransfer } = usePhotoTransfer();
-  const [activeFolder, setActiveFolder] = useState("All Photos");
-  const [photos, setPhotos] = useState([]);
-  const [selected, setSelected] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [nextCursor, setNextCursor] = useState(null);
-  const [showUpload, setShowUpload] = useState(false);
-  const [notePhoto, setNotePhoto] = useState(null);
-  const [deleting, setDeleting] = useState(false);
-  const [error, setError] = useState("");
-  const [sendingTo, setSendingTo] = useState(null); // "listing" | "ai" | null
-  const [sendProgress, setSendProgress] = useState(0);
-  const [sendDone, setSendDone] = useState(null); // "listing" | "ai" | null
+  const fileRef = useRef(null);
+  const tapTimer = useRef(null);
+  const [lightbox, setLightbox] = useState(null);
+  const [noteFor, setNoteFor] = useState(null);
+  const [noteText, setNoteText] = useState("");
+  const [noteError, setNoteError] = useState("");
+  const [askDelete, setAskDelete] = useState(false);
+  // Send to: { target, progress } while filling; { target, done: true } for
+  // the ~1s the check holds.
+  const [send, setSend] = useState(null);
 
-  const fetchPhotos = useCallback(async () => {
-    setLoading(true);
-    setError("");
-    try {
-      const res = await fetch(
-        `/api/cloudinary/list?folder=${encodeURIComponent(activeFolder)}`
-      );
-      const data = await res.json();
-      if (data.success) {
-        setPhotos(data.photos);
-        setNextCursor(data.next_cursor || null);
-      } else {
-        setPhotos([]);
-        setNextCursor(null);
-        setError(data.error || "Failed to load photos");
-      }
-    } catch (err) {
-      console.error("Failed to fetch photos:", err);
-      setPhotos([]);
-      setNextCursor(null);
-      setError("Could not connect to photo service");
-    } finally {
-      setLoading(false);
-    }
-  }, [activeFolder]);
+  const n = lib.selected.length;
+  const uploading = lib.upload && lib.upload.total !== undefined;
 
-  // Fetch the next page of older photos and append to the list. Cursor
-  // pagination — Cloudinary returns a new cursor each call until exhausted.
-  const fetchMorePhotos = useCallback(async () => {
-    if (!nextCursor || loadingMore) return;
-    setLoadingMore(true);
-    setError("");
-    try {
-      const res = await fetch(
-        `/api/cloudinary/list?folder=${encodeURIComponent(
-          activeFolder
-        )}&next_cursor=${encodeURIComponent(nextCursor)}`
-      );
-      const data = await res.json();
-      if (data.success) {
-        setPhotos((prev) => [...prev, ...data.photos]);
-        setNextCursor(data.next_cursor || null);
-      } else {
-        setError(data.error || "Failed to load more photos");
-      }
-    } catch (err) {
-      console.error("Failed to fetch more photos:", err);
-      setError("Could not connect to photo service");
-    } finally {
-      setLoadingMore(false);
-    }
-  }, [activeFolder, nextCursor, loadingMore]);
-
-  useEffect(() => {
-    fetchPhotos();
-    setSelected([]);
-  }, [fetchPhotos]);
-
-  async function handleUploadComplete(newPhotos) {
-    setPhotos((prev) => [...newPhotos, ...prev]);
-  }
-
-  async function handleDelete() {
-    if (!selected.length) return;
-    const count = selected.length;
-    if (
-      !confirm(
-        `Delete ${count} photo${count > 1 ? "s" : ""}? This cannot be undone.`
-      )
-    ) {
+  // One tap selects; a second tap within 260ms opens the photo instead.
+  function onTileTap(photo, index) {
+    if (tapTimer.current) {
+      clearTimeout(tapTimer.current);
+      tapTimer.current = null;
+      setLightbox(index);
       return;
     }
-
-    setDeleting(true);
-    try {
-      const res = await fetch("/api/cloudinary/delete", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ publicIds: selected }),
-      });
-      const data = await res.json();
-      if (data.success) {
-        setPhotos((prev) =>
-          prev.filter((p) => !selected.includes(p.public_id))
-        );
-        setSelected([]);
-      }
-    } catch (err) {
-      console.error("Delete failed:", err);
-    } finally {
-      setDeleting(false);
-    }
+    tapTimer.current = setTimeout(() => {
+      tapTimer.current = null;
+      lib.toggleSelect(photo.public_id);
+    }, 260);
   }
 
-  function handleNoteClick() {
-    if (selected.length !== 1) return;
-    const photo = photos.find((p) => p.public_id === selected[0]);
-    if (photo) setNotePhoto(photo);
-  }
-
-  function handleNoteSaved(publicId, note) {
-    setPhotos((prev) =>
-      prev.map((p) => (p.public_id === publicId ? { ...p, note } : p))
-    );
-    setNotePhoto(null);
-  }
-
-  async function handleMoveToFolder(targetFolder) {
-    if (!selected.length) return;
-
-    const movedIds = [];
-    for (const publicId of selected) {
-      try {
-        const res = await fetch("/api/cloudinary/move", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ publicId, targetFolder }),
-        });
-        const data = await res.json();
-        if (data.success) {
-          movedIds.push(publicId);
-        }
-      } catch (err) {
-        console.error("Move failed:", err);
-      }
-    }
-
-    setPhotos((prev) => prev.filter((p) => !movedIds.includes(p.public_id)));
-    setSelected([]);
-  }
-
-  function handleSendToZone(target) {
-    if (sendingTo) return; // prevent double-tap
-
-    const photoMap = Object.fromEntries(
-      photos.map((p) => [p.public_id, p])
-    );
-    const selectedPhotos = selected.map((id) => photoMap[id]).filter(Boolean);
-    addToTransfer(selectedPhotos, target);
-
-    // Animate progress bar
-    setSendingTo(target);
-    setSendProgress(0);
-
+  function sendTo(target) {
+    if (send || n === 0) return;
+    addToTransfer(lib.selectedPhotos(), target);
     let progress = 0;
+    setSend({ target, progress });
     const interval = setInterval(() => {
       progress += 5;
-      setSendProgress(progress);
       if (progress >= 100) {
         clearInterval(interval);
-        setSendingTo(null);
-        setSendProgress(0);
-        setSendDone(target);
-        setSelected([]);
-        // Clear the checkmark after 1 second
-        setTimeout(() => setSendDone(null), 1000);
+        // The selection clears the moment the check appears.
+        lib.clearSelection();
+        setSend({ target, done: true });
+        setTimeout(() => setSend(null), 1000);
+      } else {
+        setSend({ target, progress });
       }
-    }, 50); // 50ms × 20 steps = 1 second
+    }, 50);
   }
 
-  const selectedCount = selected.length;
+  function openNote() {
+    if (n !== 1) return;
+    const photo = lib.photos.find((p) => p.public_id === lib.selected[0]);
+    if (!photo) return;
+    setNoteFor(photo);
+    setNoteText(photo.note || "");
+    setNoteError("");
+  }
+
+  async function saveNote() {
+    try {
+      await lib.saveNote(noteFor.public_id, noteText);
+      setNoteFor(null);
+    } catch (err) {
+      setNoteError(err.message);
+    }
+  }
+
+  const sendButton = (target, label) => {
+    const active = send?.target === target;
+    const done = active && send.done;
+    return (
+      <button
+        type="button"
+        className={`btn send h-11 ${done ? "btn-primary" : active ? "send-on" : ""}`}
+        disabled={!!send && !active}
+        onClick={() => sendTo(target)}
+      >
+        {active && !done && <span className="send-fill" style={{ width: `${send.progress}%` }} />}
+        <span className="send-txt">
+          {done && <CheckIcon className="size-[15px]" strokeWidth={2.8} />}
+          {label}
+        </span>
+      </button>
+    );
+  };
+
+  const showBar = n > 0 || !!send;
 
   return (
-    <div className="flex h-[calc(100dvh-4rem)] flex-col md:h-[calc(100vh-3.5rem)]">
-      {/* Header */}
-      <div className="border-b border-zinc-200 bg-white px-4 py-3 md:px-6 dark:border-zinc-800 dark:bg-zinc-950">
-        <h1 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
-          Photo Library
-        </h1>
+    <div className="mx-auto flex h-full w-full max-w-[640px] flex-col bg-panel">
+      <header className="flex h-14 shrink-0 items-center gap-2.5 border-b border-line pl-3.5 pr-2">
+        <h1 className="m-0 text-3xl font-semibold tracking-[-0.01em]">Photo Library</h1>
+        <div className="grow" />
+        <button
+          type="button"
+          className="btn btn-ghost btn-touch px-2.5 text-accent"
+          disabled={uploading}
+          onClick={() => fileRef.current?.click()}
+        >
+          <UploadIcon className="size-[17px]" />
+          Upload
+        </button>
+        <input
+          ref={fileRef}
+          type="file"
+          accept="image/*"
+          multiple
+          className="hidden"
+          onChange={(e) => {
+            lib.uploadFiles(e.target.files);
+            e.target.value = "";
+          }}
+        />
+      </header>
 
-        {/* Folder Tabs */}
-        <div className="mt-2 flex items-center gap-1.5">
-          {FOLDERS.map((folder) => (
-            <button
-              key={folder}
-              onClick={() => setActiveFolder(folder)}
-              className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
-                activeFolder === folder
-                  ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
-                  : "text-zinc-500 hover:bg-zinc-100 hover:text-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
-              }`}
-            >
-              {folder === "All Photos" ? "All" : folder}
+      <div className="shrink-0 px-2 pb-1.5 pt-2">
+        <div className="seg seg-touch">
+          {FOLDERS.map((f) => (
+            <button key={f} type="button" aria-pressed={lib.activeFolder === f} onClick={() => lib.setActiveFolder(f)}>
+              {folderLabel(f)}
             </button>
           ))}
         </div>
+      </div>
 
-        {/* Action Bar */}
-        <div className="mt-2 flex flex-wrap items-center gap-1.5">
-          <button
-            onClick={() => setShowUpload(!showUpload)}
-            className="rounded-md bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-zinc-700 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300"
-          >
-            {showUpload ? "Hide Upload" : "Upload"}
-          </button>
-          <button
-            onClick={handleDelete}
-            disabled={!selected.length || deleting}
-            className={`rounded px-2 py-1.5 text-xs transition-colors ${
-              selected.length
-                ? "border border-red-300 text-red-600 hover:bg-red-50 dark:border-red-800 dark:text-red-400"
-                : "text-zinc-400 dark:text-zinc-600"
-            }`}
-          >
-            {deleting
-              ? "..."
-              : `Delete${selected.length ? ` (${selected.length})` : ""}`}
-          </button>
-          <button
-            onClick={handleNoteClick}
-            disabled={selected.length !== 1}
-            className={`rounded px-2 py-1.5 text-xs transition-colors ${
-              selected.length === 1
-                ? "text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
-                : "text-zinc-400 dark:text-zinc-600"
-            }`}
-          >
-            Note
-          </button>
-
-          {selected.length > 0 && (
+      {lib.upload && (
+        <div className="flex shrink-0 flex-col gap-1 px-3 pb-2">
+          {uploading ? (
             <>
-              {FOLDERS.filter((f) => f !== activeFolder).map((folder) => (
-                <button
-                  key={folder}
-                  onClick={() => handleMoveToFolder(folder)}
-                  className="rounded px-2 py-1.5 text-xs text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
-                >
-                  &rarr; {folder === "All Photos" ? "All" : folder}
-                </button>
-              ))}
-              <button
-                onClick={() => setSelected([])}
-                className="ml-auto text-xs text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300"
-              >
-                Clear
-              </button>
+              <div className="flex items-center gap-2">
+                <Spinner className="size-3.5 text-accent" />
+                <span className="text-base font-medium text-ink-2">
+                  Uploading {lib.upload.done}/{lib.upload.total}…
+                </span>
+              </div>
+              <span className="prog">
+                <span style={{ width: `${(lib.upload.done / lib.upload.total) * 100}%` }} />
+              </span>
             </>
+          ) : (
+            <span className={`text-base font-medium ${lib.upload.failed ? "text-bad" : "text-ok"}`}>
+              {lib.upload.message}
+            </span>
           )}
         </div>
+      )}
 
-        {/* Upload Zone */}
-        {showUpload && (
-          <div className="mt-2">
-            <UploadZone
-              folder={activeFolder}
-              onUploadComplete={handleUploadComplete}
-            />
+      {lib.error && <p className="m-0 shrink-0 px-3 pb-2 text-md font-medium text-bad">{lib.error}</p>}
+
+      {lib.loading ? (
+        <div className="flex grow items-center justify-center">
+          <Spinner className="size-6 text-ink-3" />
+        </div>
+      ) : lib.photos.length === 0 ? (
+        <div className="flex min-h-0 grow flex-col items-center justify-center gap-3.5 p-6">
+          <span className="flex size-[60px] items-center justify-center rounded-full border border-line bg-sunken text-ink-3">
+            <LibraryIcon className="size-7" strokeWidth={1.5} />
+          </span>
+          <p className="m-0 text-3xl font-semibold">No photos yet</p>
+          <p className="hint max-w-[250px] text-center">Shoot with the camera, or upload from this phone.</p>
+          <button type="button" className="btn btn-primary btn-touch" onClick={() => fileRef.current?.click()}>
+            Upload photos
+          </button>
+        </div>
+      ) : (
+        <div className="min-h-0 grow overflow-y-auto px-2 pb-[58px]">
+          <div className="pgrid4">
+            <button
+              type="button"
+              className="drop"
+              aria-label="Add photos"
+              disabled={uploading}
+              onClick={() => fileRef.current?.click()}
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={(e) => {
+                e.preventDefault();
+                lib.uploadFiles(e.dataTransfer.files);
+              }}
+            >
+              <PlusIcon className="size-[17px]" strokeWidth={1.9} />
+              <span className="text-2xs">Add</span>
+            </button>
+            {lib.photos.map((photo, i) => {
+              const on = lib.selected.includes(photo.public_id);
+              return (
+                <button
+                  key={photo.public_id}
+                  type="button"
+                  className={`tile ${on ? "tile-on" : ""}`}
+                  aria-pressed={on}
+                  onClick={() => onTileTap(photo, i)}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={thumbUrl(photo.secure_url, 200)}
+                    alt=""
+                    loading="lazy"
+                    className="absolute inset-0 size-full object-cover"
+                  />
+                  {on && (
+                    <span className="tick tick-on">
+                      <CheckIcon className="size-[11px]" strokeWidth={3.4} />
+                    </span>
+                  )}
+                  {photo.note && (
+                    <span className="notebadge" aria-label="Has a note">
+                      <NoteIcon className="size-2.5" strokeWidth={2.4} />
+                    </span>
+                  )}
+                </button>
+              );
+            })}
           </div>
-        )}
-      </div>
-
-      {/* Error */}
-      {error && (
-        <div className="mx-4 mt-2 rounded border border-amber-300 bg-amber-50 px-2 py-1.5 text-xs text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-300">
-          {error}
+          {lib.nextCursor && (
+            <button type="button" className="btn btn-touch mt-2.5 w-full" disabled={lib.loadingMore} onClick={lib.fetchMore}>
+              {lib.loadingMore ? "Loading…" : "Load older photos"}
+            </button>
+          )}
+          <p className="hint mt-2.5">Tap to select. Double-tap a photo to open it full screen.</p>
         </div>
       )}
 
-      {/* Photo Grid */}
-      <div className="flex-1 overflow-y-auto px-4 pb-4 md:px-6">
-        {loading ? (
-          <div className="mt-12 flex justify-center">
-            <svg
-              className="h-8 w-8 animate-spin text-zinc-400"
-              viewBox="0 0 24 24"
-              fill="none"
-            >
-              <circle
-                className="opacity-25"
-                cx="12"
-                cy="12"
-                r="10"
-                stroke="currentColor"
-                strokeWidth="4"
-              />
-              <path
-                className="opacity-75"
-                fill="currentColor"
-                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-              />
-            </svg>
-          </div>
-        ) : (
-          <>
-            <PhotoGrid
-              photos={photos}
-              selected={selected}
-              onSelect={setSelected}
-              onToggle={(id) =>
-                setSelected((prev) =>
-                  prev.includes(id)
-                    ? prev.filter((s) => s !== id)
-                    : [...prev, id]
-                )
-              }
-              draggable
-              tapToToggle
-            />
-            {nextCursor && (
-              <div className="mt-4 flex justify-center">
-                <button
-                  onClick={fetchMorePhotos}
-                  disabled={loadingMore}
-                  className="rounded-lg border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800"
-                >
-                  {loadingMore ? "Loading..." : "Load older photos"}
+      {showBar && (
+        <div className="shrink-0 border-t border-line bg-panel-2">
+          {n > 0 && (
+            <>
+              <div className="flex items-center gap-2 px-3 pt-0.5">
+                <span className="text-md font-semibold text-accent">{n} selected</span>
+                <div className="grow" />
+                <button type="button" className="btn btn-ghost btn-touch px-2 text-accent" onClick={lib.clearSelection}>
+                  Clear
                 </button>
               </div>
-            )}
-          </>
-        )}
-      </div>
-
-      {/* Send-to-Zone Floating Bar */}
-      {(selectedCount > 0 || sendingTo || sendDone) && (
-        <div className="fixed bottom-16 left-0 right-0 z-30 border-t border-zinc-200 bg-white px-4 py-3 md:bottom-0 dark:border-zinc-800 dark:bg-zinc-950">
-          <div className="mx-auto flex max-w-lg gap-3">
-            {/* eBay Listing Button */}
-            <div className="relative flex-1 overflow-hidden rounded-lg">
-              {sendingTo === "listing" && (
-                <div
-                  className="absolute inset-0 bg-blue-700 transition-none"
-                  style={{ width: `${sendProgress}%` }}
-                />
-              )}
-              <button
-                onClick={() => handleSendToZone("listing")}
-                disabled={!!sendingTo || !!sendDone}
-                className={`relative z-10 w-full rounded-lg px-4 py-2.5 text-sm font-medium transition-colors ${
-                  sendDone === "listing"
-                    ? "bg-green-600 text-white"
-                    : sendingTo === "listing"
-                      ? "bg-blue-600 text-white"
-                      : "bg-blue-600 text-white hover:bg-blue-700"
-                }`}
-              >
-                {sendDone === "listing" ? (
-                  <span className="flex items-center justify-center gap-1.5">
-                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-                    </svg>
-                  </span>
-                ) : sendingTo === "listing" ? "" : "eBay Listing"}
-              </button>
-            </div>
-
-            {/* AI Analysis Button */}
-            <div className="relative flex-1 overflow-hidden rounded-lg">
-              {sendingTo === "ai" && (
-                <div
-                  className="absolute inset-0 bg-blue-200 dark:bg-blue-900 transition-none"
-                  style={{ width: `${sendProgress}%` }}
-                />
-              )}
-              <button
-                onClick={() => handleSendToZone("ai")}
-                disabled={!!sendingTo || !!sendDone}
-                className={`relative z-10 w-full rounded-lg border px-4 py-2.5 text-sm font-medium transition-colors ${
-                  sendDone === "ai"
-                    ? "border-green-600 bg-green-600 text-white"
-                    : sendingTo === "ai"
-                      ? "border-blue-600 text-blue-600 dark:text-blue-400"
-                      : "border-blue-600 text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-950"
-                }`}
-              >
-                {sendDone === "ai" ? (
-                  <span className="flex items-center justify-center gap-1.5">
-                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-                    </svg>
-                  </span>
-                ) : sendingTo === "ai" ? "" : "AI Analysis"}
-              </button>
-            </div>
+              <div className="flex gap-1.5 px-3 pt-1">
+                <button type="button" className="btn btn-danger h-10 px-2.5" disabled={lib.deleting} onClick={() => setAskDelete(true)}>
+                  Delete ({n})
+                </button>
+                {/* Note is for exactly one photo — greyed at any other count. */}
+                <button
+                  type="button"
+                  className={`btn h-10 px-2.5 ${n === 1 ? "" : "btn-off"}`}
+                  disabled={n !== 1}
+                  onClick={openNote}
+                >
+                  Note
+                </button>
+                <div className="grow" />
+                {FOLDERS.filter((f) => f !== lib.activeFolder).map((f) => (
+                  <button
+                    key={f}
+                    type="button"
+                    className="btn h-10 px-[9px]"
+                    aria-label={`Move to ${folderLabel(f)}`}
+                    onClick={() => lib.moveSelected(f)}
+                  >
+                    <FolderIcon className="size-3.5" />
+                    {folderLabel(f)}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+          <div className="flex items-center gap-2 px-3 pb-2.5 pt-2">
+            <span className="lbl shrink-0">Send to</span>
+            {sendButton("listing", "eBay Listing")}
+            {sendButton("ai", "AI Analysis")}
           </div>
         </div>
       )}
 
-      {/* Note Modal */}
-      <NoteModal
-        photo={notePhoto}
-        onSave={handleNoteSaved}
-        onClose={() => setNotePhoto(null)}
-      />
+      <Lightbox photos={lib.photos} index={lightbox} onIndex={setLightbox} onClose={() => setLightbox(null)} />
+
+      <Dialog
+        open={askDelete}
+        onCancel={() => setAskDelete(false)}
+        title={`Delete ${n} photo${n === 1 ? "" : "s"}?`}
+        touch
+        actions={
+          <>
+            <button type="button" className="btn btn-touch flex-1" onClick={() => setAskDelete(false)}>
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="btn btn-danger btn-touch flex-1 font-semibold"
+              onClick={async () => {
+                setAskDelete(false);
+                await lib.deleteSelected();
+              }}
+            >
+              Delete
+            </button>
+          </>
+        }
+      >
+        <p className="hint mt-[7px]">This cannot be undone.</p>
+      </Dialog>
+
+      {noteFor && (
+        <div
+          className="scrim"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setNoteFor(null);
+          }}
+        >
+          <div className="dialog" role="dialog" aria-modal="true">
+            <div className="mb-2.5 flex items-center gap-2">
+              <p className="m-0 min-w-0 truncate text-2xl font-semibold">Note on {photoName(noteFor)}</p>
+              <div className="grow" />
+              <button type="button" className="roundbtn roundbtn-no" aria-label="Cancel" onClick={() => setNoteFor(null)}>
+                <XIcon className="size-[19px]" />
+              </button>
+              <button type="button" className="roundbtn roundbtn-yes" aria-label="Save" onClick={saveNote}>
+                <CheckIcon className="size-[19px]" strokeWidth={2.8} />
+              </button>
+            </div>
+            <textarea
+              autoFocus
+              value={noteText}
+              onChange={(e) => setNoteText(e.target.value)}
+              className="textarea-touch"
+              placeholder="Measurements, tag wording, flaws"
+            />
+            <p className="hint mt-2">
+              A reminder on this photo. Shows as a badge and in the enlarged view. Not sent to eBay
+              or the AI.
+            </p>
+            {noteError && <p className="mt-1.5 text-md font-medium text-bad">Failed to save note: {noteError}</p>}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

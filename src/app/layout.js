@@ -1,6 +1,6 @@
 import { Geist, Geist_Mono } from "next/font/google";
-import Nav from "@/components/Nav";
-import BottomNav from "@/components/BottomNav";
+import AppFrame from "@/components/nav/AppFrame";
+import DevWriteGuard from "@/components/dev/DevWriteGuard";
 import { PhotoTransferProvider } from "@/contexts/PhotoTransferContext";
 import "./globals.css";
 
@@ -32,11 +32,10 @@ export default function RootLayout({ children }) {
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col bg-zinc-50 dark:bg-zinc-950">
+      <body className="h-full text-md">
+        <DevWriteGuard />
         <PhotoTransferProvider>
-          <Nav />
-          <main className="flex-1 pb-16 md:pb-0">{children}</main>
-          <BottomNav />
+          <AppFrame>{children}</AppFrame>
         </PhotoTransferProvider>
       </body>
     </html>

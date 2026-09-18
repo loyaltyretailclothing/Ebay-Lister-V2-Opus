@@ -1,345 +1,292 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import SettingsShell from "@/components/settings/SettingsShell";
+import Dialog from "@/components/ui/Dialog";
+import { ChevronRightIcon, SearchIcon, Spinner } from "@/components/ui/Icons";
 
-export default function SettingsPage() {
+// Top-down path ("Clothing, Shoes & Accessories > Men > … > Polos"). eBay
+// lists ancestors nearest-first.
+function pathOf(cat) {
+  return [...(cat.ancestors || [])].reverse().concat(cat.name).join(" > ");
+}
+
+// Settings → Categories. Search eBay, tap a result to add it, and mark which
+// item specifics allow more than one value. Every change is sent as a change
+// to ONE category, so nothing here can wipe the other saved categories.
+export default function CategoriesPage() {
   const [categories, setCategories] = useState({});
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
+  const [loadError, setLoadError] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
-  const [searchResults, setSearchResults] = useState([]);
+  const [searchResults, setSearchResults] = useState(null);
   const [searching, setSearching] = useState(false);
-  const [loadingSpecifics, setLoadingSpecifics] = useState(null);
-  const [expandedCategory, setExpandedCategory] = useState(null);
-  const [saveStatus, setSaveStatus] = useState("");
+  const [adding, setAdding] = useState(null);
+  const [expanded, setExpanded] = useState(null);
+  const [status, setStatus] = useState("");
+  const [removeId, setRemoveId] = useState(null);
 
-  // Load saved config
   useEffect(() => {
-    async function load() {
+    (async () => {
       try {
-        const res = await fetch("/api/settings");
+        const res = await fetch("/api/settings", { cache: "no-store" });
         const data = await res.json();
-        if (data.success) {
-          setCategories(data.categories || {});
-        }
-      } catch (err) {
-        console.error("Failed to load settings:", err);
+        if (data.success) setCategories(data.categories || {});
+        else setLoadError("Couldn't load categories");
+      } catch {
+        setLoadError("Couldn't load categories");
       } finally {
         setLoading(false);
       }
-    }
-    load();
+    })();
   }, []);
 
-  // Search eBay categories
-  async function handleSearch() {
-    if (!searchQuery.trim()) return;
-    setSearching(true);
+  async function send(body) {
+    setStatus("");
     try {
-      const res = await fetch(
-        `/api/ebay/categories?q=${encodeURIComponent(searchQuery)}`
-      );
+      const res = await fetch("/api/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
       const data = await res.json();
       if (data.success) {
-        setSearchResults(data.categories || []);
+        // Take the server's list after an add/remove (it may include another
+        // user's changes). Tick changes keep the local state, so quick
+        // clicks can't be undone by an older response arriving late.
+        if (data.categories && !body.setCategory) setCategories(data.categories);
+        setStatus("Saved");
+        setTimeout(() => setStatus(""), 2000);
+        return true;
       }
-    } catch (err) {
-      console.error("Category search failed:", err);
+      setStatus(data.error ? `Save failed: ${data.error}` : "Save failed");
+    } catch {
+      setStatus("Save failed");
+    }
+    return false;
+  }
+
+  async function handleSearch() {
+    if (!searchQuery.trim() || searching) return;
+    setSearching(true);
+    try {
+      const res = await fetch(`/api/ebay/categories?q=${encodeURIComponent(searchQuery)}`);
+      const data = await res.json();
+      setSearchResults(data.success ? data.categories || [] : []);
+    } catch {
+      setSearchResults([]);
     } finally {
       setSearching(false);
     }
   }
 
-  // Add a category and load its specifics
   async function addCategory(cat) {
     if (categories[cat.id]) {
-      setExpandedCategory(cat.id);
-      setSearchResults([]);
+      setExpanded(cat.id);
+      setSearchResults(null);
       setSearchQuery("");
       return;
     }
-
-    setLoadingSpecifics(cat.id);
+    setAdding(cat.id);
     try {
       const res = await fetch(`/api/ebay/specifics?categoryId=${cat.id}`);
       const data = await res.json();
       if (data.success) {
-        const specificsConfig = {};
+        const specifics = {};
         for (const spec of data.specifics) {
-          specificsConfig[spec.name] = {
+          specifics[spec.name] = {
             localizedName: spec.localizedName,
             multiSelect: false,
             required: spec.required,
             hasValues: spec.values.length > 0,
           };
         }
-
-        const updated = {
-          ...categories,
-          [cat.id]: {
-            name: cat.name,
-            path:
-              cat.ancestors.length > 0
-                ? `${cat.ancestors.join(" > ")} > ${cat.name}`
-                : cat.name,
-            specifics: specificsConfig,
-          },
-        };
-        setCategories(updated);
-        setExpandedCategory(cat.id);
-        await saveConfig(updated);
-      }
-    } catch (err) {
-      console.error("Failed to load specifics:", err);
-    } finally {
-      setLoadingSpecifics(null);
-      setSearchResults([]);
-      setSearchQuery("");
-    }
-  }
-
-  // Toggle multi-select for a specific
-  async function toggleMultiSelect(categoryId, specificName) {
-    const updated = { ...categories };
-    updated[categoryId] = { ...updated[categoryId] };
-    updated[categoryId].specifics = { ...updated[categoryId].specifics };
-    updated[categoryId].specifics[specificName] = {
-      ...updated[categoryId].specifics[specificName],
-      multiSelect: !updated[categoryId].specifics[specificName].multiSelect,
-    };
-    setCategories(updated);
-    await saveConfig(updated);
-  }
-
-  // Remove a category
-  async function removeCategory(categoryId) {
-    const updated = { ...categories };
-    delete updated[categoryId];
-    setCategories(updated);
-    if (expandedCategory === categoryId) setExpandedCategory(null);
-    await saveConfig(updated);
-  }
-
-  // Save config to Cloudinary
-  async function saveConfig(data) {
-    setSaving(true);
-    setSaveStatus("");
-    try {
-      const res = await fetch("/api/settings", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ categories: data }),
-      });
-      const result = await res.json();
-      if (result.success) {
-        setSaveStatus("Saved");
-        setTimeout(() => setSaveStatus(""), 2000);
+        const ok = await send({
+          addCategory: { id: cat.id, config: { name: cat.name, path: pathOf(cat), specifics } },
+        });
+        if (ok) {
+          setExpanded(cat.id);
+          setSearchResults(null);
+          setSearchQuery("");
+        }
       } else {
-        setSaveStatus("Save failed");
+        setStatus("Couldn't load that category's item specifics");
       }
     } catch {
-      setSaveStatus("Save failed");
+      setStatus("Couldn't load that category's item specifics");
     } finally {
-      setSaving(false);
+      setAdding(null);
     }
   }
 
-  if (loading) {
-    return (
-      <div className="mx-auto max-w-4xl px-4 py-8 md:px-6 md:py-12">
-        <p className="text-sm text-zinc-400">Loading settings...</p>
-      </div>
-    );
+  function toggleMulti(catId, name) {
+    const cat = categories[catId];
+    const config = {
+      ...cat,
+      specifics: {
+        ...cat.specifics,
+        [name]: { ...cat.specifics[name], multiSelect: !cat.specifics[name].multiSelect },
+      },
+    };
+    setCategories((prev) => ({ ...prev, [catId]: config }));
+    send({ setCategory: { id: catId, config } });
   }
 
-  const categoryIds = Object.keys(categories);
+  async function confirmRemove() {
+    const id = removeId;
+    setRemoveId(null);
+    if (expanded === id) setExpanded(null);
+    await send({ removeCategory: id });
+  }
+
+  const ids = Object.keys(categories);
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-6 md:px-6 md:py-8">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold text-zinc-900 dark:text-zinc-100">
-            Categories
-          </h1>
-          <p className="mt-1 text-sm text-zinc-500">
-            Configure which item specifics allow multi-select per category.
+    <SettingsShell active="categories">
+      {({ touch }) =>
+        loading ? (
+          <p className="hint flex items-center gap-2 py-4">
+            <Spinner className="size-3.5" /> Loading…
           </p>
-        </div>
-        {saveStatus && (
-          <span
-            className={`rounded-full px-3 py-1 text-xs font-medium ${
-              saveStatus === "Saved"
-                ? "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300"
-                : "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300"
-            }`}
-          >
-            {saveStatus}
-          </span>
-        )}
-      </div>
-
-      {/* Add Category */}
-      <div className="mt-6 rounded-xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
-        <h2 className="text-sm font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-          Add Category
-        </h2>
-        <div className="mt-3 flex gap-2">
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-            placeholder="Search eBay categories (e.g. mens jeans, womens dresses)"
-            className="flex-1 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
-          />
-          <button
-            onClick={handleSearch}
-            disabled={searching || !searchQuery.trim()}
-            className={`rounded-lg px-4 py-2 text-sm font-medium text-white ${
-              searching || !searchQuery.trim()
-                ? "cursor-not-allowed bg-blue-600 opacity-50"
-                : "bg-blue-600 hover:bg-blue-700"
-            }`}
-          >
-            {searching ? "Searching..." : "Search"}
-          </button>
-        </div>
-
-        {/* Search Results */}
-        {searchResults.length > 0 && (
-          <div className="mt-3 space-y-1">
-            {searchResults.map((cat) => (
-              <button
-                key={cat.id}
-                onClick={() => addCategory(cat)}
-                disabled={loadingSpecifics === cat.id}
-                className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm hover:bg-zinc-50 dark:hover:bg-zinc-800"
-              >
-                <div>
-                  <span className="font-medium text-zinc-900 dark:text-zinc-100">
-                    {cat.name}
-                  </span>
-                  {cat.ancestors.length > 0 && (
-                    <span className="ml-2 text-xs text-zinc-400">
-                      {cat.ancestors.join(" > ")}
-                    </span>
-                  )}
-                </div>
-                {loadingSpecifics === cat.id ? (
-                  <span className="text-xs text-zinc-400">Loading...</span>
-                ) : categories[cat.id] ? (
-                  <span className="text-xs text-green-600">Added</span>
-                ) : (
-                  <span className="text-xs text-blue-600">+ Add</span>
-                )}
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Saved Categories */}
-      <div className="mt-6 space-y-3">
-        <h2 className="text-sm font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-          Saved Categories ({categoryIds.length})
-        </h2>
-
-        {categoryIds.length === 0 && (
-          <p className="text-sm text-zinc-400">
-            No categories added yet. Search above to add one.
-          </p>
-        )}
-
-        {categoryIds.map((catId) => {
-          const cat = categories[catId];
-          const isExpanded = expandedCategory === catId;
-          const specificsEntries = Object.entries(cat.specifics || {});
-          const multiCount = specificsEntries.filter(
-            ([, s]) => s.multiSelect
-          ).length;
-
-          return (
-            <div
-              key={catId}
-              className="rounded-xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900"
-            >
-              {/* Category Header */}
-              <div
-                onClick={() =>
-                  setExpandedCategory(isExpanded ? null : catId)
-                }
-                className="flex cursor-pointer items-center justify-between px-5 py-3"
-              >
-                <div className="flex-1">
-                  <span className="font-medium text-zinc-900 dark:text-zinc-100">
-                    {cat.name}
-                  </span>
-                  <span className="ml-2 text-xs text-zinc-400">
-                    {cat.path !== cat.name ? cat.path : ""}
-                  </span>
-                  <span className="ml-2 text-xs text-zinc-500">
-                    {specificsEntries.length} specifics
-                    {multiCount > 0 && ` (${multiCount} multi-select)`}
-                  </span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      removeCategory(catId);
-                    }}
-                    className="rounded px-2 py-1 text-xs text-red-500 hover:bg-red-50 dark:hover:bg-red-950"
-                  >
-                    Remove
-                  </button>
-                  <svg
-                    className={`h-4 w-4 text-zinc-400 transition-transform ${
-                      isExpanded ? "rotate-180" : ""
-                    }`}
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth={2}
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M19.5 8.25l-7.5 7.5-7.5-7.5"
-                    />
-                  </svg>
-                </div>
+        ) : (
+          <div className="flex flex-col gap-[18px]">
+            {loadError && <p className="m-0 font-medium text-bad">{loadError}</p>}
+            <div>
+              <h2 className="lbl mb-[7px]">Add a category</h2>
+              <div className={`flex gap-2 ${touch ? "" : "max-w-[640px]"}`}>
+                <span className="relative min-w-0 flex-1">
+                  <SearchIcon className="pointer-events-none absolute left-[11px] top-1/2 size-[15px] -translate-y-1/2 text-ink-3" />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+                    placeholder="Search eBay categories"
+                    className={`input w-full ${touch ? "h-touch rounded-panel pl-9 text-lg" : "pl-8"}`}
+                  />
+                </span>
+                <button
+                  type="button"
+                  onClick={handleSearch}
+                  disabled={searching || !searchQuery.trim()}
+                  className={`btn btn-primary min-w-[104px] shrink-0 ${touch ? "btn-touch" : ""}`}
+                >
+                  {searching && <Spinner className="size-3.5" />}
+                  {searching ? "Searching…" : "Search"}
+                </button>
               </div>
-
-              {/* Expanded Specifics */}
-              {isExpanded && (
-                <div className="border-t border-zinc-200 px-5 py-3 dark:border-zinc-800">
-                  <div className="grid grid-cols-2 gap-1">
-                    {specificsEntries.map(([name, spec]) => (
-                      <label
-                        key={name}
-                        className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm hover:bg-zinc-50 dark:hover:bg-zinc-800"
+              {searchResults && (
+                <>
+                  <div className={`card mt-1.5 overflow-hidden ${touch ? "" : "max-w-[640px]"}`}>
+                    {searchResults.length === 0 && <p className="hint px-3 py-2.5">No categories found.</p>}
+                    {searchResults.map((cat) => (
+                      <button
+                        key={cat.id}
+                        type="button"
+                        className={`resrow last:border-b-0 ${touch ? "min-h-touch text-md" : ""}`}
+                        disabled={adding === cat.id}
+                        onClick={() => addCategory(cat)}
                       >
-                        <input
-                          type="checkbox"
-                          checked={spec.multiSelect}
-                          onChange={() => toggleMultiSelect(catId, name)}
-                          className="rounded border-zinc-300 dark:border-zinc-700"
-                        />
-                        <span className="text-zinc-700 dark:text-zinc-300">
-                          {spec.localizedName}
-                        </span>
-                        {spec.required && (
-                          <span className="text-xs text-red-500">*</span>
+                        <span className="min-w-0 grow truncate">{pathOf(cat)}</span>
+                        {adding === cat.id ? (
+                          <Spinner className="size-3.5 shrink-0 text-ink-3" />
+                        ) : categories[cat.id] ? (
+                          <span className="shrink-0 text-sm font-medium text-ok">Added</span>
+                        ) : (
+                          <span className="mono shrink-0 text-sm text-ink-3">{cat.id}</span>
                         )}
-                      </label>
+                      </button>
                     ))}
                   </div>
-                </div>
+                  {searchResults.length > 0 && <p className="hint mt-1.5">Tap a result to add it.</p>}
+                </>
               )}
             </div>
-          );
-        })}
-      </div>
-    </div>
+
+            <div>
+              <div className="mb-2 flex items-center gap-2">
+                <h2 className="lbl">Saved categories</h2>
+                <span className="mono text-sm text-ink-3">{ids.length} saved</span>
+                <div className="grow" />
+                {status && (
+                  <span className={`text-sm font-medium ${status === "Saved" ? "text-ok" : "text-bad"}`}>{status}</span>
+                )}
+              </div>
+              {ids.length === 0 && <p className="hint">No categories added yet. Search above to add one.</p>}
+              <div className="flex flex-col gap-2">
+                {ids.map((id) => {
+                  const cat = categories[id];
+                  const entries = Object.entries(cat.specifics || {});
+                  const multi = entries.filter(([, s]) => s.multiSelect).length;
+                  const open = expanded === id;
+                  return (
+                    <div key={id} className="card">
+                      <div className="cathead">
+                        <button
+                          type="button"
+                          className="catbtn"
+                          aria-expanded={open}
+                          onClick={() => setExpanded(open ? null : id)}
+                        >
+                          <ChevronRightIcon
+                            className={`size-3.5 shrink-0 text-ink-3 transition-transform ${open ? "rotate-90" : ""}`}
+                            strokeWidth={2.2}
+                          />
+                          <span className="min-w-0 grow">
+                            <span className="cattitle">{cat.path && cat.path !== cat.name ? cat.path : cat.name}</span>
+                            <span className="hint mt-0.5 block">
+                              {entries.length} item specifics, {multi} allow more than one value
+                            </span>
+                          </span>
+                          {!touch && <span className="mono shrink-0 text-sm text-ink-3">{id}</span>}
+                        </button>
+                        <button type="button" className={`btn btn-dq ${touch ? "btn-touch" : ""}`} onClick={() => setRemoveId(id)}>
+                          Remove
+                        </button>
+                      </div>
+                      {open && (
+                        <div className="catbody">
+                          <p className="hint mb-2.5">Tick the item specifics eBay lets you give more than one value.</p>
+                          <div className={`specgrid ${touch ? "specgrid-touch" : ""}`}>
+                            {entries.map(([name, spec]) => (
+                              <label key={name} className={`speccheck ${touch ? "min-h-touch text-lg" : ""}`}>
+                                <input type="checkbox" checked={!!spec.multiSelect} onChange={() => toggleMulti(id, name)} />
+                                <span>
+                                  {spec.localizedName || name}
+                                  {spec.required && <span className="text-bad"> *</span>}
+                                </span>
+                              </label>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            <Dialog
+              open={!!removeId}
+              onCancel={() => setRemoveId(null)}
+              title="Remove this?"
+              touch={touch}
+              actions={
+                <>
+                  <button type="button" className={touch ? "btn btn-touch flex-1" : "btn"} onClick={() => setRemoveId(null)}>
+                    Cancel
+                  </button>
+                  <button type="button" className={`${touch ? "btn btn-touch flex-1" : "btn"} btn-danger`} onClick={confirmRemove}>
+                    Remove
+                  </button>
+                </>
+              }
+            >
+              <p className="hint mt-1.5">It goes from Settings only. Listings already using it are untouched.</p>
+            </Dialog>
+          </div>
+        )
+      }
+    </SettingsShell>
   );
 }

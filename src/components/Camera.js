@@ -1,14 +1,17 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { FlipIcon, TorchIcon, XIcon } from "@/components/ui/Icons";
 
 // Camera component — full-screen in-app viewfinder using getUserMedia.
 //
 // Props:
-//   onDone(capturedPhotos)  — called with an array of Blob photos when the
-//                             user taps Done (or the X close button with
-//                             any photos captured).
-//   onCancel()              — called if the user taps X with no photos.
+//   initialPhotos           — photos already taken (coming back from Review
+//                             with ← Back keeps them; new shots are added
+//                             to the end).
+//   onDone(capturedPhotos)  — called with the full photo list on Done.
+//   onClose(photos)         — called by the close ✕. The page asks before
+//                             discarding any photos.
 //
 // Each captured photo is a square 1:1 crop taken from the center of the
 // camera frame, encoded as JPEG. The caller is responsible for uploading
@@ -40,7 +43,7 @@ const WB_PRESETS = [
   { label: "Cloudy", k: 6000 },
 ];
 
-export default function Camera({ onDone, onCancel }) {
+export default function Camera({ initialPhotos = [], onDone, onClose }) {
   const videoRef = useRef(null);
   const streamRef = useRef(null);
   const canvasRef = useRef(null);
@@ -51,7 +54,7 @@ export default function Camera({ onDone, onCancel }) {
   const audioCtxRef = useRef(null);
   const shutterBufferRef = useRef(null);
 
-  const [photos, setPhotos] = useState([]); // [{ blob, url }]
+  const [photos, setPhotos] = useState(initialPhotos); // [{ blob, url }]
   const [error, setError] = useState("");
   const [starting, setStarting] = useState(true);
   const [facingMode, setFacingMode] = useState("environment"); // "environment" | "user"
@@ -322,13 +325,6 @@ export default function Camera({ onDone, onCancel }) {
     el.scrollTo({ left: el.scrollWidth, behavior: "smooth" });
   }, [photos.length]);
 
-  // Clear the focus indicator after it's been visible for ~900ms.
-  useEffect(() => {
-    if (!focusPoint) return;
-    const timer = setTimeout(() => setFocusPoint(null), 900);
-    return () => clearTimeout(timer);
-  }, [focusPoint]);
-
   function handleCapture() {
     const video = videoRef.current;
     if (!video || !video.videoWidth) return;
@@ -407,282 +403,273 @@ export default function Camera({ onDone, onCancel }) {
   }
 
   function handleClose() {
-    // Stop stream explicitly — parent may unmount us or navigate away.
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach((t) => t.stop());
-      streamRef.current = null;
-    }
-    if (photos.length > 0) onDone?.(photos);
-    else onCancel?.();
+    // The page confirms before discarding photos and stops the camera by
+    // unmounting us (the stream cleanup above runs then).
+    onClose?.(photos);
   }
 
   function toggleFacing() {
     setFacingMode((f) => (f === "environment" ? "user" : "environment"));
   }
 
-  // Release blob URLs when the component unmounts.
-  useEffect(() => {
-    return () => {
-      photos.forEach((p) => p.url && URL.revokeObjectURL(p.url));
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  // Blob URLs are released by the page (they outlive this component when
+  // going to Review and coming back with ← Back).
+
 
   const videoScaleStyle = hasHardwareZoom
     ? undefined
     : { transform: `scale(${zoom})`, transformOrigin: "center center" };
 
+  // Capture chrome is always dark (it sits over a live viewfinder). Layout,
+  // top to bottom: bar · square viewfinder · exposure / white balance · the
+  // strip of shots · shutter row. The strip is always rendered at its full
+  // height so NOTHING moves when the first photo is taken — a layout jump
+  // made people re-aim between shots and changed the perspective.
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-black text-white">
-      {/* Top bar: close + flash */}
-      <div className="flex items-center justify-between px-4 pt-[max(1rem,env(safe-area-inset-top))]">
-        <button
-          onClick={handleClose}
-          aria-label="Close camera"
-          className="flex h-10 w-10 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur hover:bg-black/60"
-        >
-          <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        </button>
-        <span className="text-sm font-medium opacity-80">
-          {photos.length} photo{photos.length === 1 ? "" : "s"}
-        </span>
-        <button
-          onClick={() => setFlashOn((f) => !f)}
-          disabled={!hasTorch}
-          aria-label="Toggle flash"
-          className={`flex h-10 w-10 items-center justify-center rounded-full backdrop-blur ${
-            hasTorch
-              ? flashOn
-                ? "bg-yellow-400 text-black"
-                : "bg-black/40 text-white hover:bg-black/60"
-              : "bg-black/20 text-white/40"
-          }`}
-        >
-          <svg className="h-5 w-5" viewBox="0 0 24 24" fill={flashOn ? "currentColor" : "none"} stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
-          </svg>
-        </button>
-      </div>
-
-      {/* Viewfinder — the visible region is a centered 1:1 square that
-          matches exactly what handleCapture crops from the source. Any
-          leftover vertical space above/below stays black, same as native
-          camera apps in 1:1 mode. WYSIWYG. */}
-      <div className="relative flex flex-1 items-center justify-center overflow-hidden">
-        {error ? (
-          <div className="max-w-sm px-6 text-center text-sm text-red-300">
-            {error}
+    <div className="cap fixed inset-0 z-50 flex justify-center">
+      <div className="flex h-full w-full max-w-[430px] flex-col">
+        {/* Top bar: close · photo count · torch */}
+        <div className="flex h-14 shrink-0 items-center gap-2.5 px-2.5 pt-[env(safe-area-inset-top)]">
+          <button type="button" onClick={handleClose} aria-label="Close camera" className="icobtn">
+            <XIcon className="size-5" strokeWidth={2.2} />
+          </button>
+          <div className="flex grow justify-center">
+            <span className="mono rounded-[14px] bg-white/10 px-3 py-[5px] text-base font-semibold">
+              {photos.length} photo{photos.length === 1 ? "" : "s"}
+            </span>
           </div>
-        ) : (
-          <div
-            className="relative aspect-square w-full max-h-full overflow-hidden"
-            onClick={handleViewfinderTap}
+          {/* The torch — a plain on/off, starting Off. */}
+          <button
+            type="button"
+            onClick={() => setFlashOn((f) => !f)}
+            disabled={!hasTorch}
+            aria-label="Torch"
+            aria-pressed={flashOn}
+            className={`icobtn ${flashOn ? "icobtn-on" : ""}`}
           >
-            <video
-              ref={videoRef}
-              playsInline
-              muted
-              autoPlay
-              className="absolute inset-0 h-full w-full object-cover"
-              style={videoScaleStyle}
-            />
-            {/* Tap-to-focus indicator — small yellow square, quick fade out */}
-            {focusPoint && (
-              <div
-                className="pointer-events-none absolute h-16 w-16 -translate-x-1/2 -translate-y-1/2 rounded-md border-2 border-yellow-300 shadow-[0_0_0_1px_rgba(0,0,0,0.4)] transition-transform duration-300"
+            <TorchIcon on={flashOn} />
+          </button>
+        </div>
+
+        {/* Viewfinder — a square that matches exactly what handleCapture
+            crops from the source (WYSIWYG). Sized to leave room for the
+            controls on shorter phones. */}
+        <div
+          className="relative mx-auto aspect-square shrink-0 overflow-hidden bg-[#14181e]"
+          style={{ width: "min(100%, calc(100dvh - 360px))" }}
+          onClick={error ? undefined : handleViewfinderTap}
+        >
+          {error ? (
+            <div className="absolute inset-0 flex items-center justify-center px-6 text-center text-md text-[#ff8a7c]">
+              {error}
+            </div>
+          ) : (
+            <>
+              <video
+                ref={videoRef}
+                playsInline
+                muted
+                autoPlay
+                className="absolute inset-0 h-full w-full object-cover"
+                style={videoScaleStyle}
+              />
+              {/* 3×3 framing grid — drawn over the preview, never captured. */}
+              <span aria-hidden="true" className="pointer-events-none absolute inset-y-0 left-1/3 w-px bg-white/20" />
+              <span aria-hidden="true" className="pointer-events-none absolute inset-y-0 left-2/3 w-px bg-white/20" />
+              <span aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-1/3 h-px bg-white/20" />
+              <span aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-2/3 h-px bg-white/20" />
+              {/* Focus reticle: centred until you tap, then at the tap point. */}
+              <span
+                key={focusPoint?.at || "centre"}
+                aria-hidden="true"
+                className="pointer-events-none absolute size-[78px] -translate-x-1/2 -translate-y-1/2 rounded-md border-[1.5px] border-[rgb(255_214_102/.95)]"
                 style={{
-                  left: focusPoint.x,
-                  top: focusPoint.y,
-                  animation: "focusPulse 900ms ease-out forwards",
+                  left: focusPoint ? focusPoint.x : "50%",
+                  top: focusPoint ? focusPoint.y : "50%",
+                  animation: focusPoint ? "focusPulse 600ms ease-out" : undefined,
                 }}
               />
-            )}
-            {starting && (
-              <div className="absolute inset-0 flex items-center justify-center bg-black/50 text-sm">
-                Starting camera…
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-      {/* Keyframes for the tap-to-focus indicator animation */}
-      <style jsx>{`
-        @keyframes focusPulse {
-          0% { transform: translate(-50%, -50%) scale(1.4); opacity: 0; }
-          20% { opacity: 1; }
-          100% { transform: translate(-50%, -50%) scale(1); opacity: 0.8; }
-        }
-      `}</style>
-
-      {/* Manual controls — ISO + Shutter. Each row hides if the device
-          doesn't expose that capability. Touching a slider flips its mode
-          to manual; Auto button resets to continuous exposure. */}
-      {hasIso && (
-        <div className="flex items-center gap-2 px-4 pt-2">
-          <span className="w-14 text-[10px] font-semibold uppercase tracking-wide text-white/70">ISO</span>
-          <button
-            onClick={() => setIsoMode("auto")}
-            className={`rounded-full px-2 py-0.5 text-[10px] font-semibold backdrop-blur ${
-              isoMode === "auto" ? "bg-white text-black" : "bg-black/40 text-white"
-            }`}
-          >
-            Auto
-          </button>
-          <input
-            type="range"
-            min={0}
-            max={Math.max(0, isoStops.length - 1)}
-            step={1}
-            value={isoIndex}
-            onChange={(e) => {
-              setIsoIndex(Number(e.target.value));
-              setIsoMode("manual");
-            }}
-            className="flex-1 accent-white"
-            aria-label="ISO"
-          />
-          <span className="w-12 text-right text-[10px] font-medium tabular-nums">
-            {isoMode === "manual" ? iso : "Auto"}
-          </span>
-        </div>
-      )}
-      {hasShutter && (
-        <div className="flex items-center gap-2 px-4 pt-1">
-          <span className="w-14 text-[10px] font-semibold uppercase tracking-wide text-white/70">Shutter</span>
-          <button
-            onClick={() => setShutterMode("auto")}
-            className={`rounded-full px-2 py-0.5 text-[10px] font-semibold backdrop-blur ${
-              shutterMode === "auto" ? "bg-white text-black" : "bg-black/40 text-white"
-            }`}
-          >
-            Auto
-          </button>
-          <input
-            type="range"
-            min={shutterMin}
-            max={shutterMax}
-            step={shutterStep}
-            value={shutter}
-            onChange={(e) => {
-              setShutter(Number(e.target.value));
-              setShutterMode("manual");
-            }}
-            className="flex-1 accent-white"
-            aria-label="Shutter speed"
-          />
-          <span className="w-12 text-right text-[10px] font-medium tabular-nums">
-            {shutterMode === "manual" ? shutter : "Auto"}
-          </span>
-        </div>
-      )}
-      {hasWb && (
-        <div className="flex items-center gap-2 px-4 pt-1">
-          <span className="w-14 text-[10px] font-semibold uppercase tracking-wide text-white/70">WB</span>
-          <button
-            onClick={() => setWbMode("auto")}
-            className={`flex-shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold backdrop-blur ${
-              wbMode === "auto" ? "bg-white text-black" : "bg-black/40 text-white"
-            }`}
-          >
-            Auto
-          </button>
-          {WB_PRESETS.map((p) => {
-            const active = wbMode === "manual" && wbTemp === p.k;
-            return (
-              <button
-                key={p.k}
-                onClick={() => {
-                  setWbTemp(p.k);
-                  setWbMode("manual");
-                }}
-                className={`flex flex-1 flex-col items-center justify-center rounded-md px-1 py-0.5 text-[10px] font-semibold leading-tight backdrop-blur ${
-                  active ? "bg-white text-black" : "bg-black/40 text-white"
-                }`}
+              <span className="pointer-events-none absolute left-3 top-3 rounded-xl bg-[rgb(6_8_11/.5)] px-[9px] py-1 text-sm font-medium">
+                Tap to focus
+              </span>
+              {starting && (
+                <div className="absolute inset-0 flex items-center justify-center bg-black/50 text-md">
+                  Starting camera…
+                </div>
+              )}
+              {/* Zoom sits on the viewfinder, bottom centre. */}
+              <div
+                className="absolute inset-x-0 bottom-3 flex justify-center gap-[7px]"
+                onClick={(e) => e.stopPropagation()}
               >
-                <span>{p.label}</span>
-                <span className="text-[9px] opacity-75 tabular-nums">{p.k}K</span>
-              </button>
-            );
-          })}
+                {[1, 2, 3].map((z) => (
+                  <button
+                    key={z}
+                    type="button"
+                    onClick={() => setZoom(z)}
+                    aria-pressed={zoom === z}
+                    className={`cpill ${zoom === z ? "cpill-on" : ""}`}
+                  >
+                    {z}x
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
         </div>
-      )}
+        <style jsx>{`
+          @keyframes focusPulse {
+            0% {
+              transform: translate(-50%, -50%) scale(1.4);
+              opacity: 0;
+            }
+            30% {
+              opacity: 1;
+            }
+            100% {
+              transform: translate(-50%, -50%) scale(1);
+              opacity: 1;
+            }
+          }
+        `}</style>
 
-      {/* Zoom chips */}
-      <div className="flex items-center justify-center gap-2 px-4 py-2">
-        {[1, 2, 3].map((z) => (
-          <button
-            key={z}
-            onClick={() => setZoom(z)}
-            className={`rounded-full px-3 py-1 text-xs font-semibold backdrop-blur transition-colors ${
-              zoom === z ? "bg-white text-black" : "bg-black/40 text-white hover:bg-black/60"
-            }`}
-          >
-            {z}x
-          </button>
-        ))}
-      </div>
+        <div className="flex min-h-0 grow flex-col justify-between gap-[11px] px-3 pt-[15px]">
+          {/* ISO and Shutter only on phones that expose manual exposure. */}
+          {hasIso && (
+            <div className={`flex items-center gap-2.5 ${isoMode === "auto" ? "slider-off" : ""}`}>
+              <span className="lbl w-[52px] shrink-0 text-[rgb(242_244_247/.66)]">ISO</span>
+              <input
+                type="range"
+                min={0}
+                max={Math.max(0, isoStops.length - 1)}
+                step={1}
+                value={isoIndex}
+                onChange={(e) => {
+                  setIsoIndex(Number(e.target.value));
+                  setIsoMode("manual");
+                }}
+                className="cam-range"
+                aria-label="ISO"
+              />
+              <span className={`mono w-11 shrink-0 text-right text-base ${isoMode === "manual" ? "" : "text-[rgb(242_244_247/.45)]"}`}>
+                {isoMode === "manual" ? iso : "Auto"}
+              </span>
+              <button
+                type="button"
+                onClick={() => setIsoMode("auto")}
+                aria-pressed={isoMode === "auto"}
+                className={`cpill ${isoMode === "auto" ? "cpill-on" : ""}`}
+              >
+                Auto
+              </button>
+            </div>
+          )}
+          {hasShutter && (
+            <div className={`flex items-center gap-2.5 ${shutterMode === "auto" ? "slider-off" : ""}`}>
+              <span className="lbl w-[52px] shrink-0 text-[rgb(242_244_247/.66)]">Shutter</span>
+              <input
+                type="range"
+                min={shutterMin}
+                max={shutterMax}
+                step={shutterStep}
+                value={shutter}
+                onChange={(e) => {
+                  setShutter(Number(e.target.value));
+                  setShutterMode("manual");
+                }}
+                className="cam-range"
+                aria-label="Shutter speed"
+              />
+              <span className={`mono w-11 shrink-0 text-right text-base ${shutterMode === "manual" ? "" : "text-[rgb(242_244_247/.45)]"}`}>
+                {shutterMode === "manual" ? shutter : "Auto"}
+              </span>
+              <button
+                type="button"
+                onClick={() => setShutterMode("auto")}
+                aria-pressed={shutterMode === "auto"}
+                className={`cpill ${shutterMode === "auto" ? "cpill-on" : ""}`}
+              >
+                Auto
+              </button>
+            </div>
+          )}
+          {hasWb && (
+            <div className="flex items-center gap-1.5">
+              <span className="lbl w-[52px] shrink-0 text-[rgb(242_244_247/.66)]">White</span>
+              <div className="flex min-w-0 flex-1 gap-[5px]">
+                <button
+                  type="button"
+                  onClick={() => setWbMode("auto")}
+                  aria-pressed={wbMode === "auto"}
+                  className={`cpill min-w-0 flex-1 px-1 ${wbMode === "auto" ? "cpill-on" : ""}`}
+                >
+                  Auto
+                </button>
+                {WB_PRESETS.map((p) => {
+                  const active = wbMode === "manual" && wbTemp === p.k;
+                  return (
+                    <button
+                      key={p.k}
+                      type="button"
+                      title={`${p.k}K`}
+                      onClick={() => {
+                        setWbTemp(p.k);
+                        setWbMode("manual");
+                      }}
+                      aria-pressed={active}
+                      className={`cpill min-w-0 flex-1 px-1 ${active ? "cpill-on" : ""}`}
+                    >
+                      {p.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
-      {/* Thumbnail strip — always rendered (even when empty) so the
-          viewfinder above doesn't resize the moment the first photo is
-          taken. That resize was causing users to re-aim the phone between
-          shots and get a perspective shift. */}
-      <div className="px-4 py-2">
-        <div
-          ref={thumbStripRef}
-          className="flex h-16 gap-2 overflow-x-auto"
-        >
-          {photos.map((p, i) => (
-              <div key={i} className="relative h-16 w-16 flex-shrink-0 overflow-hidden rounded-md border border-white/30">
+          {/* Thumbnail strip — fixed 64px, rendered even when empty. Swipes
+              sideways with no scrollbar. */}
+          <div ref={thumbStripRef} className="strip">
+            {photos.map((p, i) => (
+              <span key={p.url} className="cthumb">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={p.url} alt="" className="h-full w-full object-cover" />
                 <button
+                  type="button"
                   onClick={() => handleRemove(i)}
                   aria-label={`Remove photo ${i + 1}`}
-                  className="absolute top-0.5 right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-black/70 text-white"
+                  className="thumbx"
                 >
-                  <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                  </svg>
+                  <XIcon className="size-2.5" strokeWidth={3} />
                 </button>
-              </div>
-          ))}
+              </span>
+            ))}
+          </div>
+
+          {/* Flip · shutter · Done */}
+          <div className="flex items-center gap-3 pb-[max(26px,env(safe-area-inset-bottom))]">
+            <button type="button" onClick={toggleFacing} aria-label="Flip camera" className="icobtn size-[52px] rounded-2xl">
+              <FlipIcon className="size-[22px]" />
+            </button>
+            <div className="flex grow justify-center">
+              <button
+                type="button"
+                onClick={handleCapture}
+                disabled={!!error || starting}
+                aria-label="Take photo"
+                className="size-[72px] cursor-pointer rounded-full border-4 border-white/[0.28] bg-[#f2f4f7] p-0 shadow-[0_0_0_2px_rgba(6,8,11,.4)] transition-transform active:scale-95 disabled:opacity-50"
+              />
+            </div>
+            <button
+              type="button"
+              onClick={handleDone}
+              disabled={photos.length === 0}
+              className={`cpill cpill-lg min-w-[92px] ${photos.length > 0 ? "cpill-on" : "opacity-60"}`}
+            >
+              Done{photos.length > 0 ? ` (${photos.length})` : ""}
+            </button>
+          </div>
         </div>
-      </div>
-
-      {/* Bottom controls: flip camera / shutter / done */}
-      <div className="flex items-center justify-between px-6 pb-[max(1rem,env(safe-area-inset-bottom))] pt-2">
-        <button
-          onClick={toggleFacing}
-          aria-label="Flip camera"
-          className="flex h-12 w-12 items-center justify-center rounded-full bg-black/40 backdrop-blur hover:bg-black/60"
-        >
-          <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M16 3v4h4M8 21v-4H4M4 7a9 9 0 0114-4M20 17a9 9 0 01-14 4" />
-          </svg>
-        </button>
-
-        <button
-          onClick={handleCapture}
-          disabled={!!error || starting}
-          aria-label="Capture photo"
-          className="flex h-20 w-20 items-center justify-center rounded-full border-4 border-white bg-white/10 backdrop-blur transition-transform active:scale-95 disabled:opacity-50"
-        >
-          <span className="h-14 w-14 rounded-full bg-white" />
-        </button>
-
-        <button
-          onClick={handleDone}
-          disabled={photos.length === 0}
-          className={`rounded-full px-4 py-2 text-sm font-semibold backdrop-blur transition-colors ${
-            photos.length === 0
-              ? "bg-black/30 text-white/40"
-              : "bg-white text-black hover:bg-zinc-100"
-          }`}
-        >
-          Done{photos.length > 0 ? ` (${photos.length})` : ""}
-        </button>
       </div>
     </div>
   );
