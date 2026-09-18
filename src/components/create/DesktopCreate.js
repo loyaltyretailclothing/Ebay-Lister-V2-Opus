@@ -6,6 +6,7 @@ import { listButtonLabel, missingRequired } from "@/lib/listingDefaults";
 import { AnalyzeIcon, CheckIcon, PlusIcon, Spinner, TrashIcon } from "@/components/ui/Icons";
 import LibraryPanel from "@/components/create/LibraryPanel";
 import PhotoZone from "@/components/create/PhotoZone";
+import Notes from "@/components/create/Notes";
 import { DesktopLane } from "@/components/create/status";
 import { LeaveDialog, DeleteDraftDialog } from "@/components/create/dialogs";
 import {
@@ -194,20 +195,7 @@ function PhotosColumn({ editor: e }) {
         {picking && <p className="m-0 mt-[7px] text-sm font-medium text-warn">Pick a photo to search on Google.</p>}
       </div>
 
-      <NoteBox
-        id="ai-note"
-        label="AI Note"
-        value={e.listing.aiNote}
-        placeholder="e.g. tag says 32 but it measures 30 — use the measured size"
-        onChange={(v) => e.updateListing((prev) => ({ ...prev, aiNote: v }))}
-      />
-      <NoteBox
-        id="draft-note"
-        label="Draft Note"
-        value={e.listing.draftNote}
-        placeholder="Notes for yourself — not sent to eBay"
-        onChange={(v) => e.updateListing((prev) => ({ ...prev, draftNote: v }))}
-      />
+      <Notes editor={e} />
 
       {e.draftId ? (
         <div className="flex flex-wrap items-center gap-2">
@@ -241,30 +229,6 @@ function PhotosColumn({ editor: e }) {
         </p>
       )}
     </section>
-  );
-}
-
-// AI Note and Draft Note turn red when they have text.
-function NoteBox({ id, label, value, placeholder, onChange }) {
-  const filled = !!value?.trim();
-  return (
-    <div>
-      <div className="mb-1.5 flex items-center gap-1.5">
-        <h2 className={`lbl ${filled ? "text-bad" : ""}`}>{label}</h2>
-        {filled && <span className="size-1.5 rounded-full bg-bad" />}
-      </div>
-      <label className="sr-only" htmlFor={id}>
-        {label}
-      </label>
-      <textarea
-        id={id}
-        rows={3}
-        value={value || ""}
-        placeholder={placeholder}
-        onChange={(ev) => onChange(ev.target.value)}
-        className={`textarea ${filled ? "input-filled" : ""}`}
-      />
-    </div>
   );
 }
 

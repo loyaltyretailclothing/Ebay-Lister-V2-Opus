@@ -6,6 +6,7 @@ import useListingForm from "@/hooks/useListingForm";
 import { listButtonLabel, missingRequired } from "@/lib/listingDefaults";
 import { MoreIcon, PlusIcon, SearchIcon, Spinner, TrashIcon } from "@/components/ui/Icons";
 import PhotoZone from "@/components/create/PhotoZone";
+import Notes from "@/components/create/Notes";
 import { PhonePin, PhoneTopLane } from "@/components/create/status";
 import { DeleteDraftDialog, LeaveDialog } from "@/components/create/dialogs";
 import {
@@ -189,8 +190,6 @@ function PhotosTab({ editor: e }) {
   }, [picking, e]);
 
   const hasTitle = !!e.listing.title?.trim();
-  const aiFilled = !!e.listing.aiNote?.trim();
-  const draftFilled = !!e.listing.draftNote?.trim();
 
   return (
     <>
@@ -228,35 +227,7 @@ function PhotosTab({ editor: e }) {
         {picking && <p className="hint mt-[7px] font-medium text-warn">Pick a photo above to search on Google.</p>}
       </div>
 
-      <div>
-        <div className="mb-1.5 flex items-center gap-[7px]">
-          <h2 className={`lbl ${aiFilled ? "text-bad" : ""}`}>AI Note</h2>
-          {aiFilled && <span className="size-1.5 rounded-full bg-bad" />}
-        </div>
-        <textarea
-          aria-label="AI note"
-          rows={3}
-          value={e.listing.aiNote || ""}
-          onChange={(ev) => e.updateListing((prev) => ({ ...prev, aiNote: ev.target.value }))}
-          placeholder="e.g. tag says 32 but it measures 30 — use the measured size"
-          className={`textarea rounded-panel p-3 text-lg leading-5 ${aiFilled ? "input-filled" : ""}`}
-        />
-      </div>
-
-      <div>
-        <div className="mb-1.5 flex items-center gap-[7px]">
-          <h2 className={`lbl ${draftFilled ? "text-bad" : ""}`}>Draft Note</h2>
-          {draftFilled && <span className="size-1.5 rounded-full bg-bad" />}
-        </div>
-        <textarea
-          aria-label="Draft note"
-          rows={2}
-          value={e.listing.draftNote || ""}
-          onChange={(ev) => e.updateListing((prev) => ({ ...prev, draftNote: ev.target.value }))}
-          placeholder="Notes for yourself — not sent to eBay"
-          className={`textarea rounded-panel p-3 text-lg leading-5 ${draftFilled ? "input-filled" : ""}`}
-        />
-      </div>
+      <Notes editor={e} touch />
 
       {e.draftId ? (
         <div>

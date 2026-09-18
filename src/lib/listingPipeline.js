@@ -77,7 +77,8 @@ You must return a JSON object with these fields:
     "features": "Notable features (e.g. pockets, logo, embroidery)",
     "style_number": "Style number, model number, or product code from tag — NOT RN numbers, NOT UPC/barcodes, NOT care codes. null if not found.",
     "...any other details you observe": "Include ALL details you can identify from the photos"
-  }
+  },
+  "notes_for_seller": ["Short 'check this' note for the seller — see NOTES FOR SELLER. Empty array when you are confident."]
 }
 
 Rules:
@@ -91,6 +92,7 @@ Rules:
 - STYLE NUMBER: If you see a style number, model number, or product code on any tag, capture it in the style_number field. Do NOT capture RN numbers, UPC/barcodes, or care instruction codes — those are not style numbers.
 - NECKLINE: Infer neckline from item type, not just visuals. Hoodies = Crew Neck. Quarter zips = Mock Neck. Polo shirts = Collared. V-neck sweaters = V-Neck. Always fill this field — never leave it null.
 - BUTTON-DOWN SHIRTS — CATEGORY RULE (does NOT affect title): The ONLY way to choose the category for button-down shirts is the SIZE TAG format. Letter sizes (S, M, L, XL, 2XL, 3XL, etc.) = category_keywords must be "mens casual button down shirt". Numeric neck sizes (14.5, 15, 15.5, 16, 16.5, 17, etc.) = category_keywords must be "mens dress shirt". Do NOT use the shirt's appearance, fabric, or style to decide the category — ONLY the size format on the tag matters. The title should describe the shirt naturally (brand, features, size, color, etc.) — do NOT force "Casual Button-Down" or "Dress Shirt" into the title.
+- NOTES FOR SELLER: notes_for_seller is a short "check this" list for the seller, read before listing. Add a note ONLY when you are genuinely unsure about something that could cause a return or a wrong listing — at most 3 notes, each one short sentence (under 20 words), starting with what to check. Good reasons: the size tag is not visible or unreadable and the size is a guess; the tag size and the measurements disagree; a possible flaw you are not sure about (say which photo as "AI photo N", counting the photos you were given in order — these are the AI Analysis Photos, not the listing photos); the brand or style is a best guess; no measurements are visible. Do NOT add notes for things you are confident about, do NOT restate the listing, and do NOT give general advice. When you are confident about everything, return an empty array.
 - Return ONLY valid JSON, no markdown or explanation`;
 
 function parseListingJson(text) {
@@ -157,6 +159,13 @@ export async function analyzeListing(photos, notes) {
     if (!Array.isArray(parsed.keywords)) parsed.keywords = [];
     // Without pieces the AI's own title is kept and there are no chips.
     if (!hasTitleParts(parsed)) parsed.keywords = [];
+    // The AI's "check this" notes for the seller (the read-only AI Note
+    // box). Always set, so a re-analysis replaces the previous notes.
+    parsed.aiMessages = (Array.isArray(parsed.notes_for_seller) ? parsed.notes_for_seller : [])
+      .map((n) => String(n || "").trim())
+      .filter(Boolean)
+      .slice(0, 3);
+    delete parsed.notes_for_seller;
   }
   return assembleListingTitle(parsed);
 }

@@ -31,6 +31,8 @@ export const INITIAL_LISTING = {
   // they persist through draft save/load and survive re-analysis.
   aiNote: "",
   draftNote: "",
+  // The AI's "check this" notes for the seller (read-only AI Note box).
+  aiMessages: [],
   // SEO title pieces + ranked keywords from analysis. The app assembles the
   // title from these; keyword chips move keywords between title and Theme.
   // Empty for listings made before this feature (chips just don't show).

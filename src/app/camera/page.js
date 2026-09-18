@@ -270,19 +270,19 @@ export default function CameraPage() {
           <div className="flex gap-2">
             <button
               type="button"
-              onClick={() => openNoteModal("ai")}
-              className={`btn btn-touch min-w-0 flex-1 ${aiNote.trim() ? "btn-done" : ""}`}
-            >
-              {aiNote.trim() && <CheckIcon className="size-[15px]" strokeWidth={2.6} />}
-              AI Note
-            </button>
-            <button
-              type="button"
               onClick={() => openNoteModal("draft")}
               className={`btn btn-touch min-w-0 flex-1 ${draftNote.trim() ? "btn-done" : ""}`}
             >
               {draftNote.trim() && <CheckIcon className="size-[15px]" strokeWidth={2.6} />}
               Draft Note
+            </button>
+            <button
+              type="button"
+              onClick={() => openNoteModal("ai")}
+              className={`btn btn-touch min-w-0 flex-1 ${aiNote.trim() ? "btn-done" : ""}`}
+            >
+              {aiNote.trim() && <CheckIcon className="size-[15px]" strokeWidth={2.6} />}
+              AI Read
             </button>
           </div>
           {submitting ? (
@@ -319,7 +319,7 @@ export default function CameraPage() {
         >
           <div className="dialog" role="dialog" aria-modal="true">
             <div className="mb-2.5 flex items-center gap-2">
-              <p className="m-0 text-2xl font-semibold">{noteModal === "ai" ? "AI Note" : "Draft Note"}</p>
+              <p className="m-0 text-2xl font-semibold">{noteModal === "ai" ? "AI Read" : "Draft Note"}</p>
               <div className="grow" />
               <button type="button" className="roundbtn roundbtn-no size-[52px]" aria-label="Cancel" onClick={cancelNoteModal}>
                 <XIcon className="size-5" />
@@ -329,7 +329,7 @@ export default function CameraPage() {
               </button>
             </div>
             <label className="lbl mb-1.5 block" htmlFor="note-box">
-              {noteModal === "ai" ? "Sent with the photos" : "Kept on the draft"}
+              {noteModal === "ai" ? "For the AI to read" : "Kept on the draft"}
             </label>
             <textarea
               id="note-box"
