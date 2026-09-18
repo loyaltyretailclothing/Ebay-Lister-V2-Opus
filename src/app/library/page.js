@@ -44,8 +44,8 @@ export default function LibraryPage() {
   // A tap selects straight away. A second tap on the SAME photo within
   // 300ms is a double-tap: it undoes that selection and opens the photo.
   // Quick taps on different photos just select them.
-  function onTileTap(photo, index) {
-    const now = Date.now();
+  function onTileTap(e, photo, index) {
+    const now = e.timeStamp;
     const last = lastTap.current;
     if (last && last.id === photo.public_id && now - last.at < 300) {
       lastTap.current = null;
@@ -217,7 +217,7 @@ export default function LibraryPage() {
                   type="button"
                   className={`tile ${on ? "tile-on" : ""}`}
                   aria-pressed={on}
-                  onClick={() => onTileTap(photo, i)}
+                  onClick={(e) => onTileTap(e, photo, i)}
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
