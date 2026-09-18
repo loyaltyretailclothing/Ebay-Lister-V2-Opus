@@ -42,7 +42,7 @@ export default function AppFrame({ children }) {
 }
 
 function DesktopRail({ pathname }) {
-  const onCreate = pathname.startsWith("/generate");
+  const onCreate = pathname === "/" || pathname.startsWith("/generate");
   const onSettings = pathname.startsWith("/settings") || pathname.startsWith("/oauth");
   return (
     <nav
@@ -120,7 +120,7 @@ function PhoneNav({ pathname }) {
       >
         <div className="mx-auto flex h-16 max-w-[640px] items-start px-1">
           {tab("/library", "Library", LibraryIcon, pathname.startsWith("/library"))}
-          {tab("/generate", "Create", CreateIcon, pathname.startsWith("/generate"))}
+          {tab("/generate", "Create", CreateIcon, pathname === "/" || pathname.startsWith("/generate"))}
           <div className="flex flex-1 justify-center">
             <Link href="/camera" aria-label="Open camera" className="fab">
               <CameraIcon className="size-[26px]" />
