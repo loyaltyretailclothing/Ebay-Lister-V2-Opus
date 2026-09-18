@@ -485,12 +485,11 @@ body {
 .lib-closed .lib-body  { display: none; }
 .lib-closed .lib-spine { display: flex; }
 .photos       { width: 356px; }
-.lib.lib-closed ~ .photos { width: 616px; overflow: hidden; }
-.lib.lib-closed ~ .photos > *    { flex-shrink: 0; }
-.lib.lib-closed ~ .photos .pzone { flex: 1 1 0; min-height: 0; display: flex; flex-direction: column; }
-.lib.lib-closed ~ .photos .pgrid { flex: 1 1 0; min-height: 0; grid-auto-rows: 1fr; }
-.lib.lib-closed ~ .photos .ptile,
-.lib.lib-closed ~ .photos .pdrop { aspect-ratio: auto; height: 100%; min-height: 0; }
+/* Collapsing the panel gives its width to the photos column, so the photos
+   get bigger. They always stay SQUARE (the export stretched them to fill the
+   column's height, which squashed them into odd rectangles); the column
+   scrolls instead when there are many. */
+.lib.lib-closed ~ .photos { width: 616px; }
 .spec-grid    { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .form-pane-a  { flex: 1 1 0; min-width: 380px; }
 .form-pane-b  { flex: 0 1 560px; min-width: 380px; }
@@ -509,11 +508,7 @@ body {
   .lib-auto .lib-body    { display: none; }
   .lib-auto .lib-spine   { display: flex; }
   .photos                { width: 300px; }
-  .lib.lib-closed ~ .photos { width: 300px; overflow-y: auto; }
-  .lib.lib-closed ~ .photos .pzone { flex: 0 0 auto; display: block; }
-  .lib.lib-closed ~ .photos .pgrid { flex: none; grid-auto-rows: auto; }
-  .lib.lib-closed ~ .photos .ptile,
-  .lib.lib-closed ~ .photos .pdrop { aspect-ratio: 1 / 1; height: auto; }
+  .lib.lib-closed ~ .photos { width: 300px; }
   .form-pane-b           { flex: 0 1 500px; }
   .spec-grid             { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
