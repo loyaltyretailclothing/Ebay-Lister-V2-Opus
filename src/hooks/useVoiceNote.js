@@ -3,8 +3,8 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 
 // Voice notes: the browser's own speech-to-text (Chrome's, the same one the
-// Google keyboard mic uses). Free, no AI. The mic stops by itself after a
-// short pause, or when tapped again; what was said is ADDED to the note.
+// Google keyboard mic uses). Free, no AI. The mic stops by itself after 1
+// second of silence, or when tapped again; what was said is ADDED to the note.
 // Where the browser has no speech-to-text, `supported` is false and the mic
 // buttons don't show.
 
@@ -14,6 +14,11 @@ function Recognition() {
 }
 
 const subscribe = () => () => {};
+
+// Stop listening after this long with no new words.
+const SILENCE_MS = 1000;
+// If nothing is said at all, give up after this long.
+const NOTHING_SAID_MS = 8000;
 
 const ERRORS = {
   "no-speech": "Didn't hear anything — tap the mic and try again.",
@@ -47,22 +52,42 @@ export default function useVoiceNote() {
     if (!Rec) return;
     recRef.current?.abort();
 
+    // Chrome's own pause detection can't be tuned, so the mic stays open
+    // (continuous) and the app stops it after SILENCE_MS with no new words.
     const rec = new Rec();
     rec.lang = "en-US";
     rec.interimResults = true;
-    rec.continuous = false;
+    rec.continuous = true;
     rec.maxAlternatives = 1;
 
     let finalText = "";
+    let live = "";
     let failed = false;
+    let silence = null;
+    const armSilence = () => {
+      clearTimeout(silence);
+      silence = setTimeout(() => rec.stop(), SILENCE_MS);
+    };
+
     rec.onresult = (ev) => {
-      let live = "";
-      for (let i = ev.resultIndex; i < ev.results.length; i++) {
-        const r = ev.results[i];
-        if (r.isFinal) finalText += r[0].transcript;
-        else live += r[0].transcript;
+      // Rebuilt from every result each time. Android Chrome can repeat the
+      // whole sentence so far as a new result — keep the longer one instead
+      // of saying it twice.
+      let finals = "";
+      live = "";
+      for (let i = 0; i < ev.results.length; i++) {
+        const t = ev.results[i][0].transcript.trim();
+        if (!t) continue;
+        if (ev.results[i].isFinal) {
+          if (finals && t.toLowerCase().startsWith(finals.toLowerCase())) finals = t;
+          else finals = finals ? `${finals} ${t}` : t;
+        } else {
+          live = live ? `${live} ${t}` : t;
+        }
       }
+      finalText = finals;
       setHeard(`${finalText} ${live}`.trim());
+      armSilence();
     };
     rec.onerror = (ev) => {
       if (ev.error === "aborted") return;
@@ -70,8 +95,10 @@ export default function useVoiceNote() {
       setError({ key, message: ERRORS[ev.error] || "Voice didn't work — try again." });
     };
     rec.onend = () => {
+      clearTimeout(silence);
       if (recRef.current === rec) recRef.current = null;
-      const text = finalText.trim();
+      // Words still being worked out when it stopped count too.
+      const text = `${finalText} ${live}`.trim();
       if (text) onText(text);
       else if (!failed) setError({ key, message: ERRORS["no-speech"] });
       setActive((a) => (a === key ? null : a));
@@ -84,6 +111,8 @@ export default function useVoiceNote() {
     setActive(key);
     try {
       rec.start();
+      // Continuous mode never times out by itself when nobody talks.
+      silence = setTimeout(() => rec.stop(), NOTHING_SAID_MS);
     } catch {
       recRef.current = null;
       setActive(null);
