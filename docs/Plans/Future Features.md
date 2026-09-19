@@ -29,3 +29,15 @@ Ideas we want to come back to. Nothing here is built or agreed in detail yet. Se
 - A list of items live 90+ days with no watchers and no views, so you can decide what to relist, bundle, or pull.
 - Pairs with #1: markdowns and offers handle slow sellers; this catches items getting no attention at all.
 - **Check with eBay's live API before building:** where views and watcher counts come from (likely the traffic report and the listings data), and how far back the data goes.
+
+## 6. "Next item" in the camera
+- After shooting one item, tap **Next item** instead of Done → review → Create Draft: that item's photos become a draft in the background and the camera is ready for the next item.
+- Shoot a whole cart without leaving the camera; set notes and AI picks later from Drafts.
+- **Open questions:** which photos the AI reads when there's no review step (first few? all?), and where voice notes fit in.
+- **Why:** fewer taps per item across a sourcing trip.
+
+## 7. Prompt caching on the item specifics step (AI cost)
+- The item specifics step (Pass 2) is the expensive one (~$0.036 of ~$0.055 per analysis on Sonnet 5). ~90% of what it sends is eBay's specifics list for the category — identical for every item in that category.
+- Move that list to the front of the request (instructions unchanged, only the order) and mark it reusable. Same category within 5 minutes → that step ~80% cheaper (~$0.006); otherwise ~20% more (~$0.043) for the first one.
+- Estimated savings ~$0–7/month depending on how often back-to-back items share a category (break-even ~25%). No quality change.
+- Plan: build it, add cache numbers to the `[COST]` log lines, check real reuse after a week, keep or turn off. Do it after a few days of clean Sonnet 5 cost data. Photos can't benefit (different every item). See [[Costs]].
