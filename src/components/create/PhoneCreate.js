@@ -179,22 +179,27 @@ function PhotosTab({ editor: e }) {
   const googleRef = useRef(null);
   const picking = e.researchMode === "google";
 
+  // Google pick mode: jump up to the listing photos (the button sits below
+  // them), and cancel only on a real TAP elsewhere — a "click", which a
+  // scroll swipe never produces. (Touching down to scroll used to cancel it.)
   useEffect(() => {
     if (!picking) return;
-    function onDown(ev) {
+    zoneRef.current?.scrollIntoView({ block: "start", behavior: "smooth" });
+    function onTap(ev) {
       if (zoneRef.current?.contains(ev.target)) return;
       if (googleRef.current?.contains(ev.target)) return;
       e.cancelGoogleMode();
     }
-    document.addEventListener("pointerdown", onDown);
-    return () => document.removeEventListener("pointerdown", onDown);
+    document.addEventListener("click", onTap);
+    return () => document.removeEventListener("click", onTap);
   }, [picking, e]);
 
   const hasTitle = !!e.listing.title?.trim();
 
   return (
     <>
-      <div ref={zoneRef}>
+      <div ref={zoneRef} className="scroll-mt-3">
+        {picking && <p className="hint mb-[7px] font-medium text-warn">Tap a photo to search on Google.</p>}
         <PhotoZone
           title="eBay Listing Photos"
           photos={e.listingPhotos}
@@ -225,7 +230,6 @@ function PhotosTab({ editor: e }) {
             eBay
           </button>
         </div>
-        {picking && <p className="hint mt-[7px] font-medium text-warn">Pick a photo above to search on Google.</p>}
       </div>
 
       <Notes editor={e} touch />
