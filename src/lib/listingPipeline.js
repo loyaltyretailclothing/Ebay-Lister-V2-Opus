@@ -17,9 +17,25 @@ import { assembleListingTitle, hasTitleParts } from "@/lib/titleKeywords";
 // (visible in the Vercel dashboard). Count "[COST] pass1-vision" lines to
 // see how many listings were analyzed; sum the est=$ amounts (or read the
 // auto-summed total in the Anthropic Console) for total spend.
-// Claude Sonnet 4.6 pricing: $3 / million input, $15 / million output.
-const SONNET_INPUT_PER_M = 3;
-const SONNET_OUTPUT_PER_M = 15;
+// Claude Sonnet 5 pricing: $2 / million input, $10 / million output.
+const SONNET_INPUT_PER_M = 2;
+const SONNET_OUTPUT_PER_M = 10;
+
+// The model for every AI pass. Switched from claude-sonnet-4-6 on
+// 2026-09-18 — to go back, set this to "claude-sonnet-4-6" and the prices
+// above to 3 / 15. Sonnet 5 "thinks" by default (billed as output); it's
+// turned off to work like 4.6 did. Its token counting runs ~30% higher for
+// the same text, so max_tokens has headroom.
+const MODEL = "claude-sonnet-5";
+const NO_THINKING = { type: "disabled" };
+
+// The reply text (skips any non-text blocks).
+function replyText(response) {
+  return response.content
+    .filter((b) => b.type === "text")
+    .map((b) => b.text)
+    .join("\n");
+}
 function logUsage(pass, usage) {
   if (!usage) return;
   const inTok = usage.input_tokens || 0;
@@ -130,15 +146,15 @@ export async function analyzeListing(photos, notes) {
   });
 
   const response = await client.messages.create({
-    model: "claude-sonnet-4-6",
-    max_tokens: 4000,
+    model: MODEL,
+    thinking: NO_THINKING,
+    max_tokens: 6000,
     system: VISION_SYSTEM_PROMPT,
     messages: [{ role: "user", content }],
   });
   logUsage("pass1-vision", response.usage);
 
-  const textBlocks = response.content.filter((b) => b.type === "text");
-  const responseText = textBlocks.map((b) => b.text).join("\n");
+  const responseText = replyText(response);
   const parsed = parseListingJson(responseText);
 
   // Title pieces + SEO keywords → the app assembles the final title. The NWT
@@ -317,14 +333,15 @@ ${JSON.stringify(specificsForPrompt)}
 Return the filled specifics as JSON.`;
 
   const response = await client.messages.create({
-    model: "claude-sonnet-4-6",
-    max_tokens: 4000,
+    model: MODEL,
+    thinking: NO_THINKING,
+    max_tokens: 6000,
     system: SPECIFICS_SYSTEM_PROMPT,
     messages: [{ role: "user", content: userPrompt }],
   });
   logUsage("pass2-specifics", response.usage);
 
-  const responseText = response.content[0].text;
+  const responseText = replyText(response);
   let result;
   try {
     result = JSON.parse(responseText);
@@ -447,14 +464,15 @@ Step 2: If found, write a backup title from scratch using TITLE_RULES above. Use
 If no style name found, return {"updated": false}.`;
 
   const response = await client.messages.create({
-    model: "claude-sonnet-4-6",
-    max_tokens: 500,
+    model: MODEL,
+    thinking: NO_THINKING,
+    max_tokens: 1000,
     system: REFINE_SYSTEM_PROMPT,
     messages: [{ role: "user", content: userPrompt }],
   });
   logUsage("pass3-refine", response.usage);
 
-  const responseText = response.content[0].text;
+  const responseText = replyText(response);
   let result;
   try {
     result = JSON.parse(responseText);

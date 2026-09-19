@@ -2,7 +2,13 @@
 
 See [[AI Pipeline]], [[Overview]].
 
-## Measured per analysis (Sonnet: $3 per million input tokens, $15 per million output)
+## Model: Claude Sonnet 5 (since 2026-09-18)
+Switched from Sonnet 4.6 without a side-by-side test (users' call; switch back if quality drops — one line, `MODEL` in `src/lib/listingPipeline.js`, plus the two price constants).
+- Price $2 / $10 per million tokens (4.6 was $3 / $15), but Sonnet 5 counts the same text as ~30% more tokens → expected ~13% cheaper per analysis, about $0.05–0.06.
+- "Thinking" is turned off (Sonnet 5 thinks by default and bills it as output); works like 4.6 did.
+- The `[COST]` log lines use Sonnet 5 prices. Re-measure the table below from the logs after a few days.
+
+## Measured per analysis on Sonnet 4.6 ($3 per million input tokens, $15 per million output)
 | Pass | Typical tokens (in / out) | Cost |
 |---|---|---|
 | Pass 1 vision | ~4,700 / 420 | ~$0.020 |

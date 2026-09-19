@@ -2,7 +2,7 @@
 
 How photos become a listing. Code: `src/lib/listingPipeline.js`. See [[Overview]], [[Costs]].
 
-## The three Claude passes (all Sonnet)
+## The three Claude passes (all Claude Sonnet 5, thinking off — since 2026-09-18; was Sonnet 4.6. See [[Costs]])
 1. **Pass 1 (vision):** `analyzeListing(photos, notes)`. Reads the AI photos and returns `title_parts`, SEO-ranked `keywords` (Tier 1/2/3), a backup title, condition, observations (brand, style_name, type, gender, sizes, color…), and category keywords. The app then assembles the title. The **AI Note** is added here if present.
 2. **Pass 3 (refine):** `refineStyleName`. Runs only when a style number is found and Brave is configured. Searches Brave, then asks Claude for the style name; the app rebuilds the title from the same pieces and keywords with the new style name. Runs **before** Pass 2 so specifics see the final title.
 3. **Pass 2 (specifics):** `fillItemSpecifics`. Gets the category's eBay item specifics (with allowed values) and fills them from observations. This is the most expensive pass (large value lists). When the listing has keywords, Pass 2 leaves Theme empty and the app fills Theme with overflow keywords.
