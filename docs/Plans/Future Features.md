@@ -25,10 +25,9 @@ Ideas we want to come back to. Nothing here is built or agreed in detail yet. Se
 - The app fills them in when the category is chosen, and you adjust when needed.
 - **Why:** it's typed on every single listing. Small per item, but hundreds of times a month.
 
-## 5. Old listing report (items that aren't moving)
-- A list of items live 90+ days with no watchers and no views, so you can decide what to relist, bundle, or pull.
-- Pairs with #1: markdowns and offers handle slow sellers; this catches items getting no attention at all.
-- **Check with eBay's live API before building:** where views and watcher counts come from (likely the traffic report and the listings data), and how far back the data goes.
+## 5. Old listing report — BUILT, PARKED
+- Built and tested 2026-09-18, saved on git branch `old-listings` (not live). Everything about it — what it shows, where the data comes from, how to bring it back — is in [[Old Listings (Parked)]].
+- Later on top of it: actions (offer to watchers, lower price, end, relist) and "normal days to sell" from sold orders.
 
 ## 6. "Next item" in the camera
 - After shooting one item, tap **Next item** instead of Done → review → Create Draft: that item's photos become a draft in the background and the camera is ready for the next item.
