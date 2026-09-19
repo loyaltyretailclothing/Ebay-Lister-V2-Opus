@@ -4,6 +4,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Camera from "@/components/Camera";
 import { CheckIcon, ChevronLeftIcon, XIcon } from "@/components/ui/Icons";
+import MicButton, { VoiceStatus } from "@/components/ui/MicButton";
+import useVoiceNote, { appendSpoken } from "@/hooks/useVoiceNote";
 
 // /camera — phone only, full screen, no nav bar.
 //
@@ -37,8 +39,11 @@ export default function CameraPage() {
   const [draftNote, setDraftNote] = useState("");
   const [noteModal, setNoteModal] = useState(null); // "ai" | "draft" | null
   const [noteDraft, setNoteDraft] = useState("");
+  // Mic next to each note button: speaking adds to that note directly.
+  const voice = useVoiceNote();
 
   function openNoteModal(which) {
+    voice.stop();
     setNoteDraft(which === "ai" ? aiNote : draftNote);
     setNoteModal(which);
   }
@@ -267,6 +272,8 @@ export default function CameraPage() {
         </div>
 
         <div className="flex shrink-0 flex-col gap-[9px] border-t border-line bg-panel px-3 pb-[max(26px,env(safe-area-inset-bottom))] pt-[11px]">
+          <VoiceStatus voice={voice} noteKey="draft" />
+          <VoiceStatus voice={voice} noteKey="ai" />
           <div className="flex gap-2">
             <button
               type="button"
@@ -276,6 +283,14 @@ export default function CameraPage() {
               {draftNote.trim() && <CheckIcon className="size-[15px]" strokeWidth={2.6} />}
               Draft Note
             </button>
+            {voice.supported && (
+              <MicButton
+                label="Draft Note"
+                listening={voice.active === "draft"}
+                className="size-touch"
+                onClick={() => voice.toggle("draft", (t) => setDraftNote((prev) => appendSpoken(prev, t)))}
+              />
+            )}
             <button
               type="button"
               onClick={() => openNoteModal("ai")}
@@ -284,6 +299,14 @@ export default function CameraPage() {
               {aiNote.trim() && <CheckIcon className="size-[15px]" strokeWidth={2.6} />}
               AI Read
             </button>
+            {voice.supported && (
+              <MicButton
+                label="AI Read"
+                listening={voice.active === "ai"}
+                className="size-touch"
+                onClick={() => voice.toggle("ai", (t) => setAiNote((prev) => appendSpoken(prev, t)))}
+              />
+            )}
           </div>
           {submitting ? (
             <div className="flex flex-col gap-[7px]">

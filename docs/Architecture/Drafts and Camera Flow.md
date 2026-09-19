@@ -9,7 +9,7 @@ Statuses: `processing` → `ready`, or `error` (photos and notes are kept so not
 
 ## Camera flow (`/camera`)
 1. Capture photos, then Review. Tap photos to mark them for AI (the first 3 are selected by default).
-2. Optional **AI Note** / **Draft Note** (blue buttons that open a popup editor; a check mark shows when filled).
+2. Optional **Draft Note** / **AI Read** (buttons that open a popup editor; a check mark shows when filled). Each has a 🎤 **voice** button beside it (added 2026-09-18): tap, talk, and the words are added to the end of that note. Uses Chrome's built-in speech-to-text (free, no AI, needs internet; mic permission asked once); stops after a pause or a second tap. The same mics are on the Draft Note / AI Read boxes in Create Listing (phone and desktop). Hidden where the browser has no speech-to-text.
 3. **Create Draft:** photos upload to Cloudinary **one at a time** (Vercel's ~4.5 MB request cap).
 4. The client sends `POST /api/drafts/process` **fire-and-forget**, then navigates to `/drafts`.
 5. The server writes a `processing` draft, runs the pipeline (~30–50s), then saves as `ready`. The title is assembled from SEO keywords and overflow keywords go to Theme (or are dropped if the category has no Theme). See [[Title Keywords Plan]].

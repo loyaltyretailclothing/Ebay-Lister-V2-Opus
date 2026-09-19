@@ -87,6 +87,12 @@ export const XIcon = (p) => (
     <path d="M6 6l12 12M18 6 6 18" />
   </Svg>
 );
+export const MicIcon = (p) => (
+  <Svg strokeWidth={1.9} {...p}>
+    <rect x="9" y="3.5" width="6" height="11" rx="3" />
+    <path d="M5.8 11.5a6.2 6.2 0 0 0 12.4 0M12 17.7v2.8" />
+  </Svg>
+);
 export const PlusIcon = (p) => (
   <Svg strokeWidth={2} {...p}>
     <path d="M12 6v12M6 12h12" />

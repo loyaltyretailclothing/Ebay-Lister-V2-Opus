@@ -1,7 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { PlusIcon } from "@/components/ui/Icons";
+import MicButton, { VoiceStatus } from "@/components/ui/MicButton";
+import useVoiceNote, { appendSpoken } from "@/hooks/useVoiceNote";
 
 // The three note boxes on Create Listing, in order:
 //   1. Draft Note — the user's note to themselves (never sent to the AI or eBay)
@@ -11,8 +13,25 @@ import { PlusIcon } from "@/components/ui/Icons";
 //                   "AI Note")
 // An empty Draft Note / AI Read shrinks to one line with a ＋; a box with
 // text is always open. The AI Note is hidden when the AI left nothing.
+//
+// Both boxes have a mic: what you say is added to the end of the note.
 export default function Notes({ editor: e, touch = false }) {
   const messages = Array.isArray(e.listing.aiMessages) ? e.listing.aiMessages : [];
+  const voice = useVoiceNote();
+
+  // Stop listening when a different listing is put in the form.
+  const { stop } = voice;
+  useEffect(() => stop, [e.session, stop]);
+
+  // Spoken words go to the listing that was open when the mic was tapped
+  // (formSetters drops them if you've since switched drafts).
+  function speak(field) {
+    const { onUser } = e.formSetters(e.session);
+    voice.toggle(field, (text) =>
+      onUser((prev) => ({ ...prev, [field]: appendSpoken(prev[field], text) }))
+    );
+  }
+
   return (
     <>
       <NoteField
@@ -22,6 +41,9 @@ export default function Notes({ editor: e, touch = false }) {
         placeholder="Notes for yourself — not sent to eBay or the AI"
         onChange={(v) => e.updateListing((prev) => ({ ...prev, draftNote: v }))}
         touch={touch}
+        voice={voice}
+        voiceKey="draftNote"
+        onMic={() => speak("draftNote")}
       />
       {messages.length > 0 && (
         <div className="rounded-panel border border-warn-line bg-warn-weak px-3 py-2.5 text-warn">
@@ -50,49 +72,74 @@ export default function Notes({ editor: e, touch = false }) {
         placeholder="For the AI to read when analyzing — e.g. tag says 32 but it measures 30, use the measured size"
         onChange={(v) => e.updateListing((prev) => ({ ...prev, aiNote: v }))}
         touch={touch}
+        voice={voice}
+        voiceKey="aiNote"
+        onMic={() => speak("aiNote")}
       />
     </>
   );
 }
 
-function NoteField({ id, label, value, placeholder, onChange, touch }) {
+function NoteField({ id, label, value, placeholder, onChange, touch, voice, voiceKey, onMic }) {
   const filled = !!value?.trim();
-  const [opened, setOpened] = useState(false);
-  const open = filled || opened;
+  // "type" = opened with ＋ (focus the box); "mic" = opened by the mic (no
+  // keyboard popping up on the phone).
+  const [opened, setOpened] = useState(null);
+  const listening = voice.active === voiceKey;
+  const open = filled || opened || listening;
+  const micSize = touch ? "size-touch" : "size-7";
+
+  const mic = voice.supported && (
+    <MicButton
+      label={label}
+      listening={listening}
+      className={micSize}
+      onClick={() => {
+        if (!open) setOpened("mic");
+        onMic();
+      }}
+    />
+  );
 
   if (!open) {
     return (
-      <button
-        type="button"
-        onClick={() => setOpened(true)}
-        className={`flex w-full cursor-pointer items-center gap-2 rounded-panel border border-dashed border-line-strong bg-transparent px-3 text-left hover:bg-panel-2 ${
-          touch ? "h-touch" : "h-9"
-        }`}
-      >
-        <span className="lbl">{label}</span>
-        <div className="grow" />
-        <PlusIcon className="size-4 text-ink-3" />
-      </button>
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => setOpened("type")}
+          className={`flex min-w-0 grow cursor-pointer items-center gap-2 rounded-panel border border-dashed border-line-strong bg-transparent px-3 text-left hover:bg-panel-2 ${
+            touch ? "h-touch" : "h-9"
+          }`}
+        >
+          <span className="lbl">{label}</span>
+          <div className="grow" />
+          <PlusIcon className="size-4 text-ink-3" />
+        </button>
+        {mic}
+      </div>
     );
   }
 
   return (
     <div>
-      <div className="mb-1.5 flex items-center gap-1.5">
+      <div className="mb-1.5 flex min-h-7 items-center gap-1.5">
         <label htmlFor={id} className={`lbl ${filled ? "text-bad" : ""}`}>
           {label}
         </label>
         {filled && <span className="size-1.5 rounded-full bg-bad" />}
+        <div className="grow" />
+        {mic}
       </div>
+      <VoiceStatus voice={voice} noteKey={voiceKey} className="mb-1.5" />
       <textarea
         id={id}
         rows={touch ? 3 : 3}
-        autoFocus={!filled}
+        autoFocus={!filled && opened === "type"}
         value={value || ""}
         placeholder={placeholder}
         onChange={(ev) => onChange(ev.target.value)}
         onBlur={(ev) => {
-          if (!ev.target.value.trim()) setOpened(false);
+          if (!ev.target.value.trim() && !listening) setOpened(null);
         }}
         className={`textarea ${touch ? "rounded-panel p-3 text-lg leading-5" : ""} ${filled ? "input-filled" : ""}`}
       />
