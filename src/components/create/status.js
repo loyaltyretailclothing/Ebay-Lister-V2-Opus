@@ -228,8 +228,8 @@ export function PhoneTopLane({ editor }) {
 }
 
 // Phone PINNED strip above the action bar: anything about listing.
-// Precedence: failure > success > missing fields.
-export function PhonePin({ editor, missing }) {
+// Precedence: failure > success.
+export function PhonePin({ editor }) {
   const e = editor;
   const s = e.submitStatus;
   if (s?.type === "error") {
@@ -269,14 +269,6 @@ export function PhonePin({ editor, missing }) {
           </a>
         )}
         <DismissX onClick={e.dismissListed} />
-      </div>
-    );
-  }
-  if (missing) {
-    return (
-      <div className="pin pin-warn">
-        <AlertIcon className="mt-0.5 size-3.5 shrink-0" />
-        <p>Title, category, price and SKU are required to list.</p>
       </div>
     );
   }

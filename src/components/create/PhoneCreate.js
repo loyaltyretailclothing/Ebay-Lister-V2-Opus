@@ -34,7 +34,7 @@ const TABS = [
 // Phone (and every window smaller than the desktop layout): five tabs in the
 // order the work happens. Four things never scroll: the header, the top lane
 // (what the app just did to the draft), the pinned strip (the List on eBay
-// result, or what's missing) and the action bar.
+// result) and the action bar.
 export default function PhoneCreate({ editor }) {
   const e = editor;
   const [tab, setTab] = useState("photos");
@@ -102,7 +102,7 @@ export default function PhoneCreate({ editor }) {
         )}
       </main>
 
-      <PhonePin editor={e} missing={missing && !e.caughtUp} />
+      <PhonePin editor={e} />
 
       <div className="flex shrink-0 gap-2 border-t border-line bg-panel px-3 pb-[22px] pt-[9px]">
         <button type="button" className="btn btn-touch shrink-0 px-3 text-md" disabled={!canAnalyze} onClick={e.analyze}>
