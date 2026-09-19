@@ -29,3 +29,8 @@ Ideas we want to come back to. Nothing here is built or agreed in detail yet. Se
 - A list of items live 90+ days with no watchers and no views, so you can decide what to relist, bundle, or pull.
 - Pairs with #1: markdowns and offers handle slow sellers; this catches items getting no attention at all.
 - **Check with eBay's live API before building:** where views and watcher counts come from (likely the traffic report and the listings data), and how far back the data goes.
+
+## 6. Voice notes in the camera
+- Hold a mic button on the camera review screen and talk ("small stain left sleeve, pit to pit 22, length 29"); the words are typed into AI Read or Draft Note.
+- Uses the phone browser's built-in speech-to-text (Chrome on Android) — free, no AI.
+- **Why:** faster than one-handed typing while holding the item.
