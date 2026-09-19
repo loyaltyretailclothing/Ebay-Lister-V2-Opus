@@ -16,7 +16,7 @@ Open this `docs` folder in Obsidian with **"Open folder as vault."**
 - [[Future Features]] — ideas to come back to: offers to watchers + markdowns, pre-post check, profit tracking, auto shipping weights, old listing report
 - [[AI Notes Plan]] — AI leaves a read-only "check this" note; Draft Note / AI Note / AI Read boxes that hide when empty (live)
 - [[Redesign Build Plan]] — step-by-step plan to build the finished redesign (design files in `design/`)
-- [[Efficiency Tracker Plan]] — two trackers — camera time and draft time (active time only), by category, dates, compare, graphs; desktop tab "Track" (built, not live)
+- [[Efficiency Tracker Plan]] — two trackers — camera time and draft time (active time only), by category, dates, compare, graphs; desktop tab "Track" (live)
 - [[Old Listings (Parked)]] — desktop report of listings live 90+ days (watchers, views, click rate); built and tested, parked on branch `old-listings`, not live
 
 ## How the app works

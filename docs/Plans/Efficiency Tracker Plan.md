@@ -1,6 +1,6 @@
 # Efficiency Tracker Plan
 
-**Status: BUILT 2026-09-19, tested locally (faked clock / camera / listing — nothing written), NOT live.** See [[Home]], [[Drafts and Camera Flow]], [[Draft Queue Plan]].
+**Status: LIVE 2026-09-19.** Tracking starts with the first camera session / listing after this date. Silent — no visible clock anywhere. See [[Home]], [[Drafts and Camera Flow]], [[Draft Queue Plan]].
 
 ## Goal
 See how long each item really takes — shooting it, and finishing its draft — by item type, and whether we're getting faster. No extra tapping.
