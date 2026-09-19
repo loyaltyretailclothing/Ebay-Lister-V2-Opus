@@ -1,13 +1,16 @@
 // Efficiency Tracker — shared, pure helpers (safe on server and in the
 // browser). See docs/Plans/Efficiency Tracker Plan.md.
 //
-// One log entry per LISTED item:
-//   { listedAt, shotAt, category, categoryId, shootMs, reviewMs, finishMs,
-//     totalMs, photos, analyses, cameraTimed, listingId }
-// Times are ACTIVE milliseconds (see lib/activeClock). totalMs is the sum of
-// the parts; cameraTimed is false when the item never went through the
-// camera (library photos, or drafts made before the tracker existed), so
-// its total is finishing-only and is kept out of the totals comparison.
+// Two separate trackers, each with its own log entries:
+//   camera — camera opens → Create Draft. Logged when the draft is created;
+//            the server adds the category once the AI has picked it.
+//            { kind:"camera", at (when shot), category, categoryId,
+//              shootMs, reviewMs, totalMs, photos, draftId }
+//   draft  — draft opened → List on eBay (added up across sittings).
+//            Logged when it's listed.
+//            { kind:"draft", at (when listed), category, categoryId,
+//              finishMs, totalMs, analyses, listingId }
+// Times are ACTIVE milliseconds (see lib/activeClock).
 
 const MAX_MS = 24 * 60 * 60 * 1000; // anything above a day is junk
 
@@ -15,42 +18,48 @@ export function cleanMs(v) {
   const n = Math.round(Number(v));
   return Number.isFinite(n) && n >= 0 && n <= MAX_MS ? n : 0;
 }
-
 function cleanDate(v) {
   const t = Date.parse(v);
   return Number.isFinite(t) ? new Date(t).toISOString() : "";
 }
+const cleanInt = (v, max) => Math.max(0, Math.min(max, parseInt(v, 10) || 0));
+const cleanCategory = (v) => String(v || "").slice(0, 120) || "Uncategorized";
 
-// The camera's timing as stored on a draft (listing.timing).
+// What the camera page sends with Create Draft.
 export function cleanCameraTiming(t) {
   if (!t || typeof t !== "object") return null;
+  const shootMs = cleanMs(t.shootMs);
+  const reviewMs = cleanMs(t.reviewMs);
+  if (!shootMs && !reviewMs) return null;
+  return { shootMs, reviewMs, photos: cleanInt(t.photos, 99), shotAt: cleanDate(t.shotAt) };
+}
+
+export function buildCameraEntry({ timing, draftId, category, categoryId }) {
+  const t = cleanCameraTiming(timing);
+  if (!t) return null;
   return {
-    shootMs: cleanMs(t.shootMs),
-    reviewMs: cleanMs(t.reviewMs),
-    photos: Math.max(0, Math.min(99, parseInt(t.photos, 10) || 0)),
-    shotAt: cleanDate(t.shotAt),
+    kind: "camera",
+    at: t.shotAt || new Date().toISOString(),
+    category: cleanCategory(category),
+    categoryId: String(categoryId || "").slice(0, 20),
+    shootMs: t.shootMs,
+    reviewMs: t.reviewMs,
+    totalMs: t.shootMs + t.reviewMs,
+    photos: t.photos,
+    draftId: String(draftId || "").slice(0, 60),
   };
 }
 
-// Build a log entry from a listing that was just listed.
-export function buildEntry({ listing, finishMs, analyses, listingId, listedAt }) {
-  const cam = cleanCameraTiming(listing?.timing);
-  const cameraTimed = !!(cam && (cam.shootMs > 0 || cam.reviewMs > 0));
-  const shootMs = cameraTimed ? cam.shootMs : 0;
-  const reviewMs = cameraTimed ? cam.reviewMs : 0;
+export function buildDraftEntry({ listing, finishMs, analyses, listingId, listedAt }) {
   const finish = cleanMs(finishMs);
   return {
-    listedAt: cleanDate(listedAt) || new Date().toISOString(),
-    shotAt: cameraTimed ? cam.shotAt : "",
-    category: String(listing?.categoryName || "Uncategorized").slice(0, 120),
+    kind: "draft",
+    at: cleanDate(listedAt) || new Date().toISOString(),
+    category: cleanCategory(listing?.categoryName),
     categoryId: String(listing?.categoryId || "").slice(0, 20),
-    shootMs,
-    reviewMs,
     finishMs: finish,
-    totalMs: shootMs + reviewMs + finish,
-    photos: cameraTimed ? cam.photos : 0,
-    analyses: Math.max(0, Math.min(99, parseInt(analyses, 10) || 0)),
-    cameraTimed,
+    totalMs: finish,
+    analyses: cleanInt(analyses, 99),
     listingId: String(listingId || "").slice(0, 30),
   };
 }
@@ -58,25 +67,46 @@ export function buildEntry({ listing, finishMs, analyses, listingId, listedAt })
 // Clean an entry read back from storage (or received by the API).
 export function cleanEntry(e) {
   if (!e || typeof e !== "object") return null;
-  const shootMs = cleanMs(e.shootMs);
-  const reviewMs = cleanMs(e.reviewMs);
-  const finishMs = cleanMs(e.finishMs);
-  const listedAt = cleanDate(e.listedAt);
-  if (!listedAt) return null;
-  return {
-    listedAt,
-    shotAt: cleanDate(e.shotAt),
-    category: String(e.category || "Uncategorized").slice(0, 120),
+  const at = cleanDate(e.at);
+  if (!at) return null;
+  const base = {
+    at,
+    category: cleanCategory(e.category),
     categoryId: String(e.categoryId || "").slice(0, 20),
-    shootMs,
-    reviewMs,
-    finishMs,
-    totalMs: shootMs + reviewMs + finishMs,
-    photos: Math.max(0, Math.min(99, parseInt(e.photos, 10) || 0)),
-    analyses: Math.max(0, Math.min(99, parseInt(e.analyses, 10) || 0)),
-    cameraTimed: e.cameraTimed === true || e.cameraTimed === "true",
-    listingId: String(e.listingId || "").slice(0, 30),
   };
+  if (e.kind === "camera") {
+    const shootMs = cleanMs(e.shootMs);
+    const reviewMs = cleanMs(e.reviewMs);
+    return {
+      kind: "camera",
+      ...base,
+      shootMs,
+      reviewMs,
+      totalMs: shootMs + reviewMs,
+      photos: cleanInt(e.photos, 99),
+      draftId: String(e.draftId || "").slice(0, 60),
+    };
+  }
+  if (e.kind === "draft") {
+    const finishMs = cleanMs(e.finishMs);
+    return {
+      kind: "draft",
+      ...base,
+      finishMs,
+      totalMs: finishMs,
+      analyses: cleanInt(e.analyses, 99),
+      listingId: String(e.listingId || "").slice(0, 30),
+    };
+  }
+  return null;
+}
+
+// Stable storage id, so a repeat of the same event overwrites instead of
+// double counting (the camera's draft request can be retried by the host).
+export function entryId(e) {
+  const key = e.kind === "camera" ? e.draftId : e.listingId;
+  const safe = String(key || "").replace(/[^A-Za-z0-9_-]/g, "");
+  return `${e.kind}_${safe || `${Date.parse(e.at)}_${Math.random().toString(36).slice(2, 8)}`}`;
 }
 
 // --- report math -------------------------------------------------------------
@@ -100,20 +130,15 @@ export function fmtDuration(ms) {
   return `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, "0")}m`;
 }
 
-// Typical (median) times for a group of entries. Outliers are left out;
-// totals only use camera-timed items (finishing-only totals would look
-// faster than they really are).
-export function summarize(entries) {
+// Typical (median) times for a group of one tracker's entries; outliers
+// (over OUTLIER_MS) are counted but left out of the numbers.
+export function summarize(entries, partKeys = []) {
   const normal = entries.filter((e) => e.totalMs <= OUTLIER_MS);
-  const cam = normal.filter((e) => e.cameraTimed);
   const activeMs = normal.reduce((s, e) => s + e.totalMs, 0);
   return {
     count: entries.length,
-    camCount: cam.length,
-    total: median(cam.map((e) => e.totalMs)),
-    shoot: median(cam.map((e) => e.shootMs)),
-    review: median(cam.map((e) => e.reviewMs)),
-    finish: median(normal.map((e) => e.finishMs)),
+    total: median(normal.map((e) => e.totalMs)),
+    parts: Object.fromEntries(partKeys.map((k) => [k, median(normal.map((e) => e[k]))])),
     perHour: activeMs > 0 ? (normal.length / activeMs) * 3600000 : null,
     outliers: entries.length - normal.length,
   };

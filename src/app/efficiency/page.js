@@ -4,19 +4,40 @@ import { useEffect, useMemo, useState } from "react";
 import { RefreshIcon, Spinner } from "@/components/ui/Icons";
 import { OUTLIER_MS, fmtDuration, summarize, weekStart } from "@/lib/efficiency";
 
-// Efficiency Tracker (desktop tab "Track"). How long each listed item took —
-// shooting (camera open → Done) + review (Done → Create Draft) + finishing
-// (draft open → List on eBay), ACTIVE time only. Total per item is the
-// headline. Pick a date range, optionally compare it with another period.
+// Efficiency Tracker (desktop tab "Track"). Two separate trackers, ACTIVE
+// time only (see lib/activeClock):
+//   Camera — camera opens → Create Draft (shooting + review), dated by shoot
+//   Drafts — draft opened → List on eBay (finishing), dated by listing
+// One date range + compare for both; each has its own numbers and graphs.
+// A small combined line up top adds the two typical times together.
 // See docs/Plans/Efficiency Tracker Plan.md.
 
 const DAY = 24 * 60 * 60 * 1000;
-const PARTS = [
-  { key: "shoot", label: "Shooting", color: "var(--color-accent)" },
-  { key: "review", label: "Review", color: "var(--color-warn)" },
-  { key: "finish", label: "Finishing", color: "var(--color-ok)" },
-];
 const CMP_COLOR = "var(--color-ink-3)";
+
+const TRACKERS = [
+  {
+    kind: "camera",
+    title: "Camera",
+    sub: "Camera opens → Create Draft",
+    headline: "Camera time per item",
+    countLabel: "Items shot",
+    color: "var(--color-accent)",
+    parts: [
+      { key: "shootMs", label: "Shooting", color: "var(--color-accent)" },
+      { key: "reviewMs", label: "Review", color: "var(--color-warn)" },
+    ],
+  },
+  {
+    kind: "draft",
+    title: "Drafts",
+    sub: "Draft opened → List on eBay",
+    headline: "Draft time per item",
+    countLabel: "Items listed",
+    color: "var(--color-ok)",
+    parts: [],
+  },
+];
 
 // --- date ranges (local time) ------------------------------------------------
 function startOfDay(d) {
@@ -68,7 +89,7 @@ function previousOf(key, r) {
   return { from: new Date(r.from.getTime() - len), to: r.from, label: "Previous period" };
 }
 const inRange = (e, r) => {
-  const t = Date.parse(e.listedAt);
+  const t = Date.parse(e.at);
   return t >= r.from.getTime() && t < r.to.getTime();
 };
 const fmtDay = (d) => d.toLocaleDateString([], { month: "short", day: "numeric" });
@@ -90,6 +111,7 @@ function change(before, after) {
   if (pct === 0) return { text: "same", good: null };
   return pct > 0 ? { text: `${pct}% faster`, good: true } : { text: `${-pct}% slower`, good: false };
 }
+const addTimes = (a, b) => (a === null || a === undefined || b === null || b === undefined ? null : a + b);
 
 export default function EfficiencyPage() {
   const [entries, setEntries] = useState(null);
@@ -98,6 +120,8 @@ export default function EfficiencyPage() {
   const [rangeKey, setRangeKey] = useState("this-month");
   const [custom, setCustom] = useState({ from: "", to: "" });
   const [compare, setCompare] = useState("none"); // none | previous | a RANGES key
+  // "Now" for the page — read once when it opens (the 12-week graphs end here).
+  const [openedAt] = useState(() => Date.now());
 
   async function load() {
     try {
@@ -124,45 +148,33 @@ export default function EfficiencyPage() {
   }, [compare, rangeKey, range, custom]);
 
   const all = useMemo(() => entries || [], [entries]);
-  const cur = useMemo(() => all.filter((e) => inRange(e, range)), [all, range]);
-  const prev = useMemo(() => (cmpRange ? all.filter((e) => inRange(e, cmpRange)) : []), [all, cmpRange]);
-  const S = useMemo(() => summarize(cur), [cur]);
-  const P = useMemo(() => (cmpRange ? summarize(prev) : null), [prev, cmpRange]);
+  const byKind = useMemo(
+    () => Object.fromEntries(TRACKERS.map((t) => [t.kind, all.filter((e) => e.kind === t.kind)])),
+    [all]
+  );
+  const stats = useMemo(
+    () =>
+      Object.fromEntries(
+        TRACKERS.map((t) => [
+          t.kind,
+          {
+            cur: summarize(byKind[t.kind].filter((e) => inRange(e, range))),
+            prev: cmpRange ? summarize(byKind[t.kind].filter((e) => inRange(e, cmpRange))) : null,
+          },
+        ])
+      ),
+    [byKind, range, cmpRange]
+  );
 
-  // Weekly trend: the last 12 weeks (always), so improvement is visible.
-  const weeks = useMemo(() => {
-    const start = mondayOf(new Date(Date.now() - 11 * 7 * DAY));
-    const keys = [];
-    for (let i = 0; i < 12; i++) keys.push(weekStart(new Date(start.getTime() + i * 7 * DAY).toISOString()));
-    const by = Object.fromEntries(keys.map((k) => [k, []]));
-    for (const e of all) {
-      const k = weekStart(e.listedAt);
-      if (by[k]) by[k].push(e);
-    }
-    return keys.map((k) => ({ key: k, ...summarize(by[k]) }));
-  }, [all]);
-
-  // By category, for the range (and compare range).
-  const categories = useMemo(() => {
-    const names = new Set([...cur, ...prev].map((e) => e.category));
-    return [...names]
-      .map((name) => ({
-        name,
-        cur: summarize(cur.filter((e) => e.category === name)),
-        prev: cmpRange ? summarize(prev.filter((e) => e.category === name)) : null,
-      }))
-      .filter((c) => c.cur.count > 0 || (c.prev && c.prev.count > 0))
-      .sort((a, b) => b.cur.count - a.cur.count);
-  }, [cur, prev, cmpRange]);
-
-  const outliers = cur.filter((e) => e.totalMs > OUTLIER_MS);
-  const finishOnly = cur.filter((e) => !e.cameraTimed).length;
+  const combined = addTimes(stats.camera.cur.total, stats.draft.cur.total);
+  const combinedPrev = cmpRange ? addTimes(stats.camera.prev.total, stats.draft.prev.total) : null;
+  const combinedDelta = cmpRange ? change(combinedPrev, combined) : null;
 
   return (
     <div className="flex h-full min-h-0 flex-col">
       <header className="flex h-13 shrink-0 items-center gap-3 border-b border-line bg-panel px-4">
         <h1 className="m-0 whitespace-nowrap text-xl font-semibold tracking-[-0.01em]">Efficiency Tracker</h1>
-        <span className="text-sm text-ink-3">Active time per listed item</span>
+        <span className="text-sm text-ink-3">Active time per item</span>
         <div className="grow" />
         <button type="button" className="btn btn-sm" onClick={() => { setLoading(true); load(); }} disabled={loading}>
           {loading ? <Spinner className="size-3.5" /> : <RefreshIcon className="size-3.5" />}
@@ -177,7 +189,7 @@ export default function EfficiencyPage() {
       )}
 
       <div className="min-h-0 grow overflow-y-auto bg-panel">
-        {/* Range + compare */}
+        {/* Range + compare (both trackers) */}
         <div className="flex flex-wrap items-center gap-2 border-b border-line px-4 py-3">
           {RANGES.map(([k, label]) => (
             <button
@@ -218,117 +230,189 @@ export default function EfficiencyPage() {
           </div>
         ) : (
           <>
-            <p className="m-0 px-4 pt-3 text-sm text-ink-3">
-              {fmtDay(range.from)} – {fmtDay(new Date(Math.min(range.to.getTime(), Date.now() + DAY) - DAY))}
-              {range.label === "All time" ? " (all time)" : ""}
-              {cmpRange ? ` · compared with ${fmtDay(cmpRange.from)} – ${fmtDay(new Date(cmpRange.to.getTime() - DAY))}` : ""}
-            </p>
-
-            {/* Headline */}
-            <div className="grid grid-cols-[1.4fr_1fr_1fr_1fr_1fr] gap-3 px-4 pt-3">
-              <Stat big label="Total per item" value={fmtDuration(S.total)} cmp={P && fmtDuration(P.total)} delta={P && change(P.total, S.total)} />
-              <Stat label="Shooting" value={fmtDuration(S.shoot)} cmp={P && fmtDuration(P.shoot)} delta={P && change(P.shoot, S.shoot)} />
-              <Stat label="Review" value={fmtDuration(S.review)} cmp={P && fmtDuration(P.review)} delta={P && change(P.review, S.review)} />
-              <Stat label="Finishing" value={fmtDuration(S.finish)} cmp={P && fmtDuration(P.finish)} delta={P && change(P.finish, S.finish)} />
-              <Stat
-                label="Items listed"
-                value={S.count}
-                sub={S.perHour ? `${S.perHour.toFixed(1)} per active hour` : ""}
-                cmp={P && String(P.count)}
-              />
+            <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 px-4 pt-3">
+              <span className="text-sm text-ink-3">
+                {fmtDay(range.from)} – {fmtDay(new Date(Math.min(range.to.getTime(), openedAt + DAY) - DAY))}
+                {cmpRange ? ` · compared with ${fmtDay(cmpRange.from)} – ${fmtDay(new Date(cmpRange.to.getTime() - DAY))}` : ""}
+              </span>
+              <div className="grow" />
+              <span className="text-md text-ink-2">
+                Typical per item: camera <b className="text-ink">{fmtDuration(stats.camera.cur.total)}</b> + draft{" "}
+                <b className="text-ink">{fmtDuration(stats.draft.cur.total)}</b> ≈{" "}
+                <b className="text-[17px] text-ink">{fmtDuration(combined)}</b>
+                {combinedDelta && (
+                  <span className={`ml-2 font-semibold ${combinedDelta.good ? "text-ok" : combinedDelta.good === false ? "text-bad" : ""}`}>
+                    {combinedDelta.text}
+                  </span>
+                )}
+              </span>
             </div>
-            <p className="m-0 px-4 pt-2 text-sm text-ink-3">
-              Typical (median) times. Totals use items that went through the camera
-              {finishOnly ? ` — ${finishOnly} finishing-only item${finishOnly === 1 ? "" : "s"} left out of totals` : ""}.
-              {S.outliers ? ` ${S.outliers} outlier${S.outliers === 1 ? "" : "s"} (over ${OUTLIER_MS / 60000} min) left out.` : ""}
-            </p>
 
             {all.length === 0 ? (
               <div className="m-4 rounded-panel border border-dashed border-line-strong p-8 text-center text-ink-2">
-                Nothing logged yet. Every item listed from now on is timed automatically — check back after a few days.
+                Nothing logged yet. Every camera session and every listing from now on is timed automatically — check back after a few days.
               </div>
             ) : (
-              <>
-                {/* Graphs */}
-                <div className="grid grid-cols-2 gap-4 px-4 pt-5">
-                  <Card title="Total per item, week by week" sub="Last 12 weeks · typical (median) · lower is better">
-                    <LineChart weeks={weeks} />
-                  </Card>
-                  <Card title="Where the time goes" sub="Last 12 weeks · shooting · review · finishing">
-                    <StackedBars weeks={weeks} />
-                  </Card>
-                </div>
-                <div className="px-4 pt-4">
-                  <Card
-                    title="Total per item by category"
-                    sub={cmpRange ? `${range.label} vs ${cmpRange.label.toLowerCase()}` : range.label}
-                  >
-                    <CategoryBars categories={categories} compare={!!cmpRange} />
-                  </Card>
-                </div>
-
-                {/* Table */}
-                <div className="px-4 pb-2 pt-5">
-                  <h2 className="lbl mb-2">By category</h2>
-                  <table className="w-full table-fixed border-collapse text-md">
-                    <thead>
-                      <tr className="border-b border-line text-left text-sm text-ink-3">
-                        <th className="py-2 font-medium">Category</th>
-                        <th className="w-[70px] py-2 pr-3 text-right font-medium">Items</th>
-                        <th className="w-[120px] py-2 pr-3 text-right font-medium text-ink">Total per item</th>
-                        <th className="w-[230px] py-2 pr-3 text-right font-medium">Shooting · Review · Finishing</th>
-                        {cmpRange && <th className="w-[200px] py-2 text-right font-medium">vs {cmpRange.label.toLowerCase()}</th>}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {categories.map((c) => {
-                        const d = c.prev ? change(c.prev.total, c.cur.total) : null;
-                        return (
-                          <tr key={c.name} className="border-b border-line">
-                            <td className="truncate py-2" title={c.name}>{c.name}</td>
-                            <td className="py-2 pr-3 text-right">{c.cur.count}</td>
-                            <td className="py-2 pr-3 text-right font-semibold">{fmtDuration(c.cur.total)}</td>
-                            <td className="py-2 pr-3 text-right text-ink-2">
-                              {fmtDuration(c.cur.shoot)} · {fmtDuration(c.cur.review)} · {fmtDuration(c.cur.finish)}
-                            </td>
-                            {cmpRange && (
-                              <td className="py-2 text-right text-ink-2">
-                                {fmtDuration(c.prev?.total)}
-                                {d && <span className={`ml-2 font-semibold ${d.good ? "text-ok" : d.good === false ? "text-bad" : ""}`}>{d.text}</span>}
-                              </td>
-                            )}
-                          </tr>
-                        );
-                      })}
-                      {categories.length === 0 && (
-                        <tr>
-                          <td colSpan={5} className="py-6 text-center text-ink-3">Nothing listed in this date range.</td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-
-                {outliers.length > 0 && (
-                  <div className="px-4 pb-6 pt-4">
-                    <h2 className="lbl mb-2">Outliers (over {OUTLIER_MS / 60000} min active — not in the numbers above)</h2>
-                    <ul className="m-0 list-none p-0 text-md">
-                      {outliers.map((e, i) => (
-                        <li key={i} className="flex gap-3 border-b border-line py-1.5">
-                          <span className="w-[90px] text-ink-3">{fmtDay(new Date(e.listedAt))}</span>
-                          <span className="grow truncate">{e.category}</span>
-                          <span className="font-semibold">{fmtDuration(e.totalMs)}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-              </>
+              TRACKERS.map((t) => (
+                <TrackerSection key={t.kind} t={t} entries={byKind[t.kind]} range={range} cmpRange={cmpRange} openedAt={openedAt} />
+              ))
             )}
           </>
         )}
       </div>
     </div>
+  );
+}
+
+function TrackerSection({ t, entries, range, cmpRange, openedAt }) {
+  const partKeys = useMemo(() => t.parts.map((p) => p.key), [t]);
+  const cur = useMemo(() => entries.filter((e) => inRange(e, range)), [entries, range]);
+  const prev = useMemo(() => (cmpRange ? entries.filter((e) => inRange(e, cmpRange)) : []), [entries, cmpRange]);
+  const s = useMemo(() => summarize(cur, partKeys), [cur, partKeys]);
+  const p = useMemo(() => (cmpRange ? summarize(prev, partKeys) : null), [prev, cmpRange, partKeys]);
+
+  // Weekly trend: always the last 12 weeks, so improvement is visible.
+  const weeks = useMemo(() => {
+    const start = mondayOf(new Date(openedAt - 11 * 7 * DAY));
+    const keys = [];
+    for (let i = 0; i < 12; i++) keys.push(weekStart(new Date(start.getTime() + i * 7 * DAY).toISOString()));
+    const by = Object.fromEntries(keys.map((k) => [k, []]));
+    for (const e of entries) {
+      const k = weekStart(e.at);
+      if (by[k]) by[k].push(e);
+    }
+    return keys.map((k) => ({ key: k, ...summarize(by[k], partKeys) }));
+  }, [entries, partKeys, openedAt]);
+
+  const categories = useMemo(() => {
+    const names = new Set([...cur, ...prev].map((e) => e.category));
+    return [...names]
+      .map((name) => ({
+        name,
+        cur: summarize(cur.filter((e) => e.category === name), partKeys),
+        prev: cmpRange ? summarize(prev.filter((e) => e.category === name), partKeys) : null,
+      }))
+      .filter((c) => c.cur.count > 0 || (c.prev && c.prev.count > 0))
+      .sort((a, b) => b.cur.count - a.cur.count);
+  }, [cur, prev, cmpRange, partKeys]);
+
+  const outliers = cur.filter((e) => e.totalMs > OUTLIER_MS);
+
+  return (
+    <section className="mx-4 mt-5 rounded-panel border border-line">
+      <div className="flex items-baseline gap-3 border-b border-line px-4 py-2.5">
+        <h2 className="m-0 text-lg font-semibold">{t.title}</h2>
+        <span className="text-sm text-ink-3">{t.sub}</span>
+      </div>
+
+      <div className="p-4">
+        <div className={`grid gap-3 ${t.parts.length ? "grid-cols-[1.4fr_1fr_1fr_1fr]" : "grid-cols-[1.4fr_1fr_1fr]"}`}>
+          <Stat big label={t.headline} value={fmtDuration(s.total)} cmp={p && fmtDuration(p.total)} delta={p && change(p.total, s.total)} />
+          {t.parts.map((part) => (
+            <Stat
+              key={part.key}
+              label={part.label}
+              value={fmtDuration(s.parts[part.key])}
+              cmp={p && fmtDuration(p.parts[part.key])}
+              delta={p && change(p.parts[part.key], s.parts[part.key])}
+            />
+          ))}
+          <Stat label={t.countLabel} value={s.count} sub={s.perHour ? `${s.perHour.toFixed(1)} per active hour` : ""} cmp={p && String(p.count)} />
+          {!t.parts.length && (
+            <Stat label="Outliers" value={s.outliers} sub={`over ${OUTLIER_MS / 60000} min, left out`} />
+          )}
+        </div>
+        <p className="m-0 pt-2 text-sm text-ink-3">
+          Typical (median) times.
+          {t.parts.length && s.outliers ? ` ${s.outliers} outlier${s.outliers === 1 ? "" : "s"} (over ${OUTLIER_MS / 60000} min) left out.` : ""}
+        </p>
+
+        {entries.length === 0 ? (
+          <p className="m-0 py-6 text-center text-ink-3">Nothing logged for this tracker yet.</p>
+        ) : (
+          <>
+            <div className="grid grid-cols-2 gap-4 pt-4">
+              <Card title={`${t.headline}, week by week`} sub="Last 12 weeks · typical (median) · lower is better">
+                <LineChart weeks={weeks} color={t.color} />
+              </Card>
+              {t.parts.length ? (
+                <Card title="Where the time goes" sub={`Last 12 weeks · ${t.parts.map((x) => x.label.toLowerCase()).join(" · ")}`}>
+                  <StackedBars weeks={weeks} parts={t.parts} />
+                </Card>
+              ) : (
+                <Card title="By category" sub={cmpRange ? `${range.label} vs ${cmpRange.label.toLowerCase()}` : range.label}>
+                  <CategoryBars categories={categories} compare={!!cmpRange} color={t.color} compact />
+                </Card>
+              )}
+            </div>
+            {t.parts.length > 0 && (
+              <div className="pt-4">
+                <Card title="By category" sub={cmpRange ? `${range.label} vs ${cmpRange.label.toLowerCase()}` : range.label}>
+                  <CategoryBars categories={categories} compare={!!cmpRange} color={t.color} />
+                </Card>
+              </div>
+            )}
+
+            <table className="mt-4 w-full table-fixed border-collapse text-md">
+              <thead>
+                <tr className="border-b border-line text-left text-sm text-ink-3">
+                  <th className="py-2 font-medium">Category</th>
+                  <th className="w-[70px] py-2 pr-3 text-right font-medium">Items</th>
+                  <th className="w-[120px] py-2 pr-3 text-right font-medium text-ink">Per item</th>
+                  {t.parts.length > 0 && (
+                    <th className="w-[190px] py-2 pr-3 text-right font-medium">{t.parts.map((x) => x.label).join(" · ")}</th>
+                  )}
+                  {cmpRange && <th className="w-[200px] py-2 text-right font-medium">vs {cmpRange.label.toLowerCase()}</th>}
+                </tr>
+              </thead>
+              <tbody>
+                {categories.map((c) => {
+                  const d = c.prev ? change(c.prev.total, c.cur.total) : null;
+                  return (
+                    <tr key={c.name} className="border-b border-line">
+                      <td className="truncate py-2" title={c.name}>{c.name}</td>
+                      <td className="py-2 pr-3 text-right">{c.cur.count}</td>
+                      <td className="py-2 pr-3 text-right font-semibold">{fmtDuration(c.cur.total)}</td>
+                      {t.parts.length > 0 && (
+                        <td className="py-2 pr-3 text-right text-ink-2">
+                          {t.parts.map((x) => fmtDuration(c.cur.parts[x.key])).join(" · ")}
+                        </td>
+                      )}
+                      {cmpRange && (
+                        <td className="py-2 text-right text-ink-2">
+                          {fmtDuration(c.prev?.total)}
+                          {d && <span className={`ml-2 font-semibold ${d.good ? "text-ok" : d.good === false ? "text-bad" : ""}`}>{d.text}</span>}
+                        </td>
+                      )}
+                    </tr>
+                  );
+                })}
+                {categories.length === 0 && (
+                  <tr>
+                    <td colSpan={5} className="py-6 text-center text-ink-3">Nothing in this date range.</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+
+            {outliers.length > 0 && (
+              <div className="pt-4">
+                <h3 className="lbl mb-2">Outliers (over {OUTLIER_MS / 60000} min active — not in the numbers above)</h3>
+                <ul className="m-0 list-none p-0 text-md">
+                  {outliers.map((e, i) => (
+                    <li key={i} className="flex gap-3 border-b border-line py-1.5">
+                      <span className="w-[90px] text-ink-3">{fmtDay(new Date(e.at))}</span>
+                      <span className="grow truncate">{e.category}</span>
+                      <span className="font-semibold">{fmtDuration(e.totalMs)}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </section>
   );
 }
 
@@ -378,14 +462,13 @@ function niceMax(ms) {
   return Math.ceil(min / step) * step;
 }
 function YAxis({ max }) {
-  const ticks = [0, max / 2, max];
-  return ticks.map((t) => {
-    const y = PAD.t + (1 - t / max) * (H - PAD.t - PAD.b);
+  return [0, max / 2, max].map((v) => {
+    const y = PAD.t + (1 - v / max) * (H - PAD.t - PAD.b);
     return (
-      <g key={t}>
+      <g key={v}>
         <line x1={PAD.l} x2={W - PAD.r} y1={y} y2={y} stroke="var(--color-line)" />
         <text x={PAD.l - 6} y={y + 4} textAnchor="end" fontSize="11" fill="var(--color-ink-3)">
-          {fmtAxis(t)}
+          {fmtAxis(v)}
         </text>
       </g>
     );
@@ -401,48 +484,44 @@ function XLabels({ weeks, x }) {
   );
 }
 
-function LineChart({ weeks }) {
+function LineChart({ weeks, color }) {
   const max = niceMax(Math.max(0, ...weeks.map((w) => w.total || 0)));
   const x = (i) => PAD.l + (i + 0.5) * ((W - PAD.l - PAD.r) / weeks.length);
   const y = (v) => PAD.t + (1 - v / max) * (H - PAD.t - PAD.b);
-  const pts = weeks.map((w, i) => (w.total === null ? null : [x(i), y(w.total), w]));
-  const path = pts
-    .filter(Boolean)
-    .map((p, i) => `${i ? "L" : "M"}${p[0]},${p[1]}`)
-    .join(" ");
+  const pts = weeks.filter((w) => w.total !== null).map((w) => [x(weeks.indexOf(w)), y(w.total), w]);
+  const path = pts.map((pt, i) => `${i ? "L" : "M"}${pt[0]},${pt[1]}`).join(" ");
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="block w-full" role="img" aria-label="Total time per item by week">
+    <svg viewBox={`0 0 ${W} ${H}`} className="block w-full" role="img" aria-label="Typical time per item by week">
       <YAxis max={max} />
       <XLabels weeks={weeks} x={x} />
-      {path && <path d={path} fill="none" stroke="var(--color-accent)" strokeWidth="2.5" />}
-      {pts.filter(Boolean).map(([px, py, w]) => (
-        <circle key={w.key} cx={px} cy={py} r="4.5" fill="var(--color-panel)" stroke="var(--color-accent)" strokeWidth="2.5">
-          <title>{`Week of ${weekLabel(w.key)}: ${fmtDuration(w.total)} per item (${w.camCount} items)`}</title>
+      {path && <path d={path} fill="none" stroke={color} strokeWidth="2.5" />}
+      {pts.map(([px, py, w]) => (
+        <circle key={w.key} cx={px} cy={py} r="4.5" fill="var(--color-panel)" stroke={color} strokeWidth="2.5">
+          <title>{`Week of ${weekLabel(w.key)}: ${fmtDuration(w.total)} per item (${w.count} items)`}</title>
         </circle>
       ))}
     </svg>
   );
 }
 
-function StackedBars({ weeks }) {
-  const sum = (w) => (w.shoot || 0) + (w.review || 0) + (w.finish || 0);
+function StackedBars({ weeks, parts }) {
+  const sum = (w) => parts.reduce((s, p) => s + (w.parts[p.key] || 0), 0);
   const max = niceMax(Math.max(0, ...weeks.map(sum)));
   const slot = (W - PAD.l - PAD.r) / weeks.length;
   const x = (i) => PAD.l + (i + 0.5) * slot;
   const h = (v) => (v / max) * (H - PAD.t - PAD.b);
   return (
     <div>
-      <svg viewBox={`0 0 ${W} ${H}`} className="block w-full" role="img" aria-label="Shooting, review and finishing time by week">
+      <svg viewBox={`0 0 ${W} ${H}`} className="block w-full" role="img" aria-label="Time split by week">
         <YAxis max={max} />
         <XLabels weeks={weeks} x={x} />
         {weeks.map((w, i) => {
           let base = H - PAD.b;
           return (
             <g key={w.key}>
-              <title>{`Week of ${weekLabel(w.key)}: shooting ${fmtDuration(w.shoot)} · review ${fmtDuration(w.review)} · finishing ${fmtDuration(w.finish)}`}</title>
-              {PARTS.map((p) => {
-                const v = w[p.key] || 0;
-                const hh = h(v);
+              <title>{`Week of ${weekLabel(w.key)}: ${parts.map((p) => `${p.label.toLowerCase()} ${fmtDuration(w.parts[p.key])}`).join(" · ")}`}</title>
+              {parts.map((p) => {
+                const hh = h(w.parts[p.key] || 0);
                 base -= hh;
                 return hh > 0 ? <rect key={p.key} x={x(i) - slot * 0.3} y={base} width={slot * 0.6} height={hh} fill={p.color} rx="1.5" /> : null;
               })}
@@ -450,32 +529,33 @@ function StackedBars({ weeks }) {
           );
         })}
       </svg>
-      <Legend items={PARTS} />
+      <Legend items={parts} />
     </div>
   );
 }
 
-function CategoryBars({ categories, compare }) {
-  const rows = categories.slice(0, 12);
-  if (!rows.length) return <p className="m-0 py-6 text-center text-sm text-ink-3">Nothing listed in this date range.</p>;
+function CategoryBars({ categories, compare, color, compact }) {
+  const rows = categories.slice(0, compact ? 7 : 12);
+  if (!rows.length) return <p className="m-0 py-6 text-center text-sm text-ink-3">Nothing in this date range.</p>;
   const max = niceMax(Math.max(0, ...rows.flatMap((c) => [c.cur.total || 0, c.prev?.total || 0])));
-  const labelW = 190;
+  const width = compact ? 520 : 1040;
+  const labelW = compact ? 150 : 190;
   const barH = compare ? 9 : 14;
   const rowH = compare ? 30 : 24;
-  const width = 1040;
-  const height = rows.length * rowH + 22;
-  const bw = (v) => ((v || 0) / max) * (width - labelW - 80);
+  const height = rows.length * rowH + 8;
+  const bw = (v) => ((v || 0) / max) * (width - labelW - 70);
+  const maxChars = compact ? 20 : 26;
   return (
     <div>
-      <svg viewBox={`0 0 ${width} ${height}`} className="block w-full" role="img" aria-label="Total time per item by category">
+      <svg viewBox={`0 0 ${width} ${height}`} className="block w-full" role="img" aria-label="Typical time per item by category">
         {rows.map((c, i) => {
           const y = i * rowH + 4;
           return (
             <g key={c.name}>
               <text x={labelW - 8} y={y + (compare ? 14 : 12)} textAnchor="end" fontSize="12" fill="var(--color-ink)">
-                {c.name.length > 26 ? `${c.name.slice(0, 25)}…` : c.name}
+                {c.name.length > maxChars ? `${c.name.slice(0, maxChars - 1)}…` : c.name}
               </text>
-              <rect x={labelW} y={y + 1} width={bw(c.cur.total)} height={barH} rx="2" fill="var(--color-accent)">
+              <rect x={labelW} y={y + 1} width={bw(c.cur.total)} height={barH} rx="2" fill={color}>
                 <title>{`${c.name}: ${fmtDuration(c.cur.total)} per item (${c.cur.count} items)`}</title>
               </rect>
               <text x={labelW + bw(c.cur.total) + 6} y={y + barH} fontSize="11" fill="var(--color-ink-2)">
@@ -498,7 +578,7 @@ function CategoryBars({ categories, compare }) {
       {compare && (
         <Legend
           items={[
-            { key: "a", label: "Selected range", color: "var(--color-accent)" },
+            { key: "a", label: "Selected range", color },
             { key: "b", label: "Compared period", color: CMP_COLOR },
           ]}
         />

@@ -9,7 +9,20 @@ import {
   applyDescriptionTemplate,
 } from "@/lib/listingPipeline";
 import { applyKeywordTheme } from "@/lib/titleKeywords";
-import { cleanCameraTiming } from "@/lib/efficiency";
+import { buildCameraEntry, cleanCameraTiming } from "@/lib/efficiency";
+import { writeEntry } from "@/lib/efficiencyLog";
+
+// Efficiency Tracker: write (or update) this camera session's entry.
+// Best-effort — a failed log never affects the draft.
+async function logCamera(timing, draftId, category, categoryId) {
+  const entry = buildCameraEntry({ timing, draftId, category, categoryId });
+  if (!entry) return;
+  try {
+    await writeEntry(entry);
+  } catch (err) {
+    console.error("Efficiency camera log failed:", err);
+  }
+}
 
 // Pipeline takes ~30-60s (Claude vision + eBay + Claude pass 2 + optional
 // Brave refine). Vercel default is 10s on Hobby / 60s on Pro; push to 60s so
@@ -59,8 +72,7 @@ export async function POST(request) {
     // legacy `notes` as a fallback for the aiNote.
     aiNote = body.aiNote || body.notes || "";
     draftNote = body.draftNote || "";
-    // Efficiency Tracker: the camera's active shooting / review time rides
-    // on the draft until it's listed (see docs Efficiency Tracker Plan).
+    // Efficiency Tracker (camera tracker): active shooting / review time.
     timing = cleanCameraTiming(body.timing);
 
     if (listingPhotos.length === 0) {
@@ -74,12 +86,14 @@ export async function POST(request) {
     //    the moment the client fires this request.
     await saveDraft(draftId, {
       id: draftId,
-      listing: { aiNote, draftNote, timing },
+      listing: { aiNote, draftNote },
       aiPhotos,
       listingPhotos,
       status: "processing",
       savedAt: new Date().toISOString(),
     });
+    // Camera entry now (no category yet); updated with the category below.
+    await logCamera(timing, draftId);
 
     // 2. Run the full pipeline. aiNote is the user's hint for Claude.
     const analysisPhotos = aiPhotos.length > 0 ? aiPhotos : listingPhotos.slice(0, 3);
@@ -148,7 +162,7 @@ export async function POST(request) {
     // publish route ignores unknown fields, so neither reaches eBay.
     listing.aiNote = aiNote;
     listing.draftNote = draftNote;
-    listing.timing = timing;
+    await logCamera(timing, draftId, listing.categoryName, listing.categoryId);
 
     // 6. Save the completed draft.
     await saveDraft(draftId, {
@@ -170,7 +184,7 @@ export async function POST(request) {
     try {
       await saveDraft(draftId, {
         id: draftId,
-        listing: { aiNote, draftNote, timing },
+        listing: { aiNote, draftNote },
         aiPhotos,
         listingPhotos,
         status: "error",

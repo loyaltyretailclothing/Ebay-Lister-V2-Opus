@@ -8,7 +8,7 @@ import { getCategories, getSpecifics } from "@/lib/ebayCache";
 import { promoInfo } from "@/components/create/status";
 import { shortItemName } from "@/lib/titleKeywords";
 import { createActiveClock } from "@/lib/activeClock";
-import { buildEntry, cleanMs } from "@/lib/efficiency";
+import { buildDraftEntry, cleanMs } from "@/lib/efficiency";
 
 // Everything Create Listing does, shared by the desktop and phone layouts:
 // the listing and its photos, Analyze, Save / Update Draft, List on eBay,
@@ -609,9 +609,9 @@ export default function useListingEditor() {
           url: data.url,
           promoResult: data.promoResult || "",
         });
-        // Efficiency Tracker: one log entry for this item. Best-effort —
-        // a failed log never gets in the way of listing.
-        const entry = buildEntry({
+        // Efficiency Tracker (draft tracker): one entry for this listing.
+        // Best-effort — a failed log never gets in the way of listing.
+        const entry = buildDraftEntry({
           listing,
           finishMs: finishBaseRef.current + (clockRef.current?.take() || 0),
           analyses: analysesRef.current,

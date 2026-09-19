@@ -1,20 +1,19 @@
 import cloudinary from "./cloudinary";
-import { cleanEntry } from "./efficiency";
+import { cleanEntry, entryId } from "./efficiency";
 
-// Efficiency Tracker log — ONE small raw file per listed item in Cloudinary.
-// Add-only: a new file is written for every entry and nothing is ever
-// overwritten, so two people listing at once can't clobber each other (the
-// whole-file overwrite that lost the category settings can't happen here).
-// Every field is also mirrored into the file's context metadata, so the
-// report reads the whole log with one list call instead of downloading
-// each file.
+// Efficiency Tracker log — ONE small raw file per event in Cloudinary
+// (a camera session, or a draft being listed). Each file has its own stable
+// id (camera_<draftId> / draft_<listingId>), so nothing ever overwrites a
+// different entry — two people working at once can't clobber each other,
+// and a retried request just rewrites its own entry instead of doubling it.
+// Every field is mirrored into the file's context metadata, so the report
+// reads the whole log with one list call.
 
 const LOG_FOLDER = "ebay-listings/logs/efficiency";
 
 export async function writeEntry(entry) {
   const clean = cleanEntry(entry);
   if (!clean) throw new Error("Invalid efficiency entry");
-  const id = `eff_${Date.parse(clean.listedAt)}_${Math.random().toString(36).slice(2, 8)}`;
   const context = Object.fromEntries(
     Object.entries(clean).map(([k, v]) => [k, String(v).replace(/[|=]/g, " ")])
   );
@@ -23,8 +22,8 @@ export async function writeEntry(entry) {
       {
         resource_type: "raw",
         folder: LOG_FOLDER,
-        public_id: id,
-        overwrite: false,
+        public_id: entryId(clean),
+        overwrite: true,
         context,
       },
       (error, result) => (error ? reject(error) : resolve(result))
@@ -52,5 +51,5 @@ export async function listEntries() {
     }
     cursor = result.next_cursor;
   } while (cursor);
-  return entries.sort((a, b) => (a.listedAt < b.listedAt ? -1 : 1));
+  return entries.sort((a, b) => (a.at < b.at ? -1 : 1));
 }
