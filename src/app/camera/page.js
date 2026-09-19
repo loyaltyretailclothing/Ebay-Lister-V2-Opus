@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Camera from "@/components/Camera";
 import { CheckIcon, ChevronLeftIcon, XIcon } from "@/components/ui/Icons";
 import MicButton, { VoiceStatus } from "@/components/ui/MicButton";
 import useVoiceNote, { appendSpoken } from "@/hooks/useVoiceNote";
+import { createActiveClock } from "@/lib/activeClock";
 
 // /camera — phone only, full screen, no nav bar.
 //
@@ -42,6 +43,19 @@ export default function CameraPage() {
   // Mic next to each note button: speaking adds to that note directly.
   const voice = useVoiceNote();
 
+  // Efficiency Tracker: active time shooting (camera open → Done) and
+  // reviewing (Done → Create Draft). ← Back adds more shooting time.
+  const clockRef = useRef(null);
+  const timingRef = useRef({ shootMs: 0, reviewMs: 0, shotAt: "" });
+  useEffect(() => {
+    clockRef.current = createActiveClock();
+    timingRef.current.shotAt = new Date().toISOString();
+    return () => clockRef.current?.stop();
+  }, []);
+  const lap = (part) => {
+    if (clockRef.current) timingRef.current[part] += clockRef.current.take();
+  };
+
   function openNoteModal(which) {
     voice.stop();
     setNoteDraft(which === "ai" ? aiNote : draftNote);
@@ -63,6 +77,7 @@ export default function CameraPage() {
   }
 
   function handleCameraDone(captured) {
+    lap("shootMs");
     // Photos removed in the camera strip: release them and drop their picks.
     const keep = new Set(captured.map((p) => p.url));
     photos.forEach((p) => {
@@ -112,6 +127,7 @@ export default function CameraPage() {
 
   async function handleCreateDraft() {
     if (photos.length === 0 || submitting) return;
+    lap("reviewMs");
     setSubmitting(true);
     setError("");
     setUploadProgress({ done: 0, total: photos.length });
@@ -175,6 +191,12 @@ export default function CameraPage() {
           aiPhotoIndices,
           aiNote,
           draftNote,
+          timing: {
+            shootMs: Math.round(timingRef.current.shootMs),
+            reviewMs: Math.round(timingRef.current.reviewMs),
+            photos: photos.length,
+            shotAt: timingRef.current.shotAt,
+          },
         }),
       }).catch((err) => {
         // Logged only — the server still writes an error draft on its side.
@@ -204,7 +226,10 @@ export default function CameraPage() {
         <div className="flex h-14 shrink-0 items-center gap-2 border-b border-line pl-1 pr-1.5 pt-[env(safe-area-inset-top)]">
           <button
             type="button"
-            onClick={() => setPhase("capture")}
+            onClick={() => {
+              lap("reviewMs");
+              setPhase("capture");
+            }}
             disabled={submitting}
             className="inline-flex h-11 cursor-pointer items-center gap-[5px] rounded-card border-0 bg-transparent px-2.5 font-sans text-lg font-medium text-accent disabled:opacity-50"
           >

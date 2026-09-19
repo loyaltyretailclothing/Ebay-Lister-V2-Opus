@@ -31,6 +31,11 @@ export const CreateIcon = (p) => (
     <path d="M12 8.4v7.2M8.4 12h7.2" />
   </Svg>
 );
+export const ChartIcon = (p) => (
+  <Svg {...p}>
+    <path d="M4 20h16M6.5 16.5V11M11 16.5V6.5M15.5 16.5v-4M20 16.5V8.5" />
+  </Svg>
+);
 export const SettingsIcon = (p) => (
   <Svg {...p}>
     <path d="M3.5 7.5h10M18.4 7.5h2.1M3.5 16.5h4.1M12.4 16.5h8.1" />

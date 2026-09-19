@@ -7,6 +7,8 @@ import { INITIAL_LISTING, blankListingKeepingDefaults } from "@/lib/listingDefau
 import { getCategories, getSpecifics } from "@/lib/ebayCache";
 import { promoInfo } from "@/components/create/status";
 import { shortItemName } from "@/lib/titleKeywords";
+import { createActiveClock } from "@/lib/activeClock";
+import { buildEntry, cleanMs } from "@/lib/efficiency";
 
 // Everything Create Listing does, shared by the desktop and phone layouts:
 // the listing and its photos, Analyze, Save / Update Draft, List on eBay,
@@ -88,6 +90,46 @@ export default function useListingEditor() {
   const [researchMode, setResearchMode] = useState(null); // 'google' | null
 
   const busy = analyzing || savingDraft || submitting || loadingDraft || deleting;
+
+  // --- Efficiency Tracker: active time finishing each listing -------------
+  // Counts while a listing is in the form (active time only, see
+  // lib/activeClock). A draft left and reopened later keeps adding up: the
+  // time is saved on the draft (listing.timing.finishMs) with Save/Update
+  // Draft, and remembered for this page visit even if it isn't saved.
+  const clockRef = useRef(null);
+  const timedIdRef = useRef(null); // draft being timed (null = unsaved listing)
+  const finishBaseRef = useRef(0); // earlier sittings for that draft
+  const analysesRef = useRef(0);
+  const sittingsRef = useRef(new Map()); // draftId → ms, this page visit
+  useEffect(() => {
+    clockRef.current = createActiveClock();
+    return () => clockRef.current?.stop();
+  }, []);
+  const finishSoFar = useCallback(
+    () => finishBaseRef.current + (clockRef.current?.read() || 0),
+    []
+  );
+  // listing.timing with the finishing time so far (saved with the draft).
+  const timingForSave = useCallback(
+    (l) => ({
+      ...(l.timing || {}),
+      finishMs: Math.round(finishSoFar()),
+      analyses: analysesRef.current,
+    }),
+    [finishSoFar]
+  );
+  const startTiming = useCallback((nextId, saved) => {
+    const took = clockRef.current?.take() || 0;
+    if (timedIdRef.current) {
+      sittingsRef.current.set(timedIdRef.current, finishBaseRef.current + took);
+    }
+    timedIdRef.current = nextId || null;
+    finishBaseRef.current = Math.max(
+      cleanMs(saved?.finishMs),
+      (nextId && sittingsRef.current.get(nextId)) || 0
+    );
+    analysesRef.current = parseInt(saved?.analyses, 10) || 0;
+  }, []);
 
   // --- dirty tracking -----------------------------------------------------
   const setDirty = useCallback((v) => {
@@ -228,6 +270,7 @@ export default function useListingEditor() {
           });
           setAiPhotosState(data.draft.aiPhotos || []);
           setListingPhotosState(data.draft.listingPhotos || []);
+          startTiming(id, l.timing);
           setDraftId(id);
           setDraftInUrl(id);
           setDirty(false);
@@ -247,7 +290,7 @@ export default function useListingEditor() {
       }
       return false;
     },
-    [clearStatus, newSession, setDirty, getSettings]
+    [clearStatus, newSession, setDirty, getSettings, startTiming]
   );
 
   const clearToBlank = useCallback(
@@ -258,12 +301,13 @@ export default function useListingEditor() {
       setListing((prev) => blankListingKeepingDefaults(prev));
       setAiPhotosState([]);
       setListingPhotosState([]);
+      startTiming(null, null);
       setDraftId(null);
       setDraftInUrl(null);
       setDirty(false);
       newSession();
     },
-    [clearStatus, newSession, setDirty]
+    [clearStatus, newSession, setDirty, startTiming]
   );
 
   // Load ?draft=… on first visit, and the drafts list.
@@ -299,13 +343,15 @@ export default function useListingEditor() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           id: draftId || undefined,
-          listing,
+          listing: { ...listing, timing: timingForSave(listing) },
           aiPhotos,
           listingPhotos,
         }),
       });
       const data = await res.json();
       if (data.success) {
+        // A new listing saved for the first time: keep timing it as this draft.
+        if (!timedIdRef.current) timedIdRef.current = data.id;
         setDraftId(data.id);
         setDraftInUrl(data.id);
         setDirty(false);
@@ -323,7 +369,7 @@ export default function useListingEditor() {
       setSavingDraft(false);
     }
     return false;
-  }, [savingDraft, draftId, listing, aiPhotos, listingPhotos, setDirty, refreshDrafts]);
+  }, [savingDraft, draftId, listing, aiPhotos, listingPhotos, setDirty, refreshDrafts, timingForSave]);
 
   // --- switching with the unsaved-changes prompt --------------------------
   const guardSwitch = useCallback(
@@ -453,6 +499,7 @@ export default function useListingEditor() {
       return;
     }
     const s = sessionRef.current;
+    analysesRef.current += 1;
     setAnalyzing(true);
     setError("");
     setLookup(null);
@@ -562,6 +609,23 @@ export default function useListingEditor() {
           url: data.url,
           promoResult: data.promoResult || "",
         });
+        // Efficiency Tracker: one log entry for this item. Best-effort —
+        // a failed log never gets in the way of listing.
+        const entry = buildEntry({
+          listing,
+          finishMs: finishBaseRef.current + (clockRef.current?.take() || 0),
+          analyses: analysesRef.current,
+          listingId: data.listingId,
+          listedAt: new Date().toISOString(),
+        });
+        if (publishedDraft) sittingsRef.current.delete(publishedDraft);
+        timedIdRef.current = null;
+        finishBaseRef.current = 0;
+        fetch("/api/efficiency", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(entry),
+        }).catch(() => {});
         setDraftError("");
         setNotice(null);
         // The draft has been published — delete it.

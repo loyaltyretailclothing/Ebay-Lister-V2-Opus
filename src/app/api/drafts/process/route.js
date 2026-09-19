@@ -9,6 +9,7 @@ import {
   applyDescriptionTemplate,
 } from "@/lib/listingPipeline";
 import { applyKeywordTheme } from "@/lib/titleKeywords";
+import { cleanCameraTiming } from "@/lib/efficiency";
 
 // Pipeline takes ~30-60s (Claude vision + eBay + Claude pass 2 + optional
 // Brave refine). Vercel default is 10s on Hobby / 60s on Pro; push to 60s so
@@ -34,6 +35,7 @@ export async function POST(request) {
   let aiPhotos = [];
   let aiNote = "";
   let draftNote = "";
+  let timing = null;
 
   try {
     const body = await request.json();
@@ -57,6 +59,9 @@ export async function POST(request) {
     // legacy `notes` as a fallback for the aiNote.
     aiNote = body.aiNote || body.notes || "";
     draftNote = body.draftNote || "";
+    // Efficiency Tracker: the camera's active shooting / review time rides
+    // on the draft until it's listed (see docs Efficiency Tracker Plan).
+    timing = cleanCameraTiming(body.timing);
 
     if (listingPhotos.length === 0) {
       return NextResponse.json(
@@ -69,7 +74,7 @@ export async function POST(request) {
     //    the moment the client fires this request.
     await saveDraft(draftId, {
       id: draftId,
-      listing: { aiNote, draftNote },
+      listing: { aiNote, draftNote, timing },
       aiPhotos,
       listingPhotos,
       status: "processing",
@@ -143,6 +148,7 @@ export async function POST(request) {
     // publish route ignores unknown fields, so neither reaches eBay.
     listing.aiNote = aiNote;
     listing.draftNote = draftNote;
+    listing.timing = timing;
 
     // 6. Save the completed draft.
     await saveDraft(draftId, {
@@ -164,7 +170,7 @@ export async function POST(request) {
     try {
       await saveDraft(draftId, {
         id: draftId,
-        listing: { aiNote, draftNote },
+        listing: { aiNote, draftNote, timing },
         aiPhotos,
         listingPhotos,
         status: "error",

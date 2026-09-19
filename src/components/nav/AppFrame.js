@@ -6,6 +6,7 @@ import { useState } from "react";
 import useWide from "@/hooks/useWide";
 import {
   CameraIcon,
+  ChartIcon,
   CreateIcon,
   DraftsIcon,
   LibraryIcon,
@@ -18,7 +19,7 @@ import {
 // everything smaller gets the phone bottom bar. The camera is full screen
 // with neither.
 //
-// Desktop rail: logo, Create Listing, Settings. Library and Drafts live in
+// Desktop rail: logo, Create Listing, Efficiency Tracker (desktop only), Settings. Library and Drafts live in
 // the Photos | Drafts panel inside Create Listing; Camera is phone only;
 // Sourcing is unlinked (the page still works at /sourcing).
 export default function AppFrame({ children }) {
@@ -44,6 +45,7 @@ export default function AppFrame({ children }) {
 function DesktopRail({ pathname }) {
   const onCreate = pathname === "/" || pathname.startsWith("/generate");
   const onSettings = pathname.startsWith("/settings") || pathname.startsWith("/oauth");
+  const onTrack = pathname.startsWith("/efficiency");
   return (
     <nav
       aria-label="Main"
@@ -63,6 +65,15 @@ function DesktopRail({ pathname }) {
       >
         <CreateIcon className="size-[19px]" />
         <span className="lbl text-2xs tracking-[0.05em] text-current">Create</span>
+      </Link>
+      <Link
+        href="/efficiency"
+        aria-label="Efficiency Tracker"
+        aria-current={onTrack ? "page" : undefined}
+        className={`rail ${onTrack ? "rail-on" : ""}`}
+      >
+        <ChartIcon className="size-[19px]" />
+        <span className="lbl text-2xs tracking-[0.05em] text-current">Track</span>
       </Link>
       <div className="grow" />
       <Link
