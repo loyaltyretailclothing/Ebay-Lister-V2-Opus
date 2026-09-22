@@ -216,7 +216,12 @@ function mapAspects(aspects) {
     dataType: aspect.aspectConstraint?.aspectDataType || "STRING",
     mode: aspect.aspectConstraint?.aspectMode || "FREE_TEXT",
     values: (aspect.aspectValues || []).map((v) => v.localizedValue),
-    maxValues: aspect.aspectConstraint?.aspectMaxValues || 1,
+    // How many answers eBay takes for this one. The old `aspectMaxValues`
+    // doesn't exist in eBay's API (it always came back empty); the real
+    // field is itemToAspectCardinality: SINGLE or MULTI. Anything but a
+    // clear MULTI is treated as one answer only — e.g. Closure, which eBay
+    // rejects when two are sent.
+    multi: aspect.aspectConstraint?.itemToAspectCardinality === "MULTI",
   }));
 }
 
@@ -284,7 +289,7 @@ Rules:
 - For "Size" specifics, match the format eBay expects (e.g. "Regular - S" not just "S" if the presets use that format).
 - For "Department" or "Gender" specifics, map observations like "Mens" to the eBay preset (e.g. "Men").
 - THEME: If the request says "Theme is managed by the app", return null for Theme — the app fills it with overflow keywords. Otherwise: use Theme as an SEO keyword overflow field. Pick 2-3 relevant themes that did NOT fit in the 80-character title. Only use actual themes/styles (e.g. "Athletic", "Casual", "Outdoor", "Holiday", "Tropical", "Vintage", "Streetwear"). Do NOT put features here — Stretch, Lined, Moisture-Wicking, etc. are features, not themes. Never leave Theme null — always find relevant keywords.
-- MULTI-VALUE SPECIFICS: Some specifics accept multiple values (like Theme, Features, etc.). When providing multiple values for a single specific, return them as a JSON array: ["value1", "value2"]. NEVER combine multiple values into one comma-separated string.
+- HOW MANY VALUES: Each specific in the list says whether eBay accepts more than one value ("multi": true) or exactly one ("multi": false). For "multi": false you MUST return a single string — never an array, never two values joined by a comma, slash or "and" (e.g. Closure must be "Button", NOT ["Button","Zip"] and NOT "Button/Zip"). eBay rejects the whole listing otherwise. For "multi": true you may return a JSON array of values: ["value1", "value2"]. NEVER combine multiple values into one comma-separated string.
 - SEASON: Infer the season from the item type, material, and weight. Fleece/heavy knits = "Fall", "Winter". Linen/lightweight = "Spring", "Summer". Use eBay preset values when they match.
 - Return ONLY valid JSON, no markdown or explanation.
 
@@ -311,6 +316,8 @@ export async function fillItemSpecifics(
   const specificsForPrompt = specifics.map((s) => ({
     name: s.name,
     required: s.required,
+    // Whether eBay takes more than one value for this one (see mapAspects).
+    multi: s.multi === true,
     values: s.values.length > 0 ? s.values.slice(0, 200) : "free_text",
   }));
 
