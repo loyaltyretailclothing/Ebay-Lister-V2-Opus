@@ -34,6 +34,13 @@ export async function saveDraft(draftId, payload) {
           // Skip Draft: Next draft passes over it. Mirrored here so the
           // queue can show the grey "Skipped" label without opening the JSON.
           skipped: payload.listing?.skipDraft ? "true" : "",
+          // Seasonal Hold: the day the app posts this draft by itself, and
+          // its price, so the On Hold page can total up what's waiting
+          // without downloading every draft.
+          holdUntil: payload.listing?.holdUntil || "",
+          holdSeason: payload.listing?.holdSeason || "",
+          price: String(payload.listing?.price ?? ""),
+          sku: String(payload.listing?.sku || "").slice(0, 60),
         },
       },
       (error, result) => {
@@ -71,6 +78,10 @@ export async function listDrafts() {
         status: ctx.status || "ready",
         errorMessage: ctx.errorMessage || "",
         skipped: ctx.skipped === "true",
+        holdUntil: ctx.holdUntil || "",
+        holdSeason: ctx.holdSeason || "",
+        price: parseFloat(ctx.price) || 0,
+        sku: ctx.sku || "",
         createdAt: draftCreatedAt(id, r.created_at),
         url: r.secure_url,
       };

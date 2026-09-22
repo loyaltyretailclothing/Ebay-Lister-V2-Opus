@@ -6,6 +6,7 @@ Ideas we want to come back to. Nothing here is built or agreed in detail yet. Se
 - **What:** on a schedule (e.g. every morning), the app checks active eBay listings and applies rules the users set once. No AI — just rules and arithmetic.
   - **Offers:** e.g. listed 14+ days with watchers, no offer sent in the last 7 days → send watchers 10% off (eBay's own "send offer to interested buyers").
   - **Markdowns:** e.g. 30 days → −5%, 60 days → another −5%, never below a floor.
+  - **Season-end markdown (users' idea 2026-09-21):** leave the item listed (it's already up, keeps its watchers and search history) but drop the price as its season ends — and ONLY for items whose season is ending, e.g. parkas marked down in spring, not a summer shirt just because it's old. Needs the same season dates as [[Seasonal Hold Plan]]. Preferred over ending/relisting dead-season listings ("pull back to drafts"), which was considered and dropped.
 - **How:** Vercel scheduled job → ask eBay for active listings (age, price, watchers) → apply rules → tell eBay to send offers / update prices.
 - **Safety rails:** floor price, excluded items, a "show me first" mode that lists planned actions for approval, and a log of every offer/price change.
 - **Check with eBay's live API before building:** which listings are eligible for offers, the smallest discount allowed, how often watchers can be offered, and whether markdowns should use eBay's own sale/markdown feature (crossed-out price).

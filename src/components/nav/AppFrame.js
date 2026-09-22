@@ -7,6 +7,7 @@ import useWide from "@/hooks/useWide";
 import {
   CameraIcon,
   ChartIcon,
+  ClockIcon,
   CreateIcon,
   DraftsIcon,
   LibraryIcon,
@@ -46,6 +47,7 @@ function DesktopRail({ pathname }) {
   const onCreate = pathname === "/" || pathname.startsWith("/generate");
   const onSettings = pathname.startsWith("/settings") || pathname.startsWith("/oauth");
   const onTrack = pathname.startsWith("/efficiency");
+  const onHold = pathname.startsWith("/on-hold");
   return (
     <nav
       aria-label="Main"
@@ -65,6 +67,15 @@ function DesktopRail({ pathname }) {
       >
         <CreateIcon className="size-[19px]" />
         <span className="lbl text-2xs tracking-[0.05em] text-current">Create</span>
+      </Link>
+      <Link
+        href="/on-hold"
+        aria-label="On Hold"
+        aria-current={onHold ? "page" : undefined}
+        className={`rail ${onHold ? "rail-on" : ""}`}
+      >
+        <ClockIcon className="size-[19px]" />
+        <span className="lbl text-2xs tracking-[0.05em] text-current">Hold</span>
       </Link>
       <Link
         href="/efficiency"

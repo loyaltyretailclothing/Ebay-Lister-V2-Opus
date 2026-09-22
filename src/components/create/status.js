@@ -2,6 +2,7 @@
 
 import { AlertIcon, CheckCircleIcon, CheckIcon, Spinner } from "@/components/ui/Icons";
 import { DismissX } from "@/components/create/parts";
+import { fmtHoldDate } from "@/lib/seasons";
 
 // Status messages: desktop shows them all centered in the action bar; the
 // phone has two strips. Results of List on
@@ -130,6 +131,13 @@ export function TopMessage({ editor }) {
       </Pill>
     );
   }
+  if (e.held) {
+    return (
+      <Pill tone="ok" icon={<CheckCircleIcon className="size-3.5 shrink-0" />} onDismiss={e.dismissHeld}>
+        Held for {e.held.season} — it posts itself on {fmtHoldDate(e.held.date)}
+      </Pill>
+    );
+  }
   if (e.notice?.kind === "deleted") {
     return (
       <Pill
@@ -199,6 +207,17 @@ export function PhoneTopLane({ editor }) {
       <div className="lane lane-ok shrink-0 px-3">
         <CheckIcon className="size-[13px]" />
         <p>Draft saved</p>
+      </div>
+    );
+  }
+  if (e.held) {
+    return (
+      <div className="lane lane-ok shrink-0 items-center px-3">
+        <CheckIcon className="size-[13px]" />
+        <p>
+          Held for {e.held.season} — posts itself on {fmtHoldDate(e.held.date)}
+        </p>
+        <DismissX onClick={e.dismissHeld} />
       </div>
     );
   }

@@ -6,6 +6,7 @@ import useWide from "@/hooks/useWide";
 const SECTIONS = [
   { key: "categories", href: "/settings/categories", label: "Categories", short: "Categories", desc: "eBay categories and their multi-value specifics" },
   { key: "policies", href: "/settings/policies", label: "Policies", short: "Policies", desc: "Payment, shipping and returns" },
+  { key: "seasons", href: "/settings/seasons", label: "Seasons", short: "Seasons", desc: "Hold dates and what each season covers" },
   { key: "account", href: "/oauth", label: "eBay Account", short: "Account", desc: "Connection and refresh token" },
 ];
 

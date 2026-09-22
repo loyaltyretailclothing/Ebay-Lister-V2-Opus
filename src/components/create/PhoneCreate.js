@@ -5,7 +5,8 @@ import Link from "next/link";
 import useListingForm from "@/hooks/useListingForm";
 import { listButtonLabel, missingRequired } from "@/lib/listingDefaults";
 import { shortItemName } from "@/lib/titleKeywords";
-import { MoreIcon, PlusIcon, SearchIcon, Spinner, TrashIcon } from "@/components/ui/Icons";
+import { ClockIcon, MoreIcon, PlusIcon, SearchIcon, Spinner, TrashIcon } from "@/components/ui/Icons";
+import HoldDialog from "@/components/create/HoldDialog";
 import PhotoZone from "@/components/create/PhotoZone";
 import Notes from "@/components/create/Notes";
 import { PhonePin, PhoneTopLane } from "@/components/create/status";
@@ -177,6 +178,8 @@ export default function PhoneCreate({ editor }) {
 function PhotosTab({ editor: e }) {
   const zoneRef = useRef(null);
   const googleRef = useRef(null);
+  // Seasonal Hold: park the finished draft until its season.
+  const [holdOpen, setHoldOpen] = useState(false);
   const picking = e.researchMode === "google";
 
   // Google pick mode: jump up to the listing photos (the button sits below
@@ -259,6 +262,12 @@ function PhotosTab({ editor: e }) {
           queue.
         </p>
       )}
+
+      <button type="button" className="btn btn-touch w-full" onClick={() => setHoldOpen(true)} disabled={e.busy}>
+        <ClockIcon className="size-4" />
+        Hold until…
+      </button>
+      <HoldDialog editor={e} open={holdOpen} onClose={() => setHoldOpen(false)} touch />
 
       <Link href="/library" className="btn btn-touch w-full">
         Open Photo Library

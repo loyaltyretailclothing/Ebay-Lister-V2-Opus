@@ -22,17 +22,26 @@ export async function GET(_request, { params }) {
   }
 }
 
-// PATCH /api/drafts/[id] — change ONLY the Skip Draft mark.
-// Body: { skipDraft: boolean }
-// Reads the saved draft and writes it back with just that one field changed,
-// so ticking Skip Draft never saves other edits the user hasn't saved yet.
+// PATCH /api/drafts/[id] — change ONLY the Skip Draft mark, or ONLY the
+// seasonal hold. Body: { skipDraft: boolean } or
+// { holdUntil: "YYYY-MM-DD" | null, holdSeason?: string }.
+// Reads the saved draft and writes it back with just that field changed, so
+// neither ever saves other edits the user hasn't saved yet.
 export async function PATCH(request, { params }) {
   try {
     const { id } = await params;
     const body = await request.json();
-    if (typeof body.skipDraft !== "boolean") {
+    const isSkip = typeof body.skipDraft === "boolean";
+    const isHold = "holdUntil" in body;
+    if (!isSkip && !isHold) {
       return NextResponse.json(
-        { success: false, error: "skipDraft must be true or false" },
+        { success: false, error: "Nothing to change" },
+        { status: 400 }
+      );
+    }
+    if (isHold && body.holdUntil !== null && !/^\d{4}-\d{2}-\d{2}$/.test(body.holdUntil || "")) {
+      return NextResponse.json(
+        { success: false, error: "holdUntil must be YYYY-MM-DD or null" },
         { status: 400 }
       );
     }
@@ -43,13 +52,19 @@ export async function PATCH(request, { params }) {
         { status: 404 }
       );
     }
+    const change = isSkip
+      ? { skipDraft: body.skipDraft }
+      : {
+          holdUntil: body.holdUntil || "",
+          holdSeason: body.holdUntil ? String(body.holdSeason || "").slice(0, 20) : "",
+        };
     await saveDraft(id, {
       ...draft,
-      listing: { ...(draft.listing || {}), skipDraft: body.skipDraft },
+      listing: { ...(draft.listing || {}), ...change },
     });
-    return NextResponse.json({ success: true, skipDraft: body.skipDraft });
+    return NextResponse.json({ success: true, ...change });
   } catch (error) {
-    console.error("Skip draft error:", error);
+    console.error("Draft patch error:", error);
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }

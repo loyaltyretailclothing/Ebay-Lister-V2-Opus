@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import useListingForm from "@/hooks/useListingForm";
 import { listButtonLabel, missingRequired } from "@/lib/listingDefaults";
-import { AnalyzeIcon, CheckIcon, PlusIcon, Spinner, TrashIcon } from "@/components/ui/Icons";
+import { AnalyzeIcon, CheckIcon, ClockIcon, PlusIcon, Spinner, TrashIcon } from "@/components/ui/Icons";
+import HoldDialog from "@/components/create/HoldDialog";
 import LibraryPanel from "@/components/create/LibraryPanel";
 import PhotoZone from "@/components/create/PhotoZone";
 import Notes from "@/components/create/Notes";
@@ -229,6 +230,8 @@ function PhotosColumn({ editor: e }) {
 
 // Mounted once per session (keyed by it in DesktopCreate).
 function FormPanes({ editor: e, missing }) {
+  // Seasonal Hold: finish the draft, then park it until its season.
+  const [holdOpen, setHoldOpen] = useState(false);
   const form = useListingForm(e.listing, e.formSetters(e.session));
   const p = { listing: e.listing, form };
 
@@ -260,11 +263,23 @@ function FormPanes({ editor: e, missing }) {
         <OptionsGroup {...p} />
         <ShippingFields {...p} />
         <div className="flex items-center gap-3 border-t border-line pt-3">
-          <p className="m-0 grow text-sm text-ink-3">
-            Photos upload in the order shown; the first is the gallery image.
-          </p>
+          <div className="grow">
+            <p className="m-0 text-sm text-ink-3">
+              Photos upload in the order shown; the first is the gallery image.
+            </p>
+            <button
+              type="button"
+              className="btn btn-sm mt-1.5"
+              onClick={() => setHoldOpen(true)}
+              disabled={e.busy}
+            >
+              <ClockIcon className="size-[13px]" />
+              Hold until…
+            </button>
+          </div>
           <ListButton editor={e} missing={missing} className="btn btn-primary btn-lg min-w-[200px]" />
         </div>
+        <HoldDialog editor={e} open={holdOpen} onClose={() => setHoldOpen(false)} />
       </div>
     </section>
   );

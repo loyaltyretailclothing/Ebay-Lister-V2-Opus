@@ -66,6 +66,9 @@ export default function useListingEditor() {
   // itself after 10 seconds (a promotion problem stays until dismissed).
   const [listed, setListed] = useState(null);
   const listedTimer = useRef(null);
+  // "Held for Winter — posts itself on …", same idea.
+  const [held, setHeld] = useState(null);
+  const heldTimer = useRef(null);
 
   const [savingDraft, setSavingDraft] = useState(false);
   const [saveFlash, setSaveFlash] = useState(false);
@@ -81,6 +84,7 @@ export default function useListingEditor() {
   const [draftsLoaded, setDraftsLoaded] = useState(false);
   const [draftsError, setDraftsError] = useState("");
   const [caughtUp, setCaughtUp] = useState(false);
+  const [heldCount, setHeldCount] = useState(0);
 
   // Save / Discard / Cancel prompt. `run` continues the switch.
   const [leavePrompt, setLeavePrompt] = useState(null);
@@ -211,7 +215,10 @@ export default function useListingEditor() {
       const res = await fetch("/api/drafts", { cache: "no-store" });
       const data = await res.json();
       if (data.success) {
-        const sorted = sortDrafts(data.drafts || []);
+        const all = data.drafts || [];
+        // Held drafts wait on the On Hold page — they're out of the queue.
+        const sorted = sortDrafts(all.filter((d) => !d.holdUntil));
+        setHeldCount(all.length - sorted.length);
         setDrafts(sorted);
         setDraftsLoaded(true);
         return sorted;
@@ -370,6 +377,52 @@ export default function useListingEditor() {
     }
     return false;
   }, [savingDraft, draftId, listing, aiPhotos, listingPhotos, setDirty, refreshDrafts, timingForSave]);
+
+  // --- Seasonal Hold ------------------------------------------------------
+  // Saves the finished draft with its posting date and moves on. The draft
+  // leaves the queue; the app posts it on that morning by itself.
+  const holdDraft = useCallback(
+    async ({ date, season }) => {
+      if (savingDraft) return false;
+      setSavingDraft(true);
+      setSaveError("");
+      try {
+        const res = await fetch("/api/drafts", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            id: draftId || undefined,
+            listing: {
+              ...listing,
+              holdUntil: date,
+              holdSeason: season,
+              timing: timingForSave(listing),
+            },
+            aiPhotos,
+            listingPhotos,
+          }),
+        });
+        const data = await res.json();
+        if (!data.success) throw new Error(data.error || "Couldn't hold this draft");
+        setDirty(false);
+        setDraftId(null);
+        setDraftInUrl(null);
+        timedIdRef.current = null;
+        finishBaseRef.current = 0;
+        // Outlives the switch to the next draft (like "Listed on eBay!").
+        clearTimeout(heldTimer.current);
+        setHeld({ date, season });
+        heldTimer.current = setTimeout(() => setHeld(null), 8000);
+        return true;
+      } catch (err) {
+        setSaveError(err.message);
+        return false;
+      } finally {
+        setSavingDraft(false);
+      }
+    },
+    [savingDraft, draftId, listing, aiPhotos, listingPhotos, setDirty, timingForSave]
+  );
 
   // --- switching with the unsaved-changes prompt --------------------------
   const guardSwitch = useCallback(
@@ -580,7 +633,13 @@ export default function useListingEditor() {
     }
   }, []);
 
-  useEffect(() => () => clearTimeout(listedTimer.current), []);
+  useEffect(
+    () => () => {
+      clearTimeout(listedTimer.current);
+      clearTimeout(heldTimer.current);
+    },
+    []
+  );
 
   const submit = useCallback(async () => {
     // SKU is required — never post without one (the server checks too).
@@ -720,6 +779,11 @@ export default function useListingEditor() {
     dismissSubmitStatus: () => setSubmitStatus(null),
     listed,
     dismissListed,
+    held,
+    dismissHeld: () => {
+      clearTimeout(heldTimer.current);
+      setHeld(null);
+    },
     savingDraft,
     saveFlash,
     saveError,
@@ -734,6 +798,8 @@ export default function useListingEditor() {
     draftsError,
     refreshDrafts,
     caughtUp,
+    heldCount,
+    holdDraft,
     openDraft,
     nextDraft,
     newListing,
