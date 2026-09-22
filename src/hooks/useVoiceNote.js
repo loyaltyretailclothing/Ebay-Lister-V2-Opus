@@ -19,6 +19,8 @@ const subscribe = () => () => {};
 const SILENCE_MS = 1000;
 // If nothing is said at all, give up after this long.
 const NOTHING_SAID_MS = 8000;
+// How long the words stay on screen after the mic stops.
+const DONE_MS = 3000;
 
 const ERRORS = {
   "no-speech": "Didn't hear anything — tap the mic and try again.",
@@ -42,8 +44,10 @@ export default function useVoiceNote() {
   const supported = useSyncExternalStore(subscribe, () => !!Recognition(), () => false);
   const [active, setActive] = useState(null); // which note is listening
   const [heard, setHeard] = useState(""); // live words while listening
+  const [done, setDone] = useState(null); // { key, text } — stays 3s after
   const [error, setError] = useState(null); // { key, message }
   const recRef = useRef(null);
+  const doneTimer = useRef(null);
 
   const stop = useCallback(() => recRef.current?.stop(), []);
 
@@ -99,13 +103,22 @@ export default function useVoiceNote() {
       if (recRef.current === rec) recRef.current = null;
       // Words still being worked out when it stopped count too.
       const text = `${finalText} ${live}`.trim();
-      if (text) onText(text);
+      if (text) {
+        onText(text);
+        // Keep what was heard on screen for a moment — the mic turning off
+        // used to wipe it instantly, so you had to open the note to check.
+        clearTimeout(doneTimer.current);
+        setDone({ key, text });
+        doneTimer.current = setTimeout(() => setDone(null), DONE_MS);
+      }
       else if (!failed) setError({ key, message: ERRORS["no-speech"] });
       setActive((a) => (a === key ? null : a));
       setHeard("");
     };
 
     recRef.current = rec;
+    clearTimeout(doneTimer.current);
+    setDone(null);
     setError(null);
     setHeard("");
     setActive(key);
@@ -126,7 +139,13 @@ export default function useVoiceNote() {
     [active, start, stop]
   );
 
-  useEffect(() => () => recRef.current?.abort(), []);
+  useEffect(
+    () => () => {
+      recRef.current?.abort();
+      clearTimeout(doneTimer.current);
+    },
+    []
+  );
 
-  return { supported, active, heard, error, toggle, stop };
+  return { supported, active, heard, done, error, toggle, stop };
 }

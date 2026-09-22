@@ -28,6 +28,13 @@ export function VoiceStatus({ voice, noteKey, className = "" }) {
       </p>
     );
   }
+  if (voice.done?.key === noteKey) {
+    return (
+      <p className={`m-0 text-sm font-medium text-ok ${className}`}>
+        Added: “{voice.done.text}”
+      </p>
+    );
+  }
   if (voice.error?.key === noteKey) {
     return <p className={`m-0 text-sm font-medium text-bad ${className}`}>{voice.error.message}</p>;
   }
