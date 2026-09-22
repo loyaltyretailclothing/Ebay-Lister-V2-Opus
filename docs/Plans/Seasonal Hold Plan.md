@@ -1,6 +1,6 @@
 # Seasonal Hold Plan
 
-**Status: BUILT 2026-09-21/22, tested locally (nothing posted, no drafts changed), NOT live.**
+**Status: LIVE 2026-09-22.** `CRON_SECRET` set in Vercel by the users; both cron jobs confirmed listed in Vercel. Still to see: the first real posting morning.
 
 ## How it's built
 - `src/lib/seasons.js` — the four seasons, their dates (month is 1-12), what each covers, and `suggestSeason` (only outerwear/snow/swim/flannel words, and only when the date is 4+ weeks off).
@@ -17,9 +17,8 @@
 - On Hold page previewed with sample held drafts: totals, per-day cards, last-run banner.
 - The posting job ran locally with nothing due: posted 0, wrote no log. **Not yet tested end to end with a real held draft** — the first real posting morning is the proof.
 
-## Before it goes live
-- Add **`CRON_SECRET`** in Vercel (users' own value — Claude never handles secrets).
-- Check the Vercel plan allows 2 daily cron jobs; if not, fall back to posting when the app is first opened that day. See [[Home]], [[Draft Queue Plan]], [[Drafts and Camera Flow]], [[Future Features]].
+## Fallback if the crons ever stop running
+Post the day's held drafts when the app is first opened that morning (the users are in it daily). Not needed as of 2026-09-22. See [[Home]], [[Draft Queue Plan]], [[Drafts and Camera Flow]], [[Future Features]].
 
 ## Goal
 Finish a draft completely while the item is in front of you, then have the app **post it by itself** when its season arrives. Out-of-season items stop clogging the draft queue, and nothing has to be re-opened later.
