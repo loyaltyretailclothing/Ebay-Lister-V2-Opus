@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import SettingsShell from "@/components/settings/SettingsShell";
-import { SEASONS, fmtHoldDate, nextSeasonDate, ymd } from "@/lib/seasons";
+import { SEASONS, fmtHoldDate, nextSeasonDate, seasonStart, seasonStop, ymd } from "@/lib/seasons";
 
 // Settings → Seasons. What "Hold until…" means: the dates, and which items
 // belong to each season (from the research in
@@ -26,6 +26,10 @@ export default function SeasonsSettingsPage() {
                   <span className="badge">{fmtHoldDate(ymd(nextSeasonDate(s)))}</span>
                 </div>
                 <p className="m-0 mt-1 text-md text-ink-2">{s.covers}</p>
+                <p className="m-0 mt-0.5 text-md">
+                  <span className="text-ink-3">Stop listing after</span> <b>{seasonStop(s)}</b>{" "}
+                  <span className="text-ink-3">— hold the rest for {seasonStart(s)}</span>
+                </p>
                 {s.suggestFor.length > 0 && (
                   <p className="hint mt-1.5">
                     Suggested automatically for: {s.suggestFor.join(", ")}

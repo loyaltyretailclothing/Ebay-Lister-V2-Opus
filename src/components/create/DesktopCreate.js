@@ -10,6 +10,7 @@ import PhotoZone from "@/components/create/PhotoZone";
 import Notes from "@/components/create/Notes";
 import { TopMessage } from "@/components/create/status";
 import { shortItemName } from "@/lib/titleKeywords";
+import { SEASONS, seasonStart, seasonStop } from "@/lib/seasons";
 import { LeaveDialog, DeleteDraftDialog } from "@/components/create/dialogs";
 import {
   CategoryField,
@@ -262,22 +263,26 @@ function FormPanes({ editor: e, missing }) {
         <PricingFields {...p} />
         <OptionsGroup {...p} />
         <ShippingFields {...p} />
-        <div className="flex items-center gap-3 border-t border-line pt-3">
-          <div className="grow">
-            <p className="m-0 text-sm text-ink-3">
-              Photos upload in the order shown; the first is the gallery image.
-            </p>
-            <button
-              type="button"
-              className="btn btn-sm mt-1.5"
-              onClick={() => setHoldOpen(true)}
-              disabled={e.busy}
-            >
-              <ClockIcon className="size-[13px]" />
-              Hold until…
-            </button>
+        <div className="flex items-start gap-4 border-t border-line pt-3">
+          {/* When to post each season and when to stop — two lines, so the
+              box stays the height it always was. */}
+          <div
+            className="grid grow grid-cols-2 gap-x-3 text-2xs leading-[15px] text-ink-3"
+            title="Season: post from — stop listing after"
+          >
+            {SEASONS.map((s) => (
+              <span key={s.key} className="whitespace-nowrap">
+                <b className="text-ink-2">{s.label}</b> {seasonStart(s)} – {seasonStop(s)}
+              </span>
+            ))}
           </div>
-          <ListButton editor={e} missing={missing} className="btn btn-primary btn-lg min-w-[200px]" />
+          <div className="flex shrink-0 gap-2">
+            <button type="button" className="btn btn-lg" onClick={() => setHoldOpen(true)} disabled={e.busy}>
+              <ClockIcon className="size-3.5" />
+              Hold
+            </button>
+            <ListButton editor={e} missing={missing} className="btn btn-primary btn-lg" />
+          </div>
         </div>
         <HoldDialog editor={e} open={holdOpen} onClose={() => setHoldOpen(false)} />
       </div>

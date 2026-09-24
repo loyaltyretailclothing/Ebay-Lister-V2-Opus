@@ -12,6 +12,9 @@ export const SEASONS = [
     label: "Spring",
     month: 2,
     day: 15,
+    // After this, don't post new ones — hold them for next season instead.
+    stopMonth: 5,
+    stopDay: 15,
     covers: "Light jackets, cardigans, transitional pieces, dresses",
     // Only these item types get a suggestion — research says holding
     // ordinary clothes can cost more than it gains.
@@ -22,6 +25,8 @@ export const SEASONS = [
     label: "Summer",
     month: 3,
     day: 1,
+    stopMonth: 7,
+    stopDay: 15,
     covers: "Shorts, swimwear, tanks, linen",
     suggestFor: ["swim", "bikini", "trunks", "board short", "rash guard"],
   },
@@ -30,6 +35,8 @@ export const SEASONS = [
     label: "Fall",
     month: 8,
     day: 15,
+    stopMonth: 12,
+    stopDay: 15,
     covers: "Flannels, light jackets, sweaters, hoodies",
     suggestFor: ["flannel"],
   },
@@ -38,6 +45,8 @@ export const SEASONS = [
     label: "Winter",
     month: 9,
     day: 15,
+    stopMonth: 1,
+    stopDay: 31,
     covers: "Heavy coats, parkas, wool, snow gear",
     suggestFor: [
       "parka",
@@ -58,6 +67,12 @@ export const SEASONS = [
 ];
 
 export const seasonByKey = (key) => SEASONS.find((s) => s.key === key) || null;
+
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+// "Sep 15" — the season's posting date, with no year.
+export const seasonStart = (s) => `${MONTHS[s.month - 1]} ${s.day}`;
+// "Jan 31" — after this, hold them for next season instead of listing.
+export const seasonStop = (s) => `${MONTHS[s.stopMonth - 1]} ${s.stopDay}`;
 
 // The next time this season's date comes around (today counts).
 export function nextSeasonDate(season, from = new Date()) {

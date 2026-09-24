@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { SEASONS, fmtHoldDate, nextSeasonDate, suggestSeason, ymd } from "@/lib/seasons";
+import { SEASONS, fmtHoldDate, nextSeasonDate, seasonStop, suggestSeason, ymd } from "@/lib/seasons";
 
 // "Hold until…" — the finished draft leaves the queue and the app posts it
 // on the chosen morning by itself. See docs/Plans/Seasonal Hold Plan.md.
@@ -72,7 +72,10 @@ export default function HoldDialog({ editor: e, open, onClose, touch = false }) 
               >
                 <span className="min-w-[70px] text-lg font-semibold">{s.label}</span>
                 <span className="min-w-[110px] text-md">{fmtHoldDate(date)}</span>
-                <span className="grow text-sm text-ink-2">{s.covers}</span>
+                <span className="grow text-sm text-ink-2">
+                  {s.covers}
+                  <span className="block text-ink-3">Stop listing these after {seasonStop(s)}</span>
+                </span>
               </button>
             );
           })}
