@@ -121,8 +121,52 @@ export async function getDraft(draftId) {
   return res.json();
 }
 
-export async function deleteDraft(draftId) {
+// Every photo on a draft (listing photos + AI photos), by public_id.
+export function draftPhotoIds(draft) {
+  const ids = [...(draft?.listingPhotos || []), ...(draft?.aiPhotos || [])]
+    .map((p) => p?.public_id)
+    .filter(Boolean);
+  return [...new Set(ids)];
+}
+
+// Seasonal Hold: a held draft's photos leave the Photo Library (they're
+// only reachable by opening that draft) — see docs/Plans/Seasonal Hold Plan.
+// The mark is the photo's own `heldDraft` context value; clearing it puts
+// the photo back in the library.
+export async function markPhotosHeld(publicIds, draftId) {
+  if (!publicIds?.length) return;
+  for (let i = 0; i < publicIds.length; i += 100) {
+    await cloudinary.uploader.add_context(
+      { heldDraft: draftId || "" },
+      publicIds.slice(i, i + 100)
+    );
+  }
+}
+
+export async function deleteDraft(draftId, { deletePhotos = false } = {}) {
   const publicId = `${DRAFTS_FOLDER}/${draftId}`;
+  // Photos: either removed with the draft (the checkbox in the confirm), or
+  // released back into the Photo Library.
+  let draft = null;
+  try {
+    draft = await getDraft(draftId);
+  } catch {
+    // Can't read it — still delete the draft record below.
+  }
+  const photoIds = draftPhotoIds(draft);
+  if (photoIds.length) {
+    try {
+      if (deletePhotos) {
+        for (let i = 0; i < photoIds.length; i += 100) {
+          await cloudinary.api.delete_resources(photoIds.slice(i, i + 100));
+        }
+      } else {
+        await markPhotosHeld(photoIds, "");
+      }
+    } catch (err) {
+      console.error("Draft photo cleanup failed:", err);
+    }
+  }
   return cloudinary.uploader.destroy(publicId, {
     resource_type: "raw",
     invalidate: true,

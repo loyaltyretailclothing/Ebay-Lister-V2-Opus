@@ -42,6 +42,9 @@ export async function GET(request) {
       height: r.height,
       folder: r.context?.folder || "All Photos",
       note: r.context?.note || "",
+      // Seasonal Hold: set while the photo belongs to a held draft. Those
+      // photos are kept out of the library and shown only inside that draft.
+      heldDraft: r.context?.heldDraft || "",
       created_at: r.created_at,
     }));
 

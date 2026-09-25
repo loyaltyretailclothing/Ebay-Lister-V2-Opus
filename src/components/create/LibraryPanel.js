@@ -117,7 +117,7 @@ export default function LibraryPanel({ editor }) {
         </div>
         {/* Both bodies stay mounted so each keeps its scroll position. */}
         <div className={mode === "photos" ? "flex min-h-0 grow flex-col" : "hidden"}>
-          <PhotosBody />
+          <PhotosBody heldFor={editor.listing.holdUntil ? editor.draftId || "" : ""} />
         </div>
         <div className={mode === "drafts" ? "flex min-h-0 grow flex-col" : "hidden"}>
           <DraftsBody editor={editor} />
@@ -127,8 +127,10 @@ export default function LibraryPanel({ editor }) {
   );
 }
 
-function PhotosBody() {
-  const lib = usePhotoLibrary();
+// `heldFor`: when a HELD draft is open, the library shows only that draft's
+// photos (held photos are out of the library until the item posts).
+function PhotosBody({ heldFor = "" }) {
+  const lib = usePhotoLibrary({ heldFor });
   const [lightbox, setLightbox] = useState(null);
   const [noteFor, setNoteFor] = useState(null);
   const [noteText, setNoteText] = useState("");
@@ -179,15 +181,21 @@ function PhotosBody() {
 
   return (
     <>
-      <div className="px-3 pb-2">
-        <div className="seg">
-          {FOLDERS.map((f) => (
-            <button key={f} type="button" aria-pressed={lib.activeFolder === f} onClick={() => lib.setActiveFolder(f)}>
-              {folderLabel(f)}
-            </button>
-          ))}
+      {heldFor ? (
+        <p className="mx-3 mb-2 rounded-bar border border-accent-line bg-accent-weak px-2 py-[7px] text-sm font-medium text-accent">
+          This draft is on hold — only its photos are here. They rejoin the Photo Library when it posts.
+        </p>
+      ) : (
+        <div className="px-3 pb-2">
+          <div className="seg">
+            {FOLDERS.map((f) => (
+              <button key={f} type="button" aria-pressed={lib.activeFolder === f} onClick={() => lib.setActiveFolder(f)}>
+                {folderLabel(f)}
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
       <div className="flex gap-1.5 px-3 pb-2">
         <button

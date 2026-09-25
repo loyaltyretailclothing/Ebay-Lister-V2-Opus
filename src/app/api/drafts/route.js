@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { listDrafts, saveDraft, newDraftId } from "@/lib/drafts";
+import { listDrafts, saveDraft, newDraftId, draftPhotoIds, markPhotosHeld } from "@/lib/drafts";
 
 // GET /api/drafts — list all drafts (summary only)
 export async function GET() {
@@ -32,6 +32,13 @@ export async function POST(request) {
     };
 
     await saveDraft(id, payload);
+    // Held drafts keep their photos out of the Photo Library (Hold until…
+    // saves through here); saving without a hold releases them.
+    try {
+      await markPhotosHeld(draftPhotoIds(payload), payload.listing?.holdUntil ? id : "");
+    } catch (err) {
+      console.error("Could not update held photos:", err);
+    }
     return NextResponse.json({ success: true, id });
   } catch (error) {
     console.error("Save draft error:", error);

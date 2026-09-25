@@ -7,7 +7,10 @@ import { resizeImage } from "@/lib/resizeImage";
 // and the phone Photo Library page. Same endpoints and behaviour as before:
 // batches of 500 with "Load older photos", notes on one photo, move between
 // folders, delete with a confirm (the caller shows the confirm).
-export default function usePhotoLibrary() {
+// `heldFor` — the id of the held draft being edited. Held drafts keep their
+// photos out of the Photo Library; opening one turns the library into just
+// that draft's photos. Everything else behaves exactly as before.
+export default function usePhotoLibrary({ heldFor = "" } = {}) {
   const [activeFolder, setActiveFolder] = useState("All Photos");
   const [photos, setPhotos] = useState([]);
   const [selected, setSelected] = useState([]);
@@ -199,10 +202,17 @@ export default function usePhotoLibrary() {
     return selected.map((id) => map[id]).filter(Boolean);
   }, [photos, selected]);
 
+  // Held photos are hidden everywhere except inside their own held draft.
+  const visiblePhotos = heldFor
+    ? photos.filter((p) => p.heldDraft === heldFor)
+    : photos.filter((p) => !p.heldDraft);
+
   return {
     activeFolder,
     setActiveFolder,
-    photos,
+    photos: visiblePhotos,
+    allPhotos: photos,
+    heldFor,
     selected,
     setSelected,
     toggleSelect,

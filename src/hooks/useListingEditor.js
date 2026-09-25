@@ -513,14 +513,15 @@ export default function useListingEditor() {
   );
 
   // --- Delete Draft (after its confirm) ----------------------------------
-  const confirmDelete = useCallback(async () => {
+  const confirmDelete = useCallback(async ({ deletePhotos = false } = {}) => {
     if (!draftId) return;
     const id = draftId;
     setDeleting(true);
     try {
-      const res = await fetch(`/api/drafts/${encodeURIComponent(id)}`, {
-        method: "DELETE",
-      });
+      const res = await fetch(
+        `/api/drafts/${encodeURIComponent(id)}${deletePhotos ? "?photos=1" : ""}`,
+        { method: "DELETE" }
+      );
       const data = await res.json();
       if (data.success) {
         setDeletePrompt(false);

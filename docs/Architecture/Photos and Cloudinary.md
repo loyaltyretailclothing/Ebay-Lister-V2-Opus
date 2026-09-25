@@ -30,3 +30,8 @@ Testing locally reads and writes real data. See [[Rules]] #6–8.
 
 ## Photo cleanup
 Photos can only be safely removed after an item sells and its photos are on eBay's hosting. See [[Photo Hosting (EPS)]].
+
+## Photos belonging to drafts (2026-09-25)
+Each photo can carry a `heldDraft` context value — the id of the held draft it belongs to. While set, the photo is **hidden from the Photo Library** (desktop panel and phone page); opening that held draft shows only its photos. Cleared when the item posts, is unheld, or the draft is deleted. Set/cleared in `src/lib/drafts.js` (`markPhotosHeld`, `draftPhotoIds`) from the draft save, the hold PATCH, and `deleteDraft`.
+
+**Deleting a draft** (`DELETE /api/drafts/[id]?photos=1`) can delete its photos too — the checkbox in the confirm dialog. Without the flag the photos are released back into the library. See [[Seasonal Hold Plan]].

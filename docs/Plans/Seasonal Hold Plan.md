@@ -40,6 +40,13 @@ Not eBay's own scheduled listing: eBay won't hold a scheduled listing long enoug
 - **No "post automatically" checkbox** — on hold means it posts on the day (users' call).
 - The draft should be **complete** when held (photos, title, category, price, SKU, policies), because it posts as-is.
 
+## Photos of held drafts (added 2026-09-25)
+- A held draft's photos are **marked** (`heldDraft` context on the photo in Cloudinary) and **leave the Photo Library**, so the library only holds what still needs reviewing.
+- **Opening that held draft turns the library panel into just its photos** — open the Wowie shorts and only the Wowie shorts photos are there, with a line saying why. Create Listing is otherwise unchanged: normal drafts still see the whole library.
+- The mark clears (photos rejoin the library) when the item **posts**, when it's **unheld**, or when the draft is **deleted**. eBay holds its own copies of a posted listing's photos, so deleting them afterwards is safe.
+- **Delete Draft** now asks: a checkbox **"Also delete this draft's N photos"** (off by default), then **No / Yes, delete**. Ticking it deletes the photos from Cloudinary with the draft — the way to clear out photos for an item that's no longer being listed. Works the same for held and ordinary drafts.
+- If a held draft's photos are missing when its morning comes, it doesn't post: it returns to the queue with the reason (same path as any other failure).
+
 ## While held
 - Held drafts leave the normal queue — Next draft passes over them, like Skip Draft.
 - **Its own desktop tab "On Hold"** so the Drafts panel stays simple (users' call). Shows:

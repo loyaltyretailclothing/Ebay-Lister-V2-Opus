@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getDraft, deleteDraft, saveDraft } from "@/lib/drafts";
+import { getDraft, deleteDraft, draftPhotoIds, markPhotosHeld, saveDraft } from "@/lib/drafts";
 
 // GET /api/drafts/[id] — fetch full draft payload
 export async function GET(_request, { params }) {
@@ -62,6 +62,14 @@ export async function PATCH(request, { params }) {
       ...draft,
       listing: { ...(draft.listing || {}), ...change },
     });
+    // A held draft's photos leave the Photo Library; unholding brings them back.
+    if (isHold) {
+      try {
+        await markPhotosHeld(draftPhotoIds(draft), body.holdUntil ? id : "");
+      } catch (err) {
+        console.error("Could not update held photos:", err);
+      }
+    }
     return NextResponse.json({ success: true, ...change });
   } catch (error) {
     console.error("Draft patch error:", error);
@@ -72,11 +80,13 @@ export async function PATCH(request, { params }) {
   }
 }
 
-// DELETE /api/drafts/[id] — delete a draft
-export async function DELETE(_request, { params }) {
+// DELETE /api/drafts/[id][?photos=1] — delete a draft, and its photos when
+// the confirm dialog's "Also delete this draft's photos" box was ticked.
+export async function DELETE(request, { params }) {
   try {
     const { id } = await params;
-    await deleteDraft(id);
+    const deletePhotos = new URL(request.url).searchParams.get("photos") === "1";
+    await deleteDraft(id, { deletePhotos });
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Delete draft error:", error);
