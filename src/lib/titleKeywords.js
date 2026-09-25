@@ -18,18 +18,41 @@
 import { applyTwoInchAsterisk } from "./descriptionTemplate";
 
 export const TITLE_MAX = 80;
-export const MAX_KEYWORDS = 10;
+export const MAX_KEYWORDS = 15;
 export const KEYWORD_MAX_LEN = 30;
 // Theme can hold every keyword, so moving chips never has to drop one.
+// (eBay allows up to 30 values in a multi-value specific.)
 export const THEME_MAX_KEYWORDS = MAX_KEYWORDS;
 
 // Mirrors the banned-word list in titleRules.js — a code-level safety net in
 // case the AI slips one through.
 const BANNED_WORDS = new Set([
-  "cotton", "polyester", "nylon", "spandex", "blend", "stretch",
+  "cotton", "polyester", "nylon", "spandex", "blend",
   "amazing", "rare", "great", "must-have", "awesome",
   "nwt", "nwot", "nwd",
 ]);
+
+// Banned on their own, fine inside a phrase buyers search: "Stretch" is
+// filler, "4-Way Stretch" and "Comfort Stretch" are real search terms.
+const BANNED_ALONE = new Set(["stretch", "print", "knit", "lined", "zip", "pocket", "pockets"]);
+
+// Words that are a scrap, not a search term. A keyword left as one of these
+// after repeated words are stripped ("Size 30" → "Size", "V Neck" → "Neck")
+// is dropped instead of becoming a chip.
+const FRAGMENTS = new Set([
+  "size", "neck", "fit", "style", "type", "color", "colour", "cut", "length",
+  "waist", "inseam", "wear", "item", "piece", "new", "the", "and", "with",
+]);
+const SIZE_LIKE = /^(?:\d+(?:\.\d+)?|\d{2}x\d{2}\*?|xs|s|m|l|xl|xxl|xxxl|[2-7]xl|small|medium|large)$/i;
+
+// Is what's left of a keyword still worth a chip?
+function isRealKeyword(text) {
+  const w = words(text);
+  if (w.length === 0) return false;
+  if (w.every((x) => FRAGMENTS.has(x))) return false;
+  if (w.length === 1 && (SIZE_LIKE.test(w[0]) || BANNED_ALONE.has(w[0]))) return false;
+  return true;
+}
 
 function words(text) {
   return String(text || "")
@@ -119,6 +142,7 @@ export function normalizeKeywords(raw, parts) {
     if (!keyword || keyword.length > KEYWORD_MAX_LEN) return;
     const kw = words(keyword);
     if (kw.length === 0 || kw.some((w) => BANNED_WORDS.has(w))) return;
+    if (!isRealKeyword(keyword)) return;
     let tier = Number(item?.tier);
     if (![1, 2, 3].includes(tier)) tier = 3;
     candidates.push({ keyword, tier, order });
@@ -143,7 +167,8 @@ export function normalizeKeywords(raw, parts) {
       })
       .join(" ")
       .trim();
-    if (!kept) continue;
+    // Scraps left by the stripping above are not keywords.
+    if (!kept || !isRealKeyword(kept)) continue;
     words(kept).forEach((w) => usedWords.add(w));
     out.push({ keyword: kept, tier: c.tier });
     if (out.length >= MAX_KEYWORDS) break;
@@ -171,6 +196,10 @@ export function placeKeywords(base, keywords, { hasTheme = true } = {}) {
     } else if (hasTheme && themeCount < THEME_MAX_KEYWORDS) {
       placed.push({ keyword: k.keyword, tier: k.tier, placement: "theme" });
       themeCount++;
+    } else {
+      // Nowhere to put it — kept as an unused (grey) chip so it can still
+      // be chosen by hand instead of disappearing.
+      placed.push({ keyword: k.keyword, tier: k.tier, placement: "none" });
     }
   }
   return { title, keywords: placed };
@@ -217,6 +246,10 @@ export function moveKeywordToTitle(base, keywords, index) {
 export function moveKeywordToTheme(base, keywords, index, { hasTheme = true } = {}) {
   const next = (keywords || []).map((k) => ({ ...k }));
   const target = next[index];
+  if (target && target.placement === "none" && hasTheme) {
+    target.placement = "theme";
+    return { ok: true, title: composeTitle(base, next), keywords: next };
+  }
   if (!hasTheme || !target || target.placement === "theme") {
     return { ok: hasTheme, title: composeTitle(base, keywords), keywords };
   }
@@ -227,6 +260,30 @@ export function moveKeywordToTheme(base, keywords, index, { hasTheme = true } = 
     if (composeTitle(base, next).length > TITLE_MAX) next[i].placement = "theme";
   }
   return { ok: true, title: composeTitle(base, next), keywords: next };
+}
+
+// Chip click → take a keyword out of the title and Theme entirely (grey).
+// The title refills with the best Theme keywords that fit.
+export function unuseKeyword(base, keywords, index) {
+  const next = (keywords || []).map((k) => ({ ...k }));
+  const target = next[index];
+  if (!target || target.placement === "none") {
+    return { ok: true, title: composeTitle(base, next), keywords: next };
+  }
+  target.placement = "none";
+  for (let i = 0; i < next.length; i++) {
+    if (i === index || next[i].placement !== "theme") continue;
+    next[i].placement = "title";
+    if (composeTitle(base, next).length > TITLE_MAX) next[i].placement = "theme";
+  }
+  return { ok: true, title: composeTitle(base, next), keywords: next };
+}
+
+// Blue → green → grey → blue, for tapping a chip on the phone.
+export function nextPlacement(placement, { hasTheme = true } = {}) {
+  if (placement === "title") return hasTheme ? "theme" : "none";
+  if (placement === "theme") return "none";
+  return "title";
 }
 
 export function themeKeywordValues(keywords) {

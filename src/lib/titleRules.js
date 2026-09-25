@@ -29,7 +29,11 @@ KEYWORDS — SEO: the words eBay buyers type into search for THIS item:
   - Tier 2: strong but secondary search terms.
   - Tier 3: helpful broader terms.
   Tier is about search value for THIS item, not the kind of word — the same word can be Tier 1 on one item and Tier 3 on another.
-- Return 6 to 10 keywords, best first. Each keyword is 1-3 words, at most 30 characters, in Title Case.
+- Return 12 to 15 keywords, best first. Each keyword is 1-3 words, at most 30 characters, in Title Case.
+- EXPLORE several angles buyers search from: purpose or activity, fit and cut, performance features, construction details, look and occasion, and the brand's own named lines.
+- MODEL KNOWLEDGE: when the brand AND style name are confidently identified, use what that model is known for (fabric technology, fit, intended use) even if not visible. Otherwise stick to what you can see.
+- Performance phrases (4-Way Stretch, Moisture Wicking, Quick Dry, Wrinkle Resistant, Breathable, Water Repellent, UPF) ARE keywords when true; bare fabric names are not.
+- Every keyword stands alone — a phrase a buyer types. Never a slot word (brand, style name, item type, gender, size, color), never a fragment (Neck, Size, Fit, Style, Type).
 - Brand-specific terms that buyers search for this brand (a brand's named fit, fabric line, collection, or logo style) are good keywords when they truly apply to this item.
 - NO KEYWORD SPAM:
   - Every keyword must be TRUE for this item.
@@ -39,7 +43,7 @@ KEYWORDS — SEO: the words eBay buyers type into search for THIS item:
   - Never use misleading or unrelated words.
 
 NEVER INCLUDE IN TITLE OR KEYWORDS:
-- Common fabric words: cotton, polyester, nylon, spandex, blend, stretch (already in item specifics).
+- Bare fabric names: cotton, polyester, nylon, spandex, blend (already in item specifics). Performance phrases like 4-Way Stretch or Moisture Wicking ARE allowed as keywords.
 - Marketing fluff: amazing, rare, great, must-have, awesome.
 - NWOT, NWD, or any condition word other than NWT.
 - RN numbers, style codes, SKUs.

@@ -13,7 +13,9 @@ import {
   mergeTheme,
   moveKeywordToTheme,
   moveKeywordToTitle,
+  nextPlacement,
   syncDescriptionTitle,
+  unuseKeyword,
 } from "@/lib/titleKeywords";
 import { cachedCategories, cachedSpecifics, getCategories, getSpecifics } from "@/lib/ebayCache";
 
@@ -344,14 +346,24 @@ export default function useListingForm(listing, { onUser, onAuto, getSettings, p
 
   // Keyword chip click: move between title and Theme, rebuild the title,
   // update Theme, and sync the description's title line.
-  function handleKeywordToggle(index) {
+  // A chip can be in the title (blue), in Theme (green) or unused (grey).
+  // `where` is "title" | "theme" | "none" | "next" (tap-to-cycle on phones).
+  function handleKeywordToggle(index, where = "next") {
     const keyword = listing.keywords?.[index];
     if (!keyword || !hasTitleParts(listing)) return;
     const base = buildBaseTitle(listing.titleParts, listing.observations);
+    const target =
+      where === "next"
+        ? nextPlacement(keyword.placement, { hasTheme: categoryHasTheme })
+        : where;
+    if (target === keyword.placement) return;
+
     const result =
-      keyword.placement === "title"
-        ? moveKeywordToTheme(base, listing.keywords, index, { hasTheme: categoryHasTheme })
-        : moveKeywordToTitle(base, listing.keywords, index);
+      target === "title"
+        ? moveKeywordToTitle(base, listing.keywords, index)
+        : target === "theme"
+          ? moveKeywordToTheme(base, listing.keywords, index, { hasTheme: categoryHasTheme })
+          : unuseKeyword(base, listing.keywords, index);
 
     if (!result.ok) {
       setKeywordNotice(`"${keyword.keyword}" is too long to fit in the title.`);

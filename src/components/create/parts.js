@@ -69,7 +69,10 @@ export function KeywordChips({ keywords, onToggle, disabled, hasTheme, notice, t
           <span className="swatch bg-accent" /> In title
         </span>
         <span className="inline-flex items-center gap-[5px] text-sm font-medium text-legend">
-          <span className="swatch border-[1.5px] border-legend" /> In Theme
+          <span className="swatch bg-ok" /> In Theme
+        </span>
+        <span className="inline-flex items-center gap-[5px] text-sm font-medium text-legend">
+          <span className="swatch border-[1.5px] border-line-strong" /> Unused
         </span>
       </div>
       <div className={`flex flex-col ${touch ? "gap-2" : "gap-1.5"}`}>
@@ -79,29 +82,36 @@ export function KeywordChips({ keywords, onToggle, disabled, hasTheme, notice, t
           const chips = (
             <div className={`flex flex-wrap ${touch ? "gap-1.5" : "gap-[5px]"}`}>
               {items.map((k) => {
-                const inTitle = k.placement === "title";
-                const blocked = disabled || (inTitle && !hasTheme);
+                const where = k.placement === "title" ? "title" : k.placement === "theme" ? "theme" : "none";
                 return (
                   <button
                     key={`${k.keyword}-${k.index}`}
                     type="button"
-                    onClick={() => onToggle(k.index)}
-                    disabled={blocked}
-                    title={
-                      inTitle
-                        ? hasTheme
-                          ? "In title — click to move to Theme"
-                          : "This category has no Theme field"
-                        : "In Theme — click to move into the title"
+                    // Phone: tap cycles title → Theme → unused. Desktop:
+                    // click puts an unused keyword in the title or takes a
+                    // used one out; right-click sends it to Theme.
+                    onClick={() => onToggle(k.index, touch ? "next" : where === "none" ? "title" : "none")}
+                    onContextMenu={
+                      touch
+                        ? undefined
+                        : (e) => {
+                            e.preventDefault();
+                            onToggle(k.index, "theme");
+                          }
                     }
-                    className={`chip ${inTitle ? "chip-in-title" : "chip-in-theme"} ${
-                      touch ? "h-8 px-3 text-base" : ""
-                    } disabled:cursor-not-allowed disabled:opacity-50`}
+                    disabled={disabled}
+                    title={
+                      touch
+                        ? "Tap: title → Theme → unused"
+                        : where === "none"
+                          ? "Unused — click to put it in the title, right-click for Theme"
+                          : `In ${where === "title" ? "the title" : "Theme"} — click to remove, right-click for Theme`
+                    }
+                    className={`chip ${
+                      where === "title" ? "chip-in-title" : where === "theme" ? "chip-in-theme" : "chip-off"
+                    } ${touch ? "h-8 px-3 text-base" : ""} disabled:cursor-not-allowed disabled:opacity-50`}
                   >
                     {k.keyword}
-                    {!inTitle && (
-                      <span className="lbl text-[8px] tracking-[0.08em] text-ink-3">Theme</span>
-                    )}
                   </button>
                 );
               })}
@@ -121,8 +131,12 @@ export function KeywordChips({ keywords, onToggle, disabled, hasTheme, notice, t
         })}
       </div>
       <p className={`hint ${touch ? "mt-2" : "mt-[7px]"}`}>
-        Tier 1 carries the most search weight — get those into the title first. Clicking a
-        keyword rebuilds the title, replacing typed edits.
+        Tier 1 carries the most search weight — get those into the title first.{" "}
+        {touch
+          ? "Tap a keyword to move it: title → Theme → unused."
+          : "Click to put a keyword in the title or take it out; right-click to send it to Theme."}{" "}
+        Either way the title is rebuilt, replacing typed edits.
+        {!hasTheme && " This category has no Theme field, so keywords are title or unused."}
       </p>
       {notice && <p className="mt-1 text-base font-medium text-warn">{notice}</p>}
     </div>

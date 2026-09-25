@@ -98,7 +98,7 @@ You must return a JSON object with these fields:
 }
 
 Rules:
-- KEYWORDS: follow the KEYWORDS rules above — SEO-ranked (Tier 1 best), 6-10 keywords, true for this item, no keyword spam
+- KEYWORDS: follow the KEYWORDS rules above — SEO-ranked (Tier 1 best), 12-15 keywords, true for this item, no keyword spam
 - Be precise with brand names — spell them exactly as shown
 - 2-INCH RULE (pants/shorts/jeans only): If measured waist OR inseam differs from tag by 2+ inches, use the MEASURED size in the title and in observations.size. Always populate observations.tag_size and observations.measured_size with their respective values — the app will auto-build the 'Tag - X / Measures Y' lines in the description.
 - NWT = tags are visibly attached in photos

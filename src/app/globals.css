@@ -239,8 +239,10 @@ body {
   .sel > svg {
     @apply pointer-events-none absolute right-[9px] top-1/2 -translate-y-1/2 opacity-55;
   }
+  /* Keyword chips: blue in the title, green in Theme, grey unused. */
   .chip-in-title { @apply bg-accent border-accent text-on-accent; }
-  .chip-in-theme { @apply bg-transparent border-line-strong text-ink; }
+  .chip-in-theme { @apply bg-ok border-ok text-white; }
+  .chip-off      { @apply bg-transparent border-line-strong text-ink-2; }
   .badge {
     @apply inline-flex items-center h-[22px] px-1.5 rounded-chip font-mono text-sm
            bg-sunken border border-line text-ink-2;
