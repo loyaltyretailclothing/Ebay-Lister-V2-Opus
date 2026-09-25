@@ -130,15 +130,7 @@ export function KeywordChips({ keywords, onToggle, disabled, hasTheme, notice, t
           );
         })}
       </div>
-      <p className={`hint ${touch ? "mt-2" : "mt-[7px]"}`}>
-        Tier 1 carries the most search weight — get those into the title first.{" "}
-        {touch
-          ? "Tap a keyword to move it: title → Theme → unused."
-          : "Click to put a keyword in the title or take it out; right-click to send it to Theme."}{" "}
-        Either way the title is rebuilt, replacing typed edits.
-        {!hasTheme && " This category has no Theme field, so keywords are title or unused."}
-      </p>
-      {notice && <p className="mt-1 text-base font-medium text-warn">{notice}</p>}
+      {notice && <p className="mt-1.5 text-base font-medium text-warn">{notice}</p>}
     </div>
   );
 }
