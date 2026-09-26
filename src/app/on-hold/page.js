@@ -11,6 +11,7 @@ import {
   Spinner,
 } from "@/components/ui/Icons";
 import { SEASONS, daysUntil, fmtHoldDate, nextSeasonDate, ymd } from "@/lib/seasons";
+import ListedReport from "@/components/hold/ListedReport";
 
 // On Hold — finished drafts waiting for their season. The app posts them at
 // 7am Central on their day. Built for hundreds of items: season cards up
@@ -32,6 +33,7 @@ export default function OnHoldPage() {
   const [busy, setBusy] = useState(false);
   const [moveTo, setMoveTo] = useState("");
   const [calOpen, setCalOpen] = useState(false);
+  const [view, setView] = useState("hold"); // hold | listed
 
   async function load() {
     try {
@@ -157,27 +159,40 @@ export default function OnHoldPage() {
   return (
     <div className="flex h-full min-h-0 flex-col">
       <header className="flex h-13 shrink-0 items-center gap-3 border-b border-line bg-panel px-4">
-        <h1 className="m-0 whitespace-nowrap text-xl font-semibold tracking-[-0.01em]">On Hold</h1>
-        <span className="text-sm text-ink-3">Posts itself at 7am Central on its day</span>
+        <h1 className="m-0 whitespace-nowrap text-xl font-semibold tracking-[-0.01em]">Hold</h1>
+        {/* Two views in one tab: what's waiting, and what has been listed. */}
+        <div className="seg w-[220px]">
+          <button type="button" aria-pressed={view === "hold"} onClick={() => setView("hold")}>
+            On hold
+          </button>
+          <button type="button" aria-pressed={view === "listed"} onClick={() => setView("listed")}>
+            Listed
+          </button>
+        </div>
+        {view === "hold" && <span className="text-sm text-ink-3">Posts itself at 7am Central on its day</span>}
         <div className="grow" />
-        {drafts && (
+        {view === "hold" && drafts && (
           <span className="text-md">
             <b>{held.length}</b> on hold · <b>{money(total)}</b>
           </span>
         )}
-        <button type="button" className="btn btn-sm" onClick={() => { setLoading(true); load(); }} disabled={loading}>
-          {loading ? <Spinner className="size-3.5" /> : <RefreshIcon className="size-3.5" />}
-          Refresh
-        </button>
+        {view === "hold" && (
+          <button type="button" className="btn btn-sm" onClick={() => { setLoading(true); load(); }} disabled={loading}>
+            {loading ? <Spinner className="size-3.5" /> : <RefreshIcon className="size-3.5" />}
+            Refresh
+          </button>
+        )}
       </header>
 
-      {error && (
+      {view === "listed" && <ListedReport />}
+
+      {view === "hold" && error && (
         <div className="lane lane-bad shrink-0">
           <p>{error}</p>
         </div>
       )}
 
-      <div className="min-h-0 grow overflow-y-auto bg-panel p-4">
+      <div className={`min-h-0 grow overflow-y-auto bg-panel p-4 ${view === "hold" ? "" : "hidden"}`}>
         {lastRun && (
           <div className={`lane ${lastRun.failed ? "lane-warn" : "lane-ok"} mb-4 rounded-panel`}>
             <p>

@@ -35,7 +35,7 @@ $0 — no AI, no new accounts.
 ## How it's built
 - **Hold popup** (`HoldDialog.js`): **Cost paid** and **Place of purchase** (store names suggested from [[Sourcing]]); the red missing-fields box is now a one-line grey note. Saved on the draft as `cost` / `purchasePlace` via `holdDraft`.
 - **The record**: `src/lib/listedLog.js` writes one raw file per listing (`listed_<listingId>`, add-only, ~0.5 KB) including the eBay image URL — the publish route now returns `image` (the first EPS photo). Written from both paths: List on eBay by hand (`useListingEditor`) and the 7am hold run (`api/cron/post-held`, before the draft is deleted).
-- **Report**: `/listed` (rail **Listed**) — photo, title, SKU, place, cost, date, eBay link; date range, search by title/SKU/place, and the spend total for the range.
+- **Report**: inside the **Hold** tab (a segmented switch: On hold | Listed; users asked for one tab, not two). `/listed` redirects there. Component `src/components/hold/ListedReport.js` — photo, title, SKU, place, cost, date, eBay link; date range, search by title/SKU/place, and the spend total for the range.
 - Held drafts from **before** this existed: reopen **Hold**, fill in cost and place, hold again.
 
 ## Verified locally 2026-09-26 (nothing written)
