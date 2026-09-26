@@ -673,6 +673,9 @@ export async function POST(request) {
       sku: itemSku,
       promoResult,
       url: `https://www.ebay.com/itm/${listingId}`,
+      // eBay's own copy of the first photo — the Listed report uses it, so
+      // the report survives clearing out the Cloudinary library.
+      image: epsImageUrls?.[0] || "",
     });
   } catch (error) {
     console.error("Listing submission error:", error);

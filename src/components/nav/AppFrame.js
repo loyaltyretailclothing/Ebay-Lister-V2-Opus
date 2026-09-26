@@ -48,6 +48,7 @@ function DesktopRail({ pathname }) {
   const onSettings = pathname.startsWith("/settings") || pathname.startsWith("/oauth");
   const onTrack = pathname.startsWith("/efficiency");
   const onHold = pathname.startsWith("/on-hold");
+  const onListed = pathname.startsWith("/listed");
   return (
     <nav
       aria-label="Main"
@@ -76,6 +77,15 @@ function DesktopRail({ pathname }) {
       >
         <ClockIcon className="size-[19px]" />
         <span className="lbl text-2xs tracking-[0.05em] text-current">Hold</span>
+      </Link>
+      <Link
+        href="/listed"
+        aria-label="Listed report"
+        aria-current={onListed ? "page" : undefined}
+        className={`rail ${onListed ? "rail-on" : ""}`}
+      >
+        <TagIcon className="size-[19px]" />
+        <span className="lbl text-2xs tracking-[0.05em] text-current">Listed</span>
       </Link>
       <Link
         href="/efficiency"

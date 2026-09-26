@@ -42,6 +42,13 @@ export const INITIAL_LISTING = {
   analysisRun: 0,
   // Skip Draft: Next draft passes over this draft. Saved on its own.
   skipDraft: false,
+  // Seasonal Hold: the day the app posts this draft by itself, the season
+  // it was held for, and (for the Listed report) what it cost and where it
+  // came from. Set in the Hold until… popup.
+  holdUntil: "",
+  holdSeason: "",
+  cost: "",
+  purchasePlace: "",
 };
 
 // New listing: clear everything the ITEM owns, keep the account-level

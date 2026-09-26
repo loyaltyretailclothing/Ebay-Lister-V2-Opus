@@ -203,16 +203,19 @@ export default function usePhotoLibrary({ heldFor = "" } = {}) {
   }, [photos, selected]);
 
   // Held photos are hidden everywhere except inside their own held draft.
-  const visiblePhotos = heldFor
-    ? photos.filter((p) => p.heldDraft === heldFor)
-    : photos.filter((p) => !p.heldDraft);
+  // A draft held before this existed has no marked photos — fall back to
+  // the ordinary library so the panel is never mysteriously empty (saving
+  // or re-holding that draft marks its photos).
+  const mine = heldFor ? photos.filter((p) => p.heldDraft === heldFor) : [];
+  const heldActive = heldFor && mine.length > 0;
+  const visiblePhotos = heldActive ? mine : photos.filter((p) => !p.heldDraft);
 
   return {
     activeFolder,
     setActiveFolder,
     photos: visiblePhotos,
     allPhotos: photos,
-    heldFor,
+    heldActive,
     selected,
     setSelected,
     toggleSelect,

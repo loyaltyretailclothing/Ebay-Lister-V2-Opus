@@ -181,7 +181,7 @@ function PhotosBody({ heldFor = "" }) {
 
   return (
     <>
-      {heldFor ? (
+      {lib.heldActive ? (
         <p className="mx-3 mb-2 rounded-bar border border-accent-line bg-accent-weak px-2 py-[7px] text-sm font-medium text-accent">
           This draft is on hold — only its photos are here. They rejoin the Photo Library when it posts.
         </p>

@@ -3,6 +3,7 @@ import { deleteDraft, getDraft, listDrafts, saveDraft } from "@/lib/drafts";
 import { writeRun } from "@/lib/holdRuns";
 import { writeEntry } from "@/lib/efficiencyLog";
 import { buildDraftEntry } from "@/lib/efficiency";
+import { writeListed } from "@/lib/listedLog";
 
 // Seasonal Hold — the posting morning. Runs at 7am Central (see vercel.json:
 // two daily wake-ups, 12:00 and 13:00 UTC; this skips the one that isn't
@@ -109,6 +110,24 @@ export async function GET(request) {
       });
       const data = await res.json();
       if (!data.success) throw new Error(data.error || "eBay rejected the listing");
+
+      // The permanent record first — the draft (and its cost/place) is
+      // about to be deleted.
+      try {
+        await writeListed({
+          at: new Date().toISOString(),
+          listingId: data.listingId,
+          title: listing.title,
+          sku: listing.sku,
+          cost: listing.cost,
+          place: listing.purchasePlace,
+          image: data.image,
+          url: data.url,
+          held: true,
+        });
+      } catch (logErr) {
+        console.error("Listed record failed for held draft:", logErr);
+      }
 
       await deleteDraft(row.id);
       posted.push({ id: row.id, title: row.title, listingId: data.listingId });

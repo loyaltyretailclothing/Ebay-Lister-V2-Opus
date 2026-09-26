@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { SEASONS, fmtHoldDate, nextSeasonDate, seasonStop, suggestSeason, ymd } from "@/lib/seasons";
 
 // "Hold until…" — the finished draft leaves the queue and the app posts it
@@ -9,6 +9,30 @@ export default function HoldDialog({ editor: e, open, onClose, touch = false }) 
   const suggestion = open ? suggestSeason(e.listing) : null;
   const [custom, setCustom] = useState("");
   const [busy, setBusy] = useState(false);
+  const [cost, setCost] = useState(e.listing.cost ?? "");
+  const [place, setPlace] = useState(e.listing.purchasePlace ?? "");
+  const [stores, setStores] = useState([]);
+
+  // Store names from Sourcing, to suggest as you type.
+  useEffect(() => {
+    if (!open) return;
+    let alive = true;
+    fetch("/api/sourcing", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((data) => {
+        if (!alive) return;
+        const names = (data?.stores || data?.data?.stores || [])
+          .map((s) => s?.name)
+          .filter(Boolean);
+        // Two stores can share a name (different towns) — one entry each.
+        setStores([...new Set(names)]);
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [open]);
+
   if (!open) return null;
 
   const missing = [];
@@ -21,7 +45,7 @@ export default function HoldDialog({ editor: e, open, onClose, touch = false }) 
   async function hold(date, season) {
     if (busy || !date) return;
     setBusy(true);
-    const ok = await e.holdDraft({ date, season });
+    const ok = await e.holdDraft({ date, season, cost, place });
     setBusy(false);
     if (ok) {
       onClose();
@@ -43,10 +67,45 @@ export default function HoldDialog({ editor: e, open, onClose, touch = false }) 
           Finish everything first — it posts exactly as saved.
         </p>
 
+        {/* Cost and where it came from — the draft is gone the moment the
+            item posts, so the number has to be captured now (Flipwise). */}
+        <div className="mt-3 flex flex-wrap items-end gap-2.5">
+          <div>
+            <label className="fl" htmlFor="hold-cost">
+              Cost paid
+            </label>
+            <input
+              id="hold-cost"
+              type="text"
+              inputMode="decimal"
+              placeholder="4.99"
+              className={`input ${touch ? "h-touch" : "h-9"} w-[110px]`}
+              value={cost}
+              onChange={(ev) => setCost(ev.target.value)}
+            />
+          </div>
+          <div className="grow">
+            <label className="fl" htmlFor="hold-place">
+              Place of purchase
+            </label>
+            <input
+              id="hold-place"
+              type="text"
+              list="hold-places"
+              placeholder="Goodwill on Main"
+              className={`input ${touch ? "h-touch" : "h-9"} w-full`}
+              value={place}
+              onChange={(ev) => setPlace(ev.target.value)}
+            />
+            <datalist id="hold-places">
+              {stores.map((s) => (
+                <option key={s} value={s} />
+              ))}
+            </datalist>
+          </div>
+        </div>
         {missing.length > 0 && (
-          <p className="mt-2.5 rounded-bar border border-bad-line bg-bad-weak px-3 py-2 text-md font-medium text-bad">
-            Add {missing.join(", ")} before holding — a draft missing those can&apos;t post on its own.
-          </p>
+          <p className="hint mt-1.5 text-bad">Needs {missing.join(", ")} before it can be held.</p>
         )}
 
         {suggestion && (

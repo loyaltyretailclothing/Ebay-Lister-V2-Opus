@@ -382,7 +382,7 @@ export default function useListingEditor() {
   // Saves the finished draft with its posting date and moves on. The draft
   // leaves the queue; the app posts it on that morning by itself.
   const holdDraft = useCallback(
-    async ({ date, season }) => {
+    async ({ date, season, cost, place }) => {
       if (savingDraft) return false;
       setSavingDraft(true);
       setSaveError("");
@@ -396,6 +396,10 @@ export default function useListingEditor() {
               ...listing,
               holdUntil: date,
               holdSeason: season,
+              // What it cost and where it came from — kept for the Listed
+              // report, because the draft is gone once the item posts.
+              cost: String(cost ?? "").trim(),
+              purchasePlace: String(place ?? "").trim(),
               timing: timingForSave(listing),
             },
             aiPhotos,
@@ -685,6 +689,24 @@ export default function useListingEditor() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(entry),
+        }).catch(() => {});
+
+        // Listed report: the permanent record of this item (the draft is
+        // about to be deleted). Cost and place are only set on held items.
+        fetch("/api/listed", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            at: new Date().toISOString(),
+            listingId: data.listingId,
+            title: listing.title,
+            sku: listing.sku,
+            cost: listing.cost,
+            place: listing.purchasePlace,
+            image: data.image,
+            url: data.url,
+            held: !!listing.holdUntil,
+          }),
         }).catch(() => {});
         setDraftError("");
         setNotice(null);
