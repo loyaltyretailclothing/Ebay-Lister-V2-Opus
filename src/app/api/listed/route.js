@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { listListed, writeListed } from "@/lib/listedLog";
+import { deleteListed, listListed, writeListed } from "@/lib/listedLog";
 
 // The Listed report's records.
 //   GET  → everything listed (newest first)
@@ -21,6 +21,19 @@ export async function POST(request) {
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Listed report write error:", error);
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  }
+}
+
+// DELETE — take rows off the report (after the details are in Flipwise).
+// Body: { listingIds: [...] }. The eBay listings are not touched.
+export async function DELETE(request) {
+  try {
+    const { listingIds } = await request.json();
+    const removed = await deleteListed(listingIds);
+    return NextResponse.json({ success: true, removed });
+  } catch (error) {
+    console.error("Listed report delete error:", error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }

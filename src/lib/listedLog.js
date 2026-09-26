@@ -51,6 +51,20 @@ export async function writeListed(entry) {
   });
 }
 
+// Take rows off the report once their details are in Flipwise. Only the
+// record goes — the eBay listing is untouched.
+export async function deleteListed(listingIds) {
+  const ids = (listingIds || [])
+    .map((id) => String(id).replace(/[^0-9A-Za-z_-]/g, ""))
+    .filter(Boolean)
+    .map((id) => `${LOG_FOLDER}/listed_${id}`);
+  if (!ids.length) return 0;
+  for (let i = 0; i < ids.length; i += 100) {
+    await cloudinary.api.delete_resources(ids.slice(i, i + 100), { resource_type: "raw" });
+  }
+  return ids.length;
+}
+
 // Everything listed, newest first.
 export async function listListed() {
   const out = [];

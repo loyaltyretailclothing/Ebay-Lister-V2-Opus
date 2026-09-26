@@ -62,12 +62,16 @@ export default function ListedReport() {
   const [custom, setCustom] = useState({ from: "", to: "" });
   const [query, setQuery] = useState("");
   const [openedAt] = useState(() => Date.now());
+  // Rows are ticked off once their details are in Flipwise.
+  const [chosen, setChosen] = useState(() => new Set());
+  const [removing, setRemoving] = useState(false);
 
   async function load() {
     try {
       const data = await fetch("/api/listed", { cache: "no-store" }).then((r) => r.json());
       if (!data.success) throw new Error(data.error || "Couldn't load the report");
       setItems(data.items || []);
+      setChosen(new Set());
       setError("");
     } catch (err) {
       setError(err.message);
@@ -97,6 +101,33 @@ export default function ListedReport() {
 
   const spend = rows.reduce((s, it) => s + (it.cost || 0), 0);
   const withCost = rows.filter((it) => it.cost !== null).length;
+
+  const toggle = (id) =>
+    setChosen((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+
+  async function removeChosen() {
+    if (!chosen.size || removing) return;
+    setRemoving(true);
+    try {
+      const res = await fetch("/api/listed", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ listingIds: [...chosen] }),
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error || "Couldn't remove those rows");
+      await load();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setRemoving(false);
+    }
+  }
 
   return (
     <>
@@ -162,12 +193,38 @@ export default function ListedReport() {
           </p>
         ) : (
           <>
-            <p className="m-0 pt-3 text-sm text-ink-3">
-              {withCost} of {rows.length} have a cost (items listed straight away don&apos;t carry one).
-            </p>
+            <div className="flex flex-wrap items-center gap-2 pt-3">
+              <p className="m-0 text-sm text-ink-3">
+                {withCost} of {rows.length} have a cost (items listed straight away don&apos;t carry one).
+              </p>
+              <div className="grow" />
+              {chosen.size > 0 && (
+                <>
+                  <b className="text-md">{chosen.size} ticked</b>
+                  <button type="button" className="btn btn-sm" onClick={() => setChosen(new Set())}>
+                    Clear
+                  </button>
+                  <button type="button" className="btn btn-sm btn-danger" disabled={removing} onClick={removeChosen}>
+                    {removing ? "Removing…" : `Remove ${chosen.size} from report`}
+                  </button>
+                </>
+              )}
+              <button
+                type="button"
+                className="btn btn-sm"
+                onClick={() =>
+                  setChosen((prev) =>
+                    prev.size === rows.length ? new Set() : new Set(rows.map((r) => r.listingId))
+                  )
+                }
+              >
+                {chosen.size === rows.length && rows.length > 0 ? "Untick all" : "Tick all"}
+              </button>
+            </div>
             <table className="mt-2 w-full table-fixed border-collapse text-md">
               <thead>
                 <tr className="border-b border-line text-left text-sm text-ink-3">
+                  <th className="w-[34px] py-2 font-medium" />
                   <th className="w-[60px] py-2 font-medium" />
                   <th className="py-2 pr-3 font-medium">Title</th>
                   <th className="w-[110px] py-2 pr-3 font-medium">SKU</th>
@@ -179,7 +236,16 @@ export default function ListedReport() {
               </thead>
               <tbody>
                 {rows.map((it) => (
-                  <tr key={it.listingId} className="border-b border-line">
+                  <tr key={it.listingId} className={`border-b border-line ${chosen.has(it.listingId) ? "bg-accent-weak" : ""}`}>
+                    <td className="py-1.5">
+                      <input
+                        type="checkbox"
+                        className="size-4 accent-[var(--color-accent)]"
+                        checked={chosen.has(it.listingId)}
+                        onChange={() => toggle(it.listingId)}
+                        aria-label={`Tick ${it.title}`}
+                      />
+                    </td>
                     <td className="py-1.5">
                       {it.image ? (
                         // eslint-disable-next-line @next/next/no-img-element
