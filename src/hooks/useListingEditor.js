@@ -691,23 +691,26 @@ export default function useListingEditor() {
           body: JSON.stringify(entry),
         }).catch(() => {});
 
-        // Listed report: the permanent record of this item (the draft is
-        // about to be deleted). Cost and place are only set on held items.
-        fetch("/api/listed", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            at: new Date().toISOString(),
-            listingId: data.listingId,
-            title: listing.title,
-            sku: listing.sku,
-            cost: listing.cost,
-            place: listing.purchasePlace,
-            image: data.image,
-            url: data.url,
-            held: !!listing.holdUntil,
-          }),
-        }).catch(() => {});
+        // Listed report: HELD items only (users' call) — those are the ones
+        // whose cost still has to go into Flipwise long after they were
+        // finished. Items listed straight away are entered the same day.
+        if (listing.holdUntil) {
+          fetch("/api/listed", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              at: new Date().toISOString(),
+              listingId: data.listingId,
+              title: listing.title,
+              sku: listing.sku,
+              cost: listing.cost,
+              place: listing.purchasePlace,
+              image: data.image,
+              url: data.url,
+              held: true,
+            }),
+          }).catch(() => {});
+        }
         setDraftError("");
         setNotice(null);
         // The draft has been published — delete it.

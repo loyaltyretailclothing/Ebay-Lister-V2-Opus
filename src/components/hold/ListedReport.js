@@ -132,7 +132,7 @@ export default function ListedReport() {
   return (
     <>
       <div className="flex h-13 shrink-0 items-center gap-3 border-b border-line bg-panel px-4">
-        <span className="text-sm text-ink-3">Everything posted to eBay, with cost and where it came from</span>
+        <span className="text-sm text-ink-3">Held items that have posted, with cost and where they came from</span>
         <div className="grow" />
         <span className="text-md">
           <b>{rows.length}</b> listed · <b>{money(spend)}</b> spent
@@ -188,14 +188,15 @@ export default function ListedReport() {
         ) : rows.length === 0 ? (
           <p className="mt-4 rounded-panel border border-dashed border-line-strong p-8 text-center text-ink-2">
             {items?.length
-              ? "Nothing listed in this range."
-              : "Nothing recorded yet. Every item listed from now on lands here — cost and place come from the Hold popup."}
+              ? "No held items posted in this range."
+              : "Nothing here yet. Held items land here when they post, with the cost and place from the Hold popup. Items listed straight away aren't recorded."}
           </p>
         ) : (
           <>
             <div className="flex flex-wrap items-center gap-2 pt-3">
               <p className="m-0 text-sm text-ink-3">
-                {withCost} of {rows.length} have a cost (items listed straight away don&apos;t carry one).
+                Tick each one off as you enter it in Flipwise, then remove them.
+                {withCost < rows.length ? ` ${rows.length - withCost} have no cost recorded.` : ""}
               </p>
               <div className="grow" />
               {chosen.size > 0 && (
@@ -256,7 +257,6 @@ export default function ListedReport() {
                     </td>
                     <td className="truncate py-1.5 pr-3" title={it.title}>
                       {it.title}
-                      {it.held && <span className="badge ml-2">held</span>}
                     </td>
                     <td className="mono py-1.5 pr-3 text-sm">{it.sku || "—"}</td>
                     <td className="truncate py-1.5 pr-3" title={it.place}>{it.place || "—"}</td>

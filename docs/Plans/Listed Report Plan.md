@@ -15,7 +15,7 @@ In the **Hold until…** popup (held items only — items listed straight away d
 - Saved on the draft, so the already-held items can be updated by reopening Hold on each.
 
 ## The permanent record
-When **any** item posts (the 7am hold run or List on eBay by hand), one small record is written — separate from the draft, because the draft is deleted at posting:
+When a **held** item posts (the 7am hold run, or List on eBay by hand on a held draft) — items listed straight away are NOT recorded (users call 2026-09-26: their cost goes into Flipwise the same day), one small record is written — separate from the draft, because the draft is deleted at posting:
 
 `at · title · SKU · cost · place of purchase · eBay listing id + link · eBay image link`
 
@@ -27,7 +27,7 @@ When **any** item posts (the 7am hold run or List on eBay by hand), one small re
 Photo · Title · SKU · Place of purchase · Cost · Date · link to the listing.
 - Date range (this week / last week / month / custom) — the Flipwise workflow is "pull this week's list and work down it".
 - Total spend for the range.
-- Cost and place are blank for items listed straight away (by design).
+- Only held items appear; anything listed straight away is entered in Flipwise that day and never reaches this report.
 
 ## Cost
 $0 — no AI, no new accounts.
