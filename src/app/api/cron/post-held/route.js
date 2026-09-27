@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { deleteDraft, getDraft, listDrafts, saveDraft } from "@/lib/drafts";
+import { deleteDraft, draftPhotoIds, getDraft, listDrafts, markPhotosHeld, saveDraft } from "@/lib/drafts";
+import { dueTime, sweepPhotos } from "@/lib/photoSweep";
 import { writeRun } from "@/lib/holdRuns";
 import { writeEntry } from "@/lib/efficiencyLog";
 import { buildDraftEntry } from "@/lib/efficiency";
@@ -72,11 +73,28 @@ export async function GET(request) {
   const batchNo = parseInt(url.searchParams.get("batch"), 10) || 1;
   const force = url.searchParams.get("force") === "1";
 
+  // Housekeeping first, on every wake-up including the one that doesn't
+  // post: clear out the photos of items that posted half an hour ago. This
+  // is the backstop for when nobody opens the app — usually a browser tab
+  // has already done it.
+  let swept = null;
+  if (batchNo === 1) {
+    try {
+      swept = await sweepPhotos();
+    } catch (err) {
+      console.error("Photo sweep failed during the hold run:", err);
+    }
+  }
+
   // Only the wake-up that lands at 7-8am local actually posts, so a stray
   // call in the middle of the day can't start a posting morning.
   const hour = localHour();
   if (!force && (hour < 7 || hour > 8)) {
-    return NextResponse.json({ success: true, skipped: `not posting time (${hour}:00 local)` });
+    return NextResponse.json({
+      success: true,
+      skipped: `not posting time (${hour}:00 local)`,
+      swept,
+    });
   }
   if (batchNo * BATCH > DAILY_MAX) {
     return NextResponse.json({ success: true, stopped: "daily maximum reached" });
@@ -129,7 +147,9 @@ export async function GET(request) {
         console.error("Listed record failed for held draft:", logErr);
       }
 
-      await deleteDraft(row.id);
+      // The listing is live and eBay has its own copies of the photos, so
+      // the draft goes and its photos are deleted half an hour from now.
+      await deleteDraft(row.id, { photosAfter: dueTime() });
       posted.push({ id: row.id, title: row.title, listingId: data.listingId });
       value += Number(listing.price) || 0;
 
@@ -160,6 +180,9 @@ export async function GET(request) {
             status: "error",
             errorMessage: `Couldn't post automatically — ${err.message}`.slice(0, 255),
           });
+          // It's no longer held, so its photos belong back in the Photo
+          // Library — the draft has to be reviewable, photos and all.
+          await markPhotosHeld(draftPhotoIds(draft), "");
         }
       } catch (saveErr) {
         console.error("Could not mark held draft as failed:", saveErr);
@@ -193,5 +216,5 @@ export async function GET(request) {
     }).catch((err) => console.error("Next hold batch kickoff failed:", err));
   }
 
-  return NextResponse.json({ success: true, ...run, remaining: more });
+  return NextResponse.json({ success: true, ...run, remaining: more, swept });
 }

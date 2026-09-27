@@ -36,4 +36,6 @@ Each photo can carry a `heldDraft` context value — the id of the held draft it
 
 **Finding them (fixed 2026-09-27):** the library loads only the newest 500 photos, so a held draft's older photos could never be found by filtering that page. `GET /api/cloudinary/list?heldFor=<draftId>` asks Cloudinary directly (`context.heldDraft="<id>"`), so age doesn't matter. `usePhotoLibrary` also numbers its requests — the big library fetch starts first but finishes last, and without that it overwrote the held-draft answer.
 
+**When a held item posts (2026-09-27)** its photos are **deleted half an hour later**, not returned to the library: eBay has its own copies by then. Posting writes a small record (`ebay-listings/logs/photo-sweep/sweep_<draftId>`) with the due time and the photo ids; `POST /api/cloudinary/sweep` deletes what's due. It's called by any open tab (which sets a timer for the exact minute), by hand-listing, and by the daily cron. Nothing outside `ebay-listings/` can be scheduled or deleted. See `src/lib/photoSweep.js` and [[Seasonal Hold Plan]].
+
 **Deleting a draft** (`DELETE /api/drafts/[id]?photos=1`) can delete its photos too — the checkbox in the confirm dialog. Without the flag the photos are released back into the library. See [[Seasonal Hold Plan]].

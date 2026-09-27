@@ -1,4 +1,5 @@
 import cloudinary from "./cloudinary";
+import { schedulePhotoDelete } from "./photoSweep";
 
 const DRAFTS_FOLDER = "ebay-drafts";
 
@@ -143,10 +144,13 @@ export async function markPhotosHeld(publicIds, draftId) {
   }
 }
 
-export async function deleteDraft(draftId, { deletePhotos = false } = {}) {
+// `photosAfter` — an ISO time. Used when a HELD draft has just posted: its
+// photos are kept out of the library and deleted after that time instead of
+// rejoining it (see src/lib/photoSweep.js).
+export async function deleteDraft(draftId, { deletePhotos = false, photosAfter = null } = {}) {
   const publicId = `${DRAFTS_FOLDER}/${draftId}`;
-  // Photos: either removed with the draft (the checkbox in the confirm), or
-  // released back into the Photo Library.
+  // Photos: removed with the draft (the checkbox in the confirm), left for
+  // the sweep to delete after posting, or released back into the library.
   let draft = null;
   try {
     draft = await getDraft(draftId);
@@ -160,6 +164,11 @@ export async function deleteDraft(draftId, { deletePhotos = false } = {}) {
         for (let i = 0; i < photoIds.length; i += 100) {
           await cloudinary.api.delete_resources(photoIds.slice(i, i + 100));
         }
+      } else if (photosAfter) {
+        // Keep them out of the library for the wait — a draft held before
+        // the marking existed still has its photos in there.
+        await markPhotosHeld(photoIds, draftId);
+        await schedulePhotoDelete(draftId, photoIds, photosAfter);
       } else {
         await markPhotosHeld(photoIds, "");
       }

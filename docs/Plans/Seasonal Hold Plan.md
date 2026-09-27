@@ -43,7 +43,7 @@ Not eBay's own scheduled listing: eBay won't hold a scheduled listing long enoug
 ## Photos of held drafts (added 2026-09-25)
 - A held draft's photos are **marked** (`heldDraft` context on the photo in Cloudinary) and **leave the Photo Library**, so the library only holds what still needs reviewing.
 - **Opening that held draft turns the library panel into just its photos** — open the Wowie shorts and only the Wowie shorts photos are there, with a line saying why. Create Listing is otherwise unchanged: normal drafts still see the whole library.
-- The mark clears (photos rejoin the library) when the item **posts**, when it's **unheld**, or when the draft is **deleted**. eBay holds its own copies of a posted listing's photos, so deleting them afterwards is safe.
+- The mark clears (photos rejoin the library) when the item is **unheld**, when the auto-post **fails**, or when the draft is **deleted**. When it **posts**, the photos are deleted instead — see below.
 - **Delete Draft** now asks: a checkbox **"Also delete this draft's N photos"** (off by default), then **No / Yes, delete**. Ticking it deletes the photos from Cloudinary with the draft — the way to clear out photos for an item that's no longer being listed. Works the same for held and ordinary drafts.
 - If a held draft's photos are missing when its morning comes, it doesn't post: it returns to the queue with the reason (same path as any other failure).
 
@@ -53,6 +53,27 @@ Two real faults, both now fixed:
 2. **A slow answer overwrote the right one.** The library fetch starts as the page opens and takes a second or two; the held-draft fetch starts later (once the draft has loaded) and finishes first, so the library answer landed last and replaced it. `usePhotoLibrary` now numbers its requests and only the newest one is allowed to set the photos.
 
 A draft held **before** the photo-marking existed has no marked photos; the panel falls back to the ordinary library rather than showing nothing. Re-opening **Hold** on it marks its photos.
+
+## Photos are deleted half an hour after a held item posts (2026-09-27)
+Users' call: once a held item is live on eBay its photos aren't needed — eBay keeps its own copies (EPS) and the [[Listed Report Plan]] thumbnail points at eBay's image, so nothing in the app breaks. They are **not** dumped back into the Photo Library (that would put finished items back in the review pile).
+
+- **Posted** (the 7am run, or List on eBay by hand on a held draft): the draft goes, the photos stay hidden, and a small record says "these photos, deletable from 7:30". Half an hour later they're deleted from Cloudinary for good.
+- **Failed**: unchanged — the draft returns to the drafts queue with the reason, and now its photos **go back into the Photo Library** with it, so it can actually be reviewed. (Before this they stayed hidden — a bug.)
+- **Listed straight away**: unchanged. Those photos stay in the library as always.
+
+### Why it isn't a timer
+Nothing on the server can count down half an hour: a request answers and the function ends, and the free Vercel plan allows two cron wake-ups a day (both already used by the posting run). So posting only writes down **when** the photos become deletable, and a **sweep** does the deleting. It is called by whichever comes first:
+1. **An open browser tab** (`PhotoSweeper`, mounted in the root layout). It asks the server what's due, is told when the next lot comes due, and sets a timer for that minute. Open the app at 7:05 after a 7:00 run and it deletes them at 7:30 while you're sitting there. A 15-minute heartbeat covers a tab that's been open since yesterday; a background tab still counts.
+2. **Listing anything by hand** — the tab is open, so its timer is running anyway.
+3. **The daily cron wake-up**, at the top of every run including the one that doesn't post — the backstop for nobody opening the app for days.
+
+So half an hour is a **floor, never a deadline**: never sooner, occasionally later. The photos are out of the library the whole time either way.
+
+### How it's built
+- `src/lib/photoSweep.js` — `schedulePhotoDelete` (one raw record per draft in `ebay-listings/logs/photo-sweep`, due time in its context so a sweep can see what's due without downloading anything), `splitDue`, `sweepPhotos`.
+- `POST /api/cloudinary/sweep` → deletes what's due, returns `{deleted, records, nextDueAt}`. POST so local test mode blocks it.
+- `deleteDraft(id, { photosAfter })` schedules instead of releasing; the cron and `DELETE /api/drafts/[id]?posted=1` (hand-listed held drafts only) pass it.
+- **Guard rails:** only ids under `ebay-listings/` are ever scheduled or deleted, at most 100 records a sweep, and a record whose body can't be read is left alone rather than guessed at. Tested against the real module with a stubbed Cloudinary (14 checks, nothing written to the account).
 
 ## While held
 - Held drafts leave the normal queue — Next draft passes over them, like Skip Draft.

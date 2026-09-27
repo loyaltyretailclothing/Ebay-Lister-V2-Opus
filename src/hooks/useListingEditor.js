@@ -719,9 +719,14 @@ export default function useListingEditor() {
         setDirty(false);
         if (publishedDraft) {
           try {
-            await fetch(`/api/drafts/${encodeURIComponent(publishedDraft)}`, {
-              method: "DELETE",
-            });
+            // A held draft's photos left the library when it was held; now
+            // that it's live, they're deleted half an hour from now rather
+            // than put back (eBay has its own copies). Items listed straight
+            // away keep their photos in the library, as always.
+            await fetch(
+              `/api/drafts/${encodeURIComponent(publishedDraft)}${listing.holdUntil ? "?posted=1" : ""}`,
+              { method: "DELETE" }
+            );
           } catch {
             // Non-fatal — listing already published
           }

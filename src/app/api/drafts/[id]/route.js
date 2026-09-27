@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getDraft, deleteDraft, draftPhotoIds, markPhotosHeld, saveDraft } from "@/lib/drafts";
+import { dueTime } from "@/lib/photoSweep";
 
 // GET /api/drafts/[id] — fetch full draft payload
 export async function GET(_request, { params }) {
@@ -80,13 +81,17 @@ export async function PATCH(request, { params }) {
   }
 }
 
-// DELETE /api/drafts/[id][?photos=1] — delete a draft, and its photos when
-// the confirm dialog's "Also delete this draft's photos" box was ticked.
+// DELETE /api/drafts/[id][?photos=1][?posted=1] — delete a draft, and its
+// photos when the confirm dialog's "Also delete this draft's photos" box was
+// ticked. `posted=1` means a HELD draft has just gone live on eBay: its
+// photos stay out of the library and are deleted half an hour later.
 export async function DELETE(request, { params }) {
   try {
     const { id } = await params;
-    const deletePhotos = new URL(request.url).searchParams.get("photos") === "1";
-    await deleteDraft(id, { deletePhotos });
+    const query = new URL(request.url).searchParams;
+    const deletePhotos = query.get("photos") === "1";
+    const posted = query.get("posted") === "1";
+    await deleteDraft(id, { deletePhotos, photosAfter: posted ? dueTime() : null });
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Delete draft error:", error);
