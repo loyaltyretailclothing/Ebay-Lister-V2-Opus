@@ -9,6 +9,7 @@ import { promoInfo } from "@/components/create/status";
 import { shortItemName } from "@/lib/titleKeywords";
 import { createActiveClock } from "@/lib/activeClock";
 import { buildDraftEntry, cleanMs } from "@/lib/efficiency";
+import { describeFailure, readReply } from "@/lib/publishError";
 
 // Everything Create Listing does, shared by the desktop and phone layouts:
 // the listing and its photos, Analyze, Save / Update Draft, List on eBay,
@@ -666,8 +667,11 @@ export default function useListingEditor() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...listing, photos: listingPhotos }),
       });
-      const data = await res.json();
-      if (data.success) {
+      // Read it as text first: a platform error (a timeout, an error page)
+      // isn't our JSON, and guessing it is turns a useful reason into
+      // "[object Object]" or a parse error.
+      const { data, body } = await readReply(res);
+      if (data?.success) {
         showListed({
           listingId: data.listingId,
           url: data.url,
@@ -741,7 +745,11 @@ export default function useListingEditor() {
         setCaughtUp(false);
         if (!next || !(await loadDraft(next.id))) clearToBlank();
       } else {
-        setSubmitStatus({ type: "error", message: `Failed: ${data.error}`, step: data.step });
+        setSubmitStatus({
+          type: "error",
+          message: `Failed: ${describeFailure(res.status, data, body)}`,
+          step: data?.step,
+        });
       }
     } catch (err) {
       setSubmitStatus({ type: "error", message: `Connection error: ${err.message}` });

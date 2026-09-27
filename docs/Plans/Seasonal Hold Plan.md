@@ -1,6 +1,6 @@
 # Seasonal Hold Plan
 
-**Status: LIVE 2026-09-22.** `CRON_SECRET` set in Vercel by the users; both cron jobs confirmed listed in Vercel. Still to see: the first real posting morning.
+**Status: LIVE 2026-09-22.** `CRON_SECRET` set in Vercel by the users; both cron jobs confirmed listed in Vercel. First real posting morning ran 2026-09-27 and **failed on its one item** — see below; nothing was posted broken and the item came back to the queue. Second test scheduled for the morning of 2026-09-28.
 
 ## How it's built
 - `src/lib/seasons.js` — the four seasons, their dates (month is 1-12), what each covers, and `suggestSeason` (only outerwear/snow/swim/flannel words, and only when the date is 4+ weeks off).
@@ -16,6 +16,17 @@
 - Hold dialog: blocks holding while title/category/price/SKU/photos are missing; with those filled it saved (faked) `holdUntil 2027-09-15`, `holdSeason Winter` and moved to the next draft.
 - On Hold page previewed with sample held drafts: totals, per-day cards, last-run banner.
 - The posting job ran locally with nothing due: posted 0, wrote no log. **Not yet tested end to end with a real held draft** — the first real posting morning is the proof.
+
+## The first real posting morning — 2026-09-27 (failed, then made readable)
+One item was due (Johnnie-O Brevard Henley, SKU C2421, $27.97, 13 photos). The run fired at **12:27 UTC = 7:27am Central** (Vercel's free plan can drift a cron by up to an hour) and the item **failed**: `Couldn't post automatically — [object Object]`.
+
+**What was and wasn't damaged:** nothing reached eBay — no inventory item and no offer for C2421, no Listed record, no half-made listing, the SKU still clean. The draft went back to the queue marked Error with its hold cleared. The safety half of the design worked.
+
+**What `[object Object]` meant:** the run did `new Error(data.error)`, and `data.error` was an **object**, not a sentence. Every error `/api/ebay/list` returns is a written sentence (checked all of them, and every throw in `src/lib/ebay.js`), so the reply wasn't ours — `{"error":{"code":…}}` is the shape **Vercel** returns when a function is cut off or never reached. Reproduced exactly: `String({error:{code:"FUNCTION_INVOCATION_TIMEOUT"}}.error)` → `[object Object]`.
+
+**Two changes so the next one is diagnosable (2026-09-27):**
+1. `src/lib/publishError.js` — `readReply` (reads the body as text, so an error page doesn't become a parse error) and `describeFailure` (our own sentence when there is one; otherwise `HTTP 504 — FUNCTION_INVOCATION_TIMEOUT`, or an error page reduced to its words). Used by **both** the hold run and List on eBay by hand, which had the same blind spot. Verified in the browser: the top bar showed `Failed: HTTP 504 — FUNCTION_INVOCATION_TIMEOUT` against a mocked reply, with nothing sent to eBay.
+2. `/api/ebay/list` now declares `maxDuration = 60`, like the hold run already did. It had none, so it took the platform's short default (~10-15 s) while doing 13 photo uploads plus three eBay calls. A timeout is the leading suspect but **not proven** — the EPS uploads run in parallel, and the run recorded no status or body. Vercel's runtime log for that invocation is the only place the real cause is written down.
 
 ## Fallback if the crons ever stop running
 Post the day's held drafts when the app is first opened that morning (the users are in it daily). Not needed as of 2026-09-22. See [[Home]], [[Draft Queue Plan]], [[Drafts and Camera Flow]], [[Future Features]].

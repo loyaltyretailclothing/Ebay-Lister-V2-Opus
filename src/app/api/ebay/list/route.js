@@ -8,6 +8,13 @@ import { NextResponse } from "next/server";
 // definition in @/lib/conditions, used by both this publish route and the
 // ListingForm condition dropdown so they can't drift.
 
+// Publishing is a long job — every photo up to eBay's own hosting, then the
+// inventory item, the offer and the publish itself. Without this it gets the
+// platform's short default and can be cut off part-way, which answers with
+// Vercel's own error rather than ours (see docs/Plans/Seasonal Hold Plan.md,
+// the failed posting morning of 2026-09-27). Same 60s the hold run asks for.
+export const maxDuration = 60;
+
 async function ebayFetch(path, options, token) {
   const res = await fetch(`${EBAY_BASE_URL}${path}`, {
     ...options,

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { deleteDraft, draftPhotoIds, getDraft, listDrafts, markPhotosHeld, saveDraft } from "@/lib/drafts";
 import { dueTime, sweepPhotos } from "@/lib/photoSweep";
+import { describeFailure, readReply } from "@/lib/publishError";
 import { writeRun } from "@/lib/holdRuns";
 import { writeEntry } from "@/lib/efficiencyLog";
 import { buildDraftEntry } from "@/lib/efficiency";
@@ -126,8 +127,8 @@ export async function GET(request) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...listing, photos }),
       });
-      const data = await res.json();
-      if (!data.success) throw new Error(data.error || "eBay rejected the listing");
+      const { data, body } = await readReply(res);
+      if (!data?.success) throw new Error(describeFailure(res.status, data, body));
 
       // The permanent record first — the draft (and its cost/place) is
       // about to be deleted.
