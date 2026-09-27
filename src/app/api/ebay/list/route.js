@@ -177,7 +177,12 @@ export async function POST(request) {
     }
 
     // --- Step 0: Ensure inventory location exists ---
-    const locationKey = "warehouse-47904";
+    // Where the item ships from: the "Item location" buyers see and the
+    // origin zip for calculated shipping. It comes from THIS, not from the
+    // shipping business policy — the policy can't set it, which is why
+    // changing the policy never moved it. Until 2026-09-27 this named a
+    // Lafayette, Indiana location, so every listing went out saying Indiana.
+    const locationKey = "US_74074"; // the account's own Stillwater location
     // Try to delete any old bad location, then create fresh
     const locationCheck = await ebayFetch(
       `/sell/inventory/v1/location/${locationKey}`,
@@ -189,17 +194,18 @@ export async function POST(request) {
     // the GET is ambiguous — bailing out here beats blindly POSTing a fresh
     // location body that will fail with a confusing "already exists" error.
     if (locationCheck.status === 404) {
+      // Only runs if that location is ever missing (it exists today).
       const createBody = {
         location: {
           address: {
-            postalCode: "47904",
+            postalCode: "74074",
             country: "US",
-            stateOrProvince: "IN",
-            city: "Lafayette",
+            stateOrProvince: "OK",
+            city: "Stillwater",
           },
         },
         merchantLocationStatus: "ENABLED",
-        name: "Warehouse 47904",
+        name: "Stillwater 74074",
         locationTypes: ["WAREHOUSE"],
       };
       const locationRes = await ebayFetch(

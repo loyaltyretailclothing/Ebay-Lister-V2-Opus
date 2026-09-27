@@ -43,8 +43,18 @@ The route asks for **60 seconds** (`maxDuration`), like the posting run. It had 
 ## Conditions
 Our condition keys map to eBay condition IDs in `src/lib/conditions.js`. See [[Conditions by Category]].
 
+## Where listings say they ship from (fixed 2026-09-27)
+The **"Item location"** buyers see, and the origin zip for calculated shipping, come from the **inventory location** the offer names (`merchantLocationKey`) — **not** from the shipping business policy. A policy cannot set item location, which is why changing the policy never moved it.
+
+The app named `warehouse-47904` (Lafayette, Indiana), so every listing went out saying Indiana. It now names **`US_74074`** — the account's own Stillwater, Oklahoma location, which eBay created from the seller shipping settings. No new location was made and nothing was written to eBay.
+
+The account holds four locations (`US_47904`, `US_74074`, `default-location`, `warehouse-47904`); the unused ones are harmless. The create-if-missing branch in the route now carries the Stillwater address too, for a fresh account.
+
+**Listings posted before this keep saying Lafayette** — the location is fixed on each offer at posting time. Correcting the back catalogue would mean revising every live offer, a separate job.
+
 ## Useful diagnostics
 - `/api/ebay/sku-inspect?sku=XXXX` (read-only): shows the inventory item and all offers, including unpublished ones that don't appear in Seller Hub.
+- `/api/ebay/locations` (read-only): every inventory location and the address it holds — what buyers are actually shown.
 
 ## Related gotchas
 [[Orphan Offers and SKUs]] · [[Size Type and Size]] · [[Item Specifics Rejections]] · [[Description Line Breaks]]
