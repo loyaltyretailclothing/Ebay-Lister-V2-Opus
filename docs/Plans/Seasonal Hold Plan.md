@@ -47,6 +47,13 @@ Not eBay's own scheduled listing: eBay won't hold a scheduled listing long enoug
 - **Delete Draft** now asks: a checkbox **"Also delete this draft's N photos"** (off by default), then **No / Yes, delete**. Ticking it deletes the photos from Cloudinary with the draft — the way to clear out photos for an item that's no longer being listed. Works the same for held and ordinary drafts.
 - If a held draft's photos are missing when its morning comes, it doesn't post: it returns to the queue with the reason (same path as any other failure).
 
+### Fixed 2026-09-27 — opening a held draft still showed the whole library
+Two real faults, both now fixed:
+1. **The photos couldn't be found.** The library loads the newest 500 photos; the held draft's photos were from days earlier, so filtering the loaded page never reached them (the account has 5,340 photos). `/api/cloudinary/list` now takes `heldFor=<draftId>` and asks Cloudinary for **exactly that draft's photos** (`context.heldDraft="…"`), however old they are.
+2. **A slow answer overwrote the right one.** The library fetch starts as the page opens and takes a second or two; the held-draft fetch starts later (once the draft has loaded) and finishes first, so the library answer landed last and replaced it. `usePhotoLibrary` now numbers its requests and only the newest one is allowed to set the photos.
+
+A draft held **before** the photo-marking existed has no marked photos; the panel falls back to the ordinary library rather than showing nothing. Re-opening **Hold** on it marks its photos.
+
 ## While held
 - Held drafts leave the normal queue — Next draft passes over them, like Skip Draft.
 - **Its own desktop tab "On Hold"** so the Drafts panel stays simple (users' call). Shows:

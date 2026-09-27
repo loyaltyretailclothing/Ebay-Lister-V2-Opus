@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { resizeImage } from "@/lib/resizeImage";
 
 // Photo library data + actions, shared by the desktop Create Listing panel
@@ -22,14 +22,28 @@ export default function usePhotoLibrary({ heldFor = "" } = {}) {
   // Upload progress: { done, total } while running; { message } briefly after.
   const [upload, setUpload] = useState(null);
 
+  // Which fetch is the current one. A big library takes seconds to come back,
+  // so opening a held draft (which asks for that draft's photos instead) would
+  // otherwise be overwritten by the library answer landing later. Only the
+  // newest request is allowed to set the photos.
+  const request = useRef(0);
+
   const fetchPhotos = useCallback(async () => {
+    const mine = ++request.current;
     setLoading(true);
     setError("");
     try {
+      const libraryUrl = `/api/cloudinary/list?folder=${encodeURIComponent(activeFolder)}`;
       const res = await fetch(
-        `/api/cloudinary/list?folder=${encodeURIComponent(activeFolder)}`
+        heldFor ? `/api/cloudinary/list?heldFor=${encodeURIComponent(heldFor)}` : libraryUrl
       );
-      const data = await res.json();
+      let data = await res.json();
+      // A draft held before its photos were marked has none to find — show
+      // the ordinary library rather than an empty panel.
+      if (heldFor && data.success && (data.photos || []).length === 0) {
+        data = await fetch(libraryUrl).then((r) => r.json());
+      }
+      if (mine !== request.current) return;
       if (data.success) {
         setPhotos(data.photos);
         setNextCursor(data.next_cursor || null);
@@ -40,17 +54,19 @@ export default function usePhotoLibrary({ heldFor = "" } = {}) {
       }
     } catch (err) {
       console.error("Failed to fetch photos:", err);
+      if (mine !== request.current) return;
       setPhotos([]);
       setNextCursor(null);
       setError("Could not connect to photo service");
     } finally {
-      setLoading(false);
+      if (mine === request.current) setLoading(false);
     }
-  }, [activeFolder]);
+  }, [activeFolder, heldFor]);
 
   // Cursor pagination: append the next batch of older photos.
   const fetchMore = useCallback(async () => {
     if (!nextCursor || loadingMore) return;
+    const mine = request.current;
     setLoadingMore(true);
     setError("");
     try {
@@ -60,6 +76,8 @@ export default function usePhotoLibrary({ heldFor = "" } = {}) {
         )}&next_cursor=${encodeURIComponent(nextCursor)}`
       );
       const data = await res.json();
+      // The view changed while this batch was loading — drop it.
+      if (mine !== request.current) return;
       if (data.success) {
         setPhotos((prev) => [...prev, ...data.photos]);
         setNextCursor(data.next_cursor || null);
@@ -202,13 +220,13 @@ export default function usePhotoLibrary({ heldFor = "" } = {}) {
     return selected.map((id) => map[id]).filter(Boolean);
   }, [photos, selected]);
 
-  // Held photos are hidden everywhere except inside their own held draft.
-  // A draft held before this existed has no marked photos — fall back to
-  // the ordinary library so the panel is never mysteriously empty (saving
-  // or re-holding that draft marks its photos).
-  const mine = heldFor ? photos.filter((p) => p.heldDraft === heldFor) : [];
-  const heldActive = heldFor && mine.length > 0;
-  const visiblePhotos = heldActive ? mine : photos.filter((p) => !p.heldDraft);
+  // With heldFor set, the fetch above already asked for exactly that
+  // draft's photos, so nothing to filter. Otherwise held photos are hidden
+  // from the library. A draft held before the marking existed comes back
+  // empty — fall back to the ordinary library rather than an empty panel
+  // (re-holding it marks its photos).
+  const heldActive = !!heldFor && photos.some((p) => p.heldDraft === heldFor);
+  const visiblePhotos = heldActive ? photos : photos.filter((p) => !p.heldDraft);
 
   return {
     activeFolder,

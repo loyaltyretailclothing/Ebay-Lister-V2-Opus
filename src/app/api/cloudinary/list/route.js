@@ -10,6 +10,10 @@ export async function GET(request) {
     const { searchParams } = new URL(request.url);
     const folder = searchParams.get("folder") || "All Photos";
     const cursor = searchParams.get("next_cursor") || null;
+    // A held draft's own photos, by the mark on them. Asked for directly
+    // because they can be far older than the newest batch the library
+    // loads — filtering the loaded page would miss them entirely.
+    const heldFor = (searchParams.get("heldFor") || "").replace(/[^A-Za-z0-9_-]/g, "");
 
     let prefix;
     if (folder === "All Photos") {
@@ -18,8 +22,9 @@ export async function GET(request) {
       prefix = `ebay-listings/${folder.toLowerCase()}`;
     }
 
-    const expression =
-      folder === "All Photos"
+    const expression = heldFor
+      ? `resource_type:image AND context.heldDraft="${heldFor}"`
+      : folder === "All Photos"
         ? `resource_type:image AND folder:ebay-listings/*`
         : `resource_type:image AND folder:${prefix}`;
 
