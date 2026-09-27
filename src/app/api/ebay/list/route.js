@@ -2,6 +2,7 @@ import { getUserToken, uploadPhotosToEps } from "@/lib/ebay";
 import { EBAY_BASE_URL } from "@/lib/constants";
 import { CONDITION_MAP } from "@/lib/conditions";
 import { evaluateSkuLookup, offerWasListed } from "@/lib/skuGuard";
+import { localToUtcIso } from "@/lib/localTime";
 import { NextResponse } from "next/server";
 
 // CONDITION_MAP (our enum -> { condition, conditionId }) is now the shared
@@ -340,11 +341,14 @@ export async function POST(request) {
       offer.listingPolicies.returnPolicyId = returnPolicyId;
     }
 
-    // Add scheduled start date to offer
+    // Add scheduled start date to offer. The time on screen is the users'
+    // own (Central) — read off the server clock it would be UTC, so a 5pm
+    // start went live at noon their time. Left off entirely if it can't be
+    // read, rather than sent to eBay wrong.
     if (scheduleEnabled && scheduledDate) {
-      const time = scheduledTime || "08:00";
-      const scheduledDateTime = new Date(`${scheduledDate}T${time}:00`);
-      offer.listingStartDate = scheduledDateTime.toISOString();
+      const startsAt = localToUtcIso(scheduledDate, scheduledTime || "08:00");
+      if (startsAt) offer.listingStartDate = startsAt;
+      else console.error("Ignoring an unreadable scheduled start:", scheduledDate, scheduledTime);
     }
 
     let offerRes = await ebayFetch(

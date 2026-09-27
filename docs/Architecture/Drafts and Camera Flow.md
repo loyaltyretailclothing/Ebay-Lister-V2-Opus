@@ -7,6 +7,8 @@ Each draft is a raw JSON file in Cloudinary under `ebay-drafts/<draftId>`, conta
 
 Statuses: `processing` → `ready`, or `error` (photos and notes are kept so nothing is lost).
 
+**Listing them all (fixed 2026-09-27):** Cloudinary answers 500 records at a time, and `listDrafts` only ever read the first page. Everything reads that one list — the queue, the On Hold page and the 7am posting run — so past 500 drafts some would have silently disappeared from all three, and a held item could have reached its morning without ever being seen. It now follows the cursor (stopping at 20 pages, i.e. 10,000 drafts). 74 records today: still one page, one call. Found in the code audit of 2026-09-27.
+
 ## Camera flow (`/camera`)
 1. Capture photos, then Review. Tap photos to mark them for AI (the first 3 are selected by default).
 2. Optional **Draft Note** / **AI Read** (buttons that open a popup editor; a check mark shows when filled). Each has a 🎤 **voice** button beside it (added 2026-09-18): tap, talk, and the words are added to the end of that note. Uses Chrome's built-in speech-to-text (free, no AI, needs internet; mic permission asked once); shows what it heard in green ("Added: …") for 3 seconds after the mic stops (2026-09-21 — it used to vanish the instant the mic turned off), stops after 1 second of silence (the app's own timer — Chrome's pause detection can't be tuned), after 8 seconds if nothing is said, or on a second tap. The same mics are on the Draft Note / AI Read boxes in Create Listing (phone and desktop). Hidden where the browser has no speech-to-text.

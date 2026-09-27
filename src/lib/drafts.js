@@ -2,6 +2,9 @@ import cloudinary from "./cloudinary";
 import { schedulePhotoDelete } from "./photoSweep";
 
 const DRAFTS_FOLDER = "ebay-drafts";
+// 500 drafts a page. A stop so a mistake can't loop forever; 20 pages is
+// 10,000 drafts, far beyond anything real.
+const MAX_PAGES = 20;
 
 export function newDraftId() {
   return `draft_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
@@ -54,16 +57,29 @@ export async function saveDraft(draftId, payload) {
 }
 
 // List all drafts (summary only — from Cloudinary context metadata).
+// Cloudinary answers 500 at a time, so this follows the cursor: with
+// hundreds of items on hold, a single page would quietly leave some out —
+// out of the queue, off the On Hold page, and invisible to the posting run,
+// which would mean a held item never posting at all.
 export async function listDrafts() {
-  const result = await cloudinary.api.resources({
-    resource_type: "raw",
-    type: "upload",
-    prefix: `${DRAFTS_FOLDER}/`,
-    max_results: 500,
-    context: true,
-  });
+  const resources = [];
+  let cursor;
+  let page = 0;
+  do {
+    const result = await cloudinary.api.resources({
+      resource_type: "raw",
+      type: "upload",
+      prefix: `${DRAFTS_FOLDER}/`,
+      max_results: 500,
+      context: true,
+      ...(cursor ? { next_cursor: cursor } : {}),
+    });
+    resources.push(...(result.resources || []));
+    cursor = result.next_cursor;
+    page += 1;
+  } while (cursor && page < MAX_PAGES);
 
-  return (result.resources || [])
+  return resources
     .map((r) => {
       const ctx = r.context?.custom || {};
       // Extract the draft id from the public_id (strip folder prefix)

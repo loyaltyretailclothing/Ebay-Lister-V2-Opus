@@ -18,6 +18,12 @@ Route: `POST /api/ebay/list` (`src/app/api/ebay/list/route.js`). **No Claude cal
 4. **Promote** (Marketing API), optional.
 5. Logs `[POST] published listing <id>` for cost tracking. See [[Costs]].
 
+## Time limit
+The route asks for **60 seconds** (`maxDuration`), like the posting run. It had none until 2026-09-27, so it took the platform's short default (~10-15 s) while uploading every photo to eBay and making four more calls — see [[Seasonal Hold Plan]], the failed posting morning.
+
+## Scheduled listings — the time means Central (fixed 2026-09-27)
+`scheduledDate` + `scheduledTime` are read as the users' own time (`America/Chicago`, `src/lib/localTime.js`) and converted to UTC for `offer.listingStartDate`. Before this they were read off the **server** clock, which is UTC on Vercel, so a listing set for **5pm went live at noon** Central — and the error changed by an hour with daylight saving. Verified: 5pm on Sep 28 → `22:00Z`, 5pm on Dec 15 → `23:00Z`. An unreadable date or time is now left off the offer rather than sent wrong.
+
 ## Error messages
 `formatEbayErrors()` shows the full eBay error: `#errorId message (longMessage) [parameters]`. The `#number` and parameters usually point right at the field at fault.
 
