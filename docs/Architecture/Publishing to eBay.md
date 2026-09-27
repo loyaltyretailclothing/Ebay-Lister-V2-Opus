@@ -18,6 +18,19 @@ Route: `POST /api/ebay/list` (`src/app/api/ebay/list/route.js`). **No Claude cal
 4. **Promote** (Marketing API), optional.
 5. Logs `[POST] published listing <id>` for cost tracking. See [[Costs]].
 
+## If the answer is lost (2026-09-27)
+eBay can list an item and the reply never reach us — the job cut short, the connection dropped. The listing is live, but the app used to call it a failure: the draft went back in the queue, nothing reached the [[Listed Report Plan|Listed report]], and the next attempt was refused for reusing the SKU (the guard doing its job, but it reads like a bug).
+
+Now, **when our own route gives no reason**, both the hold run and List on eBay ask eBay whether it went up: `GET /api/ebay/sku-inspect?sku=` (read-only). If it did, the item is finished properly — Listed record, draft cleared, photos scheduled, Efficiency entry — and said out loud:
+- **By hand:** "Listed on eBay! Item 336… · The reply from eBay was lost, but the listing is live — promotion not confirmed."
+- **The hold run:** counted as posted, and named on the On Hold page banner under "Worth a look".
+
+**It only asks when it doesn't know.** A reason from our route ("SKU already used", "Create offer failed") is definitive — those paths clean up after themselves — so nothing changes there, and no extra call is made. Normal listings are untouched.
+
+**It can't claim someone else's listing.** A match needs a live listing id *and* the item eBay stores under that SKU to have the same title we were publishing (`src/lib/skuMatch.js`, `matchPublished`). A SKU that was genuinely already in use has a different title, so it is refused.
+
+Verified locally 2026-09-27, nothing written: 14 matcher checks (including a different live item under the same SKU → refused); in the browser, a platform timeout with nothing live → still a failure; the same timeout with a matching live listing → listed, draft cleared, moved on; a real error from our route → no lookup at all.
+
 ## Time limit
 The route asks for **60 seconds** (`maxDuration`), like the posting run. It had none until 2026-09-27, so it took the platform's short default (~10-15 s) while uploading every photo to eBay and making four more calls — see [[Seasonal Hold Plan]], the failed posting morning.
 

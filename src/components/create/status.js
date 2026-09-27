@@ -17,6 +17,13 @@ export function promoInfo(pr) {
   if (pr === "promoted_updated") return { text: "Promoted (rate updated).", warn: false };
   if (pr === "promoted_existing") return { text: "Already promoted.", warn: false };
   if (pr === "no_campaign") return { text: "Not promoted: no promotion campaign found.", warn: true };
+  // The publish gave no answer, but eBay says the listing is live — so it
+  // counts as listed. We just can't say whether promotion got applied.
+  if (pr === "recovered")
+    return {
+      text: "The reply from eBay was lost, but the listing is live — promotion not confirmed.",
+      warn: true,
+    };
   if (pr.startsWith("promo_failed")) {
     const detail = pr.replace(/^promo_failed:?\s*/, "").trim();
     const reason = detail ? `: ${detail}${/[.!?]$/.test(detail) ? "" : "."}` : ".";

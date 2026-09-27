@@ -15,6 +15,8 @@ export async function writeRun(run) {
     value: String(run.value ?? 0),
     // Titles of anything that couldn't post, so the page can name them.
     problems: String(run.problems || "").slice(0, 900),
+    // Anything that turned out to be live after a silent failure.
+    recovered: String(run.recovered || "").slice(0, 900),
   };
   return new Promise((resolve, reject) => {
     const stream = cloudinary.uploader.upload_stream(
@@ -42,6 +44,7 @@ export async function listRuns(limit = 20) {
         failed: parseInt(c.failed, 10) || 0,
         value: parseFloat(c.value) || 0,
         problems: c.problems || "",
+        recovered: c.recovered || "",
       };
     })
     .sort((a, b) => (a.at < b.at ? 1 : -1))

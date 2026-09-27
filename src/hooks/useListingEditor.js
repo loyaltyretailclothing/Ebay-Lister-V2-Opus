@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { usePhotoTransfer } from "@/contexts/PhotoTransferContext";
@@ -10,6 +10,7 @@ import { shortItemName } from "@/lib/titleKeywords";
 import { createActiveClock } from "@/lib/activeClock";
 import { buildDraftEntry, cleanMs } from "@/lib/efficiency";
 import { describeFailure, readReply } from "@/lib/publishError";
+import { matchPublished } from "@/lib/skuMatch";
 
 // Everything Create Listing does, shared by the desktop and phone layouts:
 // the listing and its photos, Analyze, Save / Update Draft, List on eBay,
@@ -27,11 +28,30 @@ import { describeFailure, readReply } from "@/lib/publishError";
 // Analyze), not by comparing snapshots: the form fills in some fields by
 // itself after a draft opens (policies, condition), and those must not count.
 
-// Oldest first by creation date — what makes Next draft the next row down.
+// Oldest first by creation date â€” what makes Next draft the next row down.
 function sortDrafts(list) {
   return [...list].sort((a, b) =>
     (a.createdAt || a.updatedAt || "") < (b.createdAt || b.updatedAt || "") ? -1 : 1
   );
+}
+
+// After a publish that gave no reason, ask eBay whether the item went live
+// anyway. Only accepted when the item eBay holds under that SKU has the
+// title we were publishing, so a SKU that was genuinely already in use can
+// never be mistaken for our own listing. See src/lib/skuInspect.js.
+async function recoverListing(listing) {
+  const sku = String(listing?.sku || "").trim();
+  if (!sku || !listing?.title?.trim()) return null;
+  try {
+    const found = await fetch(`/api/ebay/sku-inspect?sku=${encodeURIComponent(sku)}`, {
+      cache: "no-store",
+    }).then((r) => r.json());
+    if (!found?.success) return null;
+    const live = matchPublished(found, listing.title);
+    return live ? { success: true, recovered: true, ...live } : null;
+  } catch {
+    return null; // couldn't ask — leave it as a failure
+  }
 }
 
 function setDraftInUrl(id) {
@@ -63,11 +83,11 @@ export default function useListingEditor() {
 
   const [submitting, setSubmitting] = useState(false);
   const [submitStatus, setSubmitStatus] = useState(null); // failures only
-  // "Listed on eBay!" — outlives the switch to the next draft and clears
+  // "Listed on eBay!" â€” outlives the switch to the next draft and clears
   // itself after 10 seconds (a promotion problem stays until dismissed).
   const [listed, setListed] = useState(null);
   const listedTimer = useRef(null);
-  // "Held for Winter — posts itself on …", same idea.
+  // "Held for Winter â€” posts itself on â€¦", same idea.
   const [held, setHeld] = useState(null);
   const heldTimer = useRef(null);
 
@@ -105,7 +125,7 @@ export default function useListingEditor() {
   const timedIdRef = useRef(null); // draft being timed (null = unsaved listing)
   const finishBaseRef = useRef(0); // earlier sittings for that draft
   const analysesRef = useRef(0);
-  const sittingsRef = useRef(new Map()); // draftId → ms, this page visit
+  const sittingsRef = useRef(new Map()); // draftId â†’ ms, this page visit
   useEffect(() => {
     clockRef.current = createActiveClock();
     return () => clockRef.current?.stop();
@@ -217,7 +237,7 @@ export default function useListingEditor() {
       const data = await res.json();
       if (data.success) {
         const all = data.drafts || [];
-        // Held drafts wait on the On Hold page — they're out of the queue.
+        // Held drafts wait on the On Hold page â€” they're out of the queue.
         const sorted = sortDrafts(all.filter((d) => !d.holdUntil));
         setHeldCount(all.length - sorted.length);
         setDrafts(sorted);
@@ -248,8 +268,8 @@ export default function useListingEditor() {
   }, []);
 
   // Opening a draft is ONE visible step: the current listing stays on screen
-  // (faded) while the draft and everything its form needs — saved settings,
-  // the category's item specifics, category suggestions — are fetched; then
+  // (faded) while the draft and everything its form needs â€” saved settings,
+  // the category's item specifics, category suggestions â€” are fetched; then
   // the new draft is swapped in complete. No strip appears and nothing jumps.
   const loadDraft = useCallback(
     async (id) => {
@@ -318,7 +338,7 @@ export default function useListingEditor() {
     [clearStatus, newSession, setDirty, startTiming]
   );
 
-  // Load ?draft=… on first visit, and the drafts list.
+  // Load ?draft=â€¦ on first visit, and the drafts list.
   useEffect(() => {
     const id = new URLSearchParams(window.location.search).get("draft");
     if (id) loadDraft(id);
@@ -397,7 +417,7 @@ export default function useListingEditor() {
               ...listing,
               holdUntil: date,
               holdSeason: season,
-              // What it cost and where it came from — kept for the Listed
+              // What it cost and where it came from â€” kept for the Listed
               // report, because the draft is gone once the item posts.
               cost: String(cost ?? "").trim(),
               purchasePlace: String(place ?? "").trim(),
@@ -563,7 +583,7 @@ export default function useListingEditor() {
     setError("");
     setLookup(null);
     setSubmitStatus(null);
-    setAnalysisStep("Analyzing photos…");
+    setAnalysisStep("Analyzing photosâ€¦");
     try {
       const res = await fetch("/api/generate", {
         method: "POST",
@@ -579,7 +599,7 @@ export default function useListingEditor() {
         const styleNumber = aiListing.observations?.style_number;
         if (styleNumber) {
           try {
-            setAnalysisStep(`Looking up style number ${styleNumber}…`);
+            setAnalysisStep(`Looking up style number ${styleNumber}â€¦`);
             const refineRes = await fetch("/api/generate/refine", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
@@ -600,12 +620,12 @@ export default function useListingEditor() {
         }
         if (s !== sessionRef.current) return;
 
-        // Title rules, 2-inch asterisk, description, condition boilerplate —
+        // Title rules, 2-inch asterisk, description, condition boilerplate â€”
         // shared with the camera flow so both produce identical drafts.
         const finalListing = applyDescriptionTemplate(aiListing);
 
         // Start from square one for everything the AI creates; keep what the
-        // user typed (price, SKU, weight, policies, notes…).
+        // user typed (price, SKU, weight, policies, notesâ€¦).
         updateListing((prev) => ({
           ...prev,
           ...finalListing,
@@ -648,7 +668,7 @@ export default function useListingEditor() {
   );
 
   const submit = useCallback(async () => {
-    // SKU is required — never post without one (the server checks too).
+    // SKU is required â€” never post without one (the server checks too).
     if (!String(listing.sku || "").trim()) {
       setSubmitStatus({
         type: "error",
@@ -671,19 +691,28 @@ export default function useListingEditor() {
       // isn't our JSON, and guessing it is turns a useful reason into
       // "[object Object]" or a parse error.
       const { data, body } = await readReply(res);
-      if (data?.success) {
+      // No answer from our own route (a timeout, an error page) means we
+      // don't know whether eBay listed it. Ask before calling it a failure:
+      // a live listing treated as failed loses its Listed-report row and is
+      // refused for reusing its SKU next time.
+      const result =
+        data?.success || typeof data?.error === "string"
+          ? data
+          : (await recoverListing(listing)) || data;
+
+      if (result?.success) {
         showListed({
-          listingId: data.listingId,
-          url: data.url,
-          promoResult: data.promoResult || "",
+          listingId: result.listingId,
+          url: result.url,
+          promoResult: result.recovered ? "recovered" : result.promoResult || "",
         });
         // Efficiency Tracker (draft tracker): one entry for this listing.
-        // Best-effort — a failed log never gets in the way of listing.
+        // Best-effort â€” a failed log never gets in the way of listing.
         const entry = buildDraftEntry({
           listing,
           finishMs: finishBaseRef.current + (clockRef.current?.take() || 0),
           analyses: analysesRef.current,
-          listingId: data.listingId,
+          listingId: result.listingId,
           listedAt: new Date().toISOString(),
         });
         if (publishedDraft) sittingsRef.current.delete(publishedDraft);
@@ -695,7 +724,7 @@ export default function useListingEditor() {
           body: JSON.stringify(entry),
         }).catch(() => {});
 
-        // Listed report: HELD items only (users' call) — those are the ones
+        // Listed report: HELD items only (users' call) â€” those are the ones
         // whose cost still has to go into Flipwise long after they were
         // finished. Items listed straight away are entered the same day.
         if (listing.holdUntil) {
@@ -704,20 +733,20 @@ export default function useListingEditor() {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               at: new Date().toISOString(),
-              listingId: data.listingId,
+              listingId: result.listingId,
               title: listing.title,
               sku: listing.sku,
               cost: listing.cost,
               place: listing.purchasePlace,
-              image: data.image,
-              url: data.url,
+              image: result.image,
+              url: result.url,
               held: true,
             }),
           }).catch(() => {});
         }
         setDraftError("");
         setNotice(null);
-        // The draft has been published — delete it.
+        // The draft has been published â€” delete it.
         setDraftId(null);
         setDraftInUrl(null);
         setDirty(false);
@@ -732,7 +761,7 @@ export default function useListingEditor() {
               { method: "DELETE" }
             );
           } catch {
-            // Non-fatal — listing already published
+            // Non-fatal â€” listing already published
           }
         }
         // Straight on to the next draft (same order as Next draft), or a

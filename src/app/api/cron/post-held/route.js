@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { deleteDraft, draftPhotoIds, getDraft, listDrafts, markPhotosHeld, saveDraft } from "@/lib/drafts";
 import { dueTime, sweepPhotos } from "@/lib/photoSweep";
 import { describeFailure, readReply } from "@/lib/publishError";
+import { findPublishedListing } from "@/lib/skuInspect";
 import { writeRun } from "@/lib/holdRuns";
 import { writeEntry } from "@/lib/efficiencyLog";
 import { buildDraftEntry } from "@/lib/efficiency";
@@ -110,7 +111,52 @@ export async function GET(request) {
   const batch = due.slice(0, BATCH);
   const posted = [];
   const problems = [];
+  const recovered = [];
   let value = 0;
+
+  // Everything that has to happen once an item is live: the permanent
+  // record (written first — the draft and its cost are about to go), the
+  // draft itself, and the Efficiency Tracker entry. Shared by a normal post
+  // and by one we only found out about afterwards.
+  async function finish(row, listing, live) {
+    try {
+      await writeListed({
+        at: new Date().toISOString(),
+        listingId: live.listingId,
+        title: listing.title,
+        sku: listing.sku,
+        cost: listing.cost,
+        place: listing.purchasePlace,
+        image: live.image,
+        url: live.url,
+        held: true,
+      });
+    } catch (logErr) {
+      console.error("Listed record failed for held draft:", logErr);
+    }
+
+    // The listing is live and eBay has its own copies of the photos, so
+    // the draft goes and its photos are deleted half an hour from now.
+    await deleteDraft(row.id, { photosAfter: dueTime() });
+    posted.push({ id: row.id, title: row.title, listingId: live.listingId });
+    value += Number(listing.price) || 0;
+
+    // Efficiency Tracker: the draft was finished earlier; log it as listed
+    // today so the Track tab counts it.
+    try {
+      await writeEntry(
+        buildDraftEntry({
+          listing,
+          finishMs: listing.timing?.finishMs,
+          analyses: listing.timing?.analyses,
+          listingId: live.listingId,
+          listedAt: new Date().toISOString(),
+        })
+      );
+    } catch (logErr) {
+      console.error("Efficiency log failed for held draft:", logErr);
+    }
+  }
 
   for (const row of batch) {
     try {
@@ -119,7 +165,11 @@ export async function GET(request) {
       const listing = draft.listing || {};
       const photos = draft.listingPhotos || [];
       const missing = whatsMissing(listing, photos);
-      if (missing.length) throw new Error(`Missing ${missing.join(", ")}`);
+      if (missing.length) {
+        const stop = new Error(`Missing ${missing.join(", ")}`);
+        stop.answered = true; // nothing was sent to eBay
+        throw stop;
+      }
 
       // The same publish path (and SKU check) as List on eBay.
       const res = await fetch(`${siteUrl(request)}/api/ebay/list`, {
@@ -128,48 +178,39 @@ export async function GET(request) {
         body: JSON.stringify({ ...listing, photos }),
       });
       const { data, body } = await readReply(res);
-      if (!data?.success) throw new Error(describeFailure(res.status, data, body));
-
-      // The permanent record first — the draft (and its cost/place) is
-      // about to be deleted.
-      try {
-        await writeListed({
-          at: new Date().toISOString(),
-          listingId: data.listingId,
-          title: listing.title,
-          sku: listing.sku,
-          cost: listing.cost,
-          place: listing.purchasePlace,
-          image: data.image,
-          url: data.url,
-          held: true,
-        });
-      } catch (logErr) {
-        console.error("Listed record failed for held draft:", logErr);
+      if (!data?.success) {
+        const failed = new Error(describeFailure(res.status, data, body));
+        // Our own route gave a reason (and cleans up after itself), so the
+        // item is definitely not live. Without a reason we don't know yet.
+        failed.answered = typeof data?.error === "string" && data.error.trim().length > 0;
+        throw failed;
       }
 
-      // The listing is live and eBay has its own copies of the photos, so
-      // the draft goes and its photos are deleted half an hour from now.
-      await deleteDraft(row.id, { photosAfter: dueTime() });
-      posted.push({ id: row.id, title: row.title, listingId: data.listingId });
-      value += Number(listing.price) || 0;
-
-      // Efficiency Tracker: the draft was finished earlier; log it as listed
-      // today so the Track tab counts it.
-      try {
-        await writeEntry(
-          buildDraftEntry({
-            listing,
-            finishMs: listing.timing?.finishMs,
-            analyses: listing.timing?.analyses,
-            listingId: data.listingId,
-            listedAt: new Date().toISOString(),
-          })
-        );
-      } catch (logErr) {
-        console.error("Efficiency log failed for held draft:", logErr);
-      }
+      await finish(row, listing, {
+        listingId: data.listingId,
+        url: data.url,
+        image: data.image,
+      });
     } catch (err) {
+      // No answer from our own publish route means we don't actually know
+      // whether eBay listed it. Ask: a live listing recorded as a failure
+      // would go back in the queue, never reach the Listed report, and be
+      // refused for reusing its SKU on the next try.
+      let live = null;
+      if (!err.answered) {
+        const draft = await getDraft(row.id).catch(() => null);
+        live = await findPublishedListing(draft?.listing?.sku, draft?.listing?.title);
+        if (live && draft) {
+          try {
+            await finish(row, draft.listing || {}, live);
+            recovered.push(`${row.title} is live (#${live.listingId}) — the reply was lost`);
+            continue;
+          } catch (finishErr) {
+            console.error("Could not record a recovered listing:", finishErr);
+          }
+        }
+      }
+
       // Back into the drafts queue with the reason — never posted broken.
       problems.push(`${row.title}: ${err.message}`);
       try {
@@ -199,6 +240,9 @@ export async function GET(request) {
     failed: problems.length,
     value: Math.round(value * 100) / 100,
     problems: problems.join(" | "),
+    // Items that turned out to be live after a silent failure — counted as
+    // posted, but worth saying out loud on the On Hold page.
+    recovered: recovered.join(" | "),
   };
   if (posted.length || problems.length) {
     try {

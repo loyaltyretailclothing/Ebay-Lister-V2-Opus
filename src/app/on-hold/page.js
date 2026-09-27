@@ -194,7 +194,9 @@ export default function OnHoldPage() {
 
       <div className={`min-h-0 grow overflow-y-auto bg-panel p-4 ${view === "hold" ? "" : "hidden"}`}>
         {lastRun && (
-          <div className={`lane ${lastRun.failed ? "lane-warn" : "lane-ok"} mb-4 rounded-panel`}>
+          <div
+            className={`lane ${lastRun.failed || lastRun.recovered ? "lane-warn" : "lane-ok"} mb-4 rounded-panel`}
+          >
             <p>
               Last posting morning (
               {new Date(lastRun.at).toLocaleDateString([], { month: "short", day: "numeric" })}):{" "}
@@ -202,6 +204,8 @@ export default function OnHoldPage() {
               {lastRun.failed
                 ? ` · ${lastRun.failed} couldn't post (back in your drafts): ${lastRun.problems}`
                 : ""}
+              {/* Listed, but only after asking eBay — worth checking. */}
+              {lastRun.recovered ? ` · Worth a look: ${lastRun.recovered}` : ""}
             </p>
           </div>
         )}
