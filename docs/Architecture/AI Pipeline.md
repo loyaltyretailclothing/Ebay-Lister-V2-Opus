@@ -23,8 +23,19 @@ Rules: `src/lib/titleRules.js`. Assembly: `src/lib/titleKeywords.js`.
 - **Draft Note:** stored on the listing for whoever finishes the draft. Never sent to the AI or eBay.
 - Both live on the listing object (`aiNote`, `draftNote`), so they survive save/load and re-analysis.
 
+## Brand sends no value list (2026-09-28)
+eBay's value lists are alphabetical and Pass 2 can only afford the first 200. For Brand that means "everything starting with a digit or A" — 200 of **9,130** on shirts, of 19,161 on polos. Measured across 30 real drafts: the chosen brand was inside those 200 exactly **7 times, 4 of them "Unbranded"**. The only real ones were 5.11 Tactical and 7 For All Mankind, which sort early because they start with digits. The other 23 came from the AI reading the tag — Proper Cloth sits at #13,980 in eBay's list.
+
+A FREE_TEXT field with more than 500 values now sends no list (`sendableValues` in `listingPipeline.js`). Only Brand crosses that line in the categories they list; Model, the next largest, has 363. **Everything eBay actually constrains (SELECTION_ONLY) keeps its values**, as do short free-text lists like Color (17) and Material (58) — users' call 2026-09-28: "I want AI to use the selections Ebay gives us."
+
+The Brand rule in `SPECIFICS_SYSTEM_PROMPT` was rewritten to match: it used to say "search the values list carefully before using a custom value", which means nothing when there is no list, and now says a missing list is never a reason to answer "Unbranded".
+
+**Saving:** 14–20% of the Pass 2 prompt (Sweaters 12,672 → 10,146 chars; one shorts category 16,062 → 13,787). Roughly $2/month.
+
+**What the test did NOT show.** 4 of 30 saved drafts have Brand "Unbranded", including a Johnnie-O and a Birddogs, so the failure is real in production — but it could not be reproduced on demand. One baseline run got all three wrong; an identical second run got all three right, and 5 further runs per arm (30 calls) were right every time in **both** arms. **The change is justified by cost, not by proven accuracy.** Other fields moved no more than normal noise: two identical runs differed on 16 of 248 fields, old vs new on 22 of 248. Test cost ~$0.80 of AI.
+
 ## Item specifics notes
-- Pass 2 is told to use eBay's preset spelling (especially Brand) and return multi-values as arrays.
+- Pass 2 is told to use eBay's preset spelling and return multi-values as arrays. Brand is the exception above.
 - **Theme:** for listings with keywords, the app owns Theme (overflow keywords). Older listings without keywords keep the original behavior, where Pass 2 picks 2–3 Theme words itself.
 - **Re-analyzing** a draft redoes everything the AI creates, including a fresh category lookup and a full item specifics refill. Typed-in fields are kept. See [[Title Keywords Plan]].
 - The item specifics fetch keeps only value **lists**. It does **not** keep eBay's value dependencies (e.g. Size ↔ Size Type). That gap causes [[Size Type and Size]].

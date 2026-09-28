@@ -282,7 +282,7 @@ Your job: fill in EVERY item specific with the best value.
 
 Rules:
 - ALWAYS prefer eBay's preset values when one matches (case-insensitive). Use the EXACT preset spelling and casing from the values list — never invent your own casing.
-- CRITICAL for Brand: If the brand exists in the preset values list, you MUST use the exact preset spelling (e.g. "Peter Millar" not "PETER MILLAR"). Search the values list carefully before using a custom value.
+- CRITICAL for Brand: use the brand named in the observations or the title, written the way the brand writes itself (e.g. "Peter Millar" not "PETER MILLAR", "TravisMathew" not "Travis Mathew"). Brand usually has no preset list — that is expected, and a missing list is NEVER a reason to answer "Unbranded". Only answer "Unbranded" when there is genuinely no brand on the item. If a preset list IS given for Brand, use its exact spelling when one matches.
 - If no preset value matches but you have a relevant observation, provide a custom value with proper title casing for SEO benefit.
 - If you truly have no information for a specific, use null.
 - For required specifics, make your best effort — never leave them null unless truly unknown.
@@ -302,6 +302,23 @@ Return format:
   }
 }`;
 
+// eBay's value lists are alphabetical and we can only afford to send the
+// first 200. For a field like Brand that has thousands, those 200 are
+// "everything starting with a digit or A" — the real brand is almost never
+// among them. Worse, the model was told to prefer a listed value, so a
+// Johnnie-O came back as "Unbranded" (position 0 in the list). Those fields
+// are free text on eBay anyway, so we send no list and let the AI write what
+// it read off the tag. Everything eBay actually constrains keeps its values.
+// Measured 2026-09-28: only Brand crosses this line in the categories they
+// list (Model, the next largest, has 363).
+const LONG_LIST = 500;
+
+function sendableValues(s) {
+  if (!s.values?.length) return "free_text";
+  if (s.mode === "FREE_TEXT" && s.values.length > LONG_LIST) return "free_text";
+  return s.values.slice(0, 200);
+}
+
 // themeManaged: true when the listing has SEO keywords — the app puts
 // overflow keywords in Theme itself, so Pass 2 must leave Theme empty.
 // Listings without keywords (older drafts) keep the original Theme behavior.
@@ -318,7 +335,7 @@ export async function fillItemSpecifics(
     required: s.required,
     // Whether eBay takes more than one value for this one (see mapAspects).
     multi: s.multi === true,
-    values: s.values.length > 0 ? s.values.slice(0, 200) : "free_text",
+    values: sendableValues(s),
   }));
 
   // Compact JSON (no indentation) — the model parses it identically, and
