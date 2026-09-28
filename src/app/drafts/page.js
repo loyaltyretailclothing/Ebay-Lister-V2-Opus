@@ -175,7 +175,11 @@ export default function DraftsPage() {
                         Phase {d.batchPhase} · {waitedFor(d.batchAt)}
                       </span>
                     )}
-                    {d.readyBy === "batch" && !isError && <span className="pill pill-skip mt-px">by Batch</span>}
+                    {/* Only once it's out of the queue — while a phase is
+                        running, the phase is the whole story. */}
+                    {d.readyBy === "batch" && !isError && !fillingSpecifics && (
+                      <span className="pill pill-skip mt-px">by Batch</span>
+                    )}
                     {d.readyBy === "force" && !isError && <span className="pill pill-err mt-px">by Force</span>}
                     {isError && <span className="pill pill-err mt-px">Error</span>}
                     {d.skipped && !processing && <span className="pill pill-skip mt-px">Skipped</span>}

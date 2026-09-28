@@ -453,11 +453,12 @@ function DraftsBody({ editor }) {
                     <Spinner className="size-[11px]" />
                     Processing
                   </span>
-                ) : waitingOnPhotos ? (
-                  // Nothing to open yet — the photos are still in the queue.
+                ) : waitingOnPhotos || fillingSpecifics ? (
+                  // Still in the queue. Phase 1 can't be opened; phase 2 can
+                  // — the draft is workable and the specifics land behind it.
                   <span className="dstat text-ink-3">
                     <Spinner className="size-[11px]" />
-                    Phase 1 · {waitedFor(d.batchAt)}
+                    Phase {d.batchPhase} · {waitedFor(d.batchAt)}
                   </span>
                 ) : isError ? (
                   <span className="dstat text-bad">
@@ -469,10 +470,6 @@ function DraftsBody({ editor }) {
                   <span className="dstat text-ok">
                     <span className="dot bg-ok" />
                     {readyLabel(d.readyBy)}
-                    {/* Usable already; eBay's questions are still in the queue. */}
-                    {fillingSpecifics && (
-                      <span className="skipped">Phase 2 · {waitedFor(d.batchAt)}</span>
-                    )}
                     {d.skipped && <span className="skipped">Skipped</span>}
                   </span>
                 )}
