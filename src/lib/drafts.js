@@ -10,6 +10,14 @@ export function newDraftId() {
   return `draft_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
+// A draft id becomes a Cloudinary file name (`ebay-drafts/<id>`), so it has
+// to be exactly the shape we generate. Anything with a slash or a dot in it
+// would point somewhere else in the account — at another draft, or at one
+// of the log files — to read, overwrite or delete.
+export function isDraftId(id) {
+  return typeof id === "string" && id.length > 0 && id.length <= 100 && /^[A-Za-z0-9_-]+$/.test(id);
+}
+
 // Upload a JSON payload to Cloudinary as a raw resource.
 // public_id becomes `${DRAFTS_FOLDER}/${draftId}`.
 // payload may include a `status` ("processing" | "ready" | "error") and

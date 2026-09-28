@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { newDraftId, saveDraft } from "@/lib/drafts";
+import { isDraftId, newDraftId, saveDraft } from "@/lib/drafts";
 import {
   analyzeListing,
   lookupCategory,
@@ -57,10 +57,7 @@ export async function POST(request) {
     // platform-level retry) overwrites the SAME draft instead of creating a
     // duplicate. Validate it as a safe Cloudinary public_id; otherwise fall
     // back to a server-generated id.
-    draftId =
-      typeof body.draftId === "string" && /^[A-Za-z0-9_-]+$/.test(body.draftId)
-        ? body.draftId
-        : newDraftId();
+    draftId = isDraftId(body.draftId) ? body.draftId : newDraftId();
     listingPhotos = Array.isArray(body.listingPhotos) ? body.listingPhotos : [];
     const aiIndices = Array.isArray(body.aiPhotoIndices) ? body.aiPhotoIndices : [];
     aiPhotos = aiIndices

@@ -32,6 +32,12 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+# …but the template of which keys are needed belongs in the repo. It holds
+# names only, never values.
+!.env.local.example
+
+# Claude Code's per-machine permissions — never committed (see CLAUDE.md).
+.claude/settings.local.json
 
 # vercel
 .vercel

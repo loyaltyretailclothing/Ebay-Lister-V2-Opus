@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { listDrafts, saveDraft, newDraftId, draftPhotoIds, markPhotosHeld } from "@/lib/drafts";
+import { listDrafts, saveDraft, newDraftId, draftPhotoIds, isDraftId, markPhotosHeld } from "@/lib/drafts";
 
 // GET /api/drafts — list all drafts (summary only)
 export async function GET() {
@@ -21,6 +21,10 @@ export async function GET() {
 export async function POST(request) {
   try {
     const body = await request.json();
+    // The id becomes a file name — only ever the shape we generate.
+    if (body.id !== undefined && body.id !== null && !isDraftId(body.id)) {
+      return NextResponse.json({ success: false, error: "Invalid draft id" }, { status: 400 });
+    }
     const id = body.id || newDraftId();
 
     const payload = {

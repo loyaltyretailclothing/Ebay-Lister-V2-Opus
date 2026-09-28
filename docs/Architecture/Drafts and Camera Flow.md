@@ -7,6 +7,8 @@ Each draft is a raw JSON file in Cloudinary under `ebay-drafts/<draftId>`, conta
 
 Statuses: `processing` → `ready`, or `error` (photos and notes are kept so nothing is lost).
 
+**The id is a file name (2026-09-28).** A draft id becomes `ebay-drafts/<id>` in Cloudinary, so every route that takes one checks it first (`isDraftId` in `src/lib/drafts.js`: letters, digits, `_` and `-`, up to 100 characters). An id with a slash or a dot in it could otherwise point at another draft or at one of the log files, to read, overwrite or delete. The camera route had this check from the start; the other four were added after the audit of 2026-09-27.
+
 **Listing them all (fixed 2026-09-27):** Cloudinary answers 500 records at a time, and `listDrafts` only ever read the first page. Everything reads that one list — the queue, the On Hold page and the 7am posting run — so past 500 drafts some would have silently disappeared from all three, and a held item could have reached its morning without ever being seen. It now follows the cursor (stopping at 20 pages, i.e. 10,000 drafts). 74 records today: still one page, one call. Found in the code audit of 2026-09-27.
 
 ## Camera flow (`/camera`)

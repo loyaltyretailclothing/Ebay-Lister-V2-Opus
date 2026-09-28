@@ -1,11 +1,17 @@
 import { NextResponse } from "next/server";
-import { getDraft, deleteDraft, draftPhotoIds, markPhotosHeld, saveDraft } from "@/lib/drafts";
+import { getDraft, deleteDraft, draftPhotoIds, isDraftId, markPhotosHeld, saveDraft } from "@/lib/drafts";
 import { dueTime } from "@/lib/photoSweep";
+
+// Every handler here builds a Cloudinary file name from the id in the URL,
+// so each one checks it first. See isDraftId in @/lib/drafts.
+const badId = () =>
+  NextResponse.json({ success: false, error: "Invalid draft id" }, { status: 400 });
 
 // GET /api/drafts/[id] — fetch full draft payload
 export async function GET(_request, { params }) {
   try {
     const { id } = await params;
+    if (!isDraftId(id)) return badId();
     const draft = await getDraft(id);
     if (!draft) {
       return NextResponse.json(
@@ -31,6 +37,7 @@ export async function GET(_request, { params }) {
 export async function PATCH(request, { params }) {
   try {
     const { id } = await params;
+    if (!isDraftId(id)) return badId();
     const body = await request.json();
     const isSkip = typeof body.skipDraft === "boolean";
     const isHold = "holdUntil" in body;
@@ -88,6 +95,7 @@ export async function PATCH(request, { params }) {
 export async function DELETE(request, { params }) {
   try {
     const { id } = await params;
+    if (!isDraftId(id)) return badId();
     const query = new URL(request.url).searchParams;
     const deletePhotos = query.get("photos") === "1";
     const posted = query.get("posted") === "1";

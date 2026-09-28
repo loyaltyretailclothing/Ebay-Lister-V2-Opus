@@ -14,14 +14,14 @@ These are the working rules for this project. They override defaults. See [[Home
 7. **Never write test or cleanup data to live storage.** Verification is read-only by default. (Past mistake: a test "cleanup" overwrote real Sourcing data with empty data.)
 8. **If a write is truly needed to verify**, send the complete current dataset (never partial or empty), and tell them exactly what was written.
 9. **Never delete their data** (drafts, photos, stores, trips). Drafts represent days of work. Offer to identify things; let them delete.
-10. **Never handle secrets.** They add API keys to Vercel and `.env.local` themselves. Keys never go in chat, notes, or commits.
+10. **Never handle secrets.** They add API keys to Vercel and `.env.local` themselves. Keys never go in chat, notes, or commits. `.env.local.example` lists the **names** of every key the app needs and lives in the repo (2026-09-28 — `.gitignore` had been hiding it, so the list existed on one computer only). Add a new key's name there the session it's introduced.
 10a. **SKUs are sacred.** Never post without a SKU, never auto-generate one, and never post to a SKU that was ever used (live, sold, or ended). A failed or unclear eBay lookup means **stop**, never "probably unused." Anything that writes to eBay under a SKU must be checked *before* the write. Test publishing only with a fake photo link, so nothing can reach eBay even if a check is broken. See [[Orphan Offers and SKUs]].
 
 ## Code and deploys
 11. **Read the current code before claiming how it behaves.** Memory notes can be out of date.
 12. **Run `npx next build` before committing.**
 13. **Commit messages:** `Area: short description`, a body explaining why, and a `Co-Authored-By` trailer.
-14. **Never commit `.claude/settings.local.json`.**
+14. **Never commit `.claude/settings.local.json`.** As of 2026-09-28 `.gitignore` enforces this — it used to be tracked, so every commit needed it excluded by hand.
 15. **Pushing to `origin/main` deploys to Vercel** (live in about 1–2 minutes).
 16. **Temporary scripts** go in the session scratchpad or get deleted right after use. Never leave them in the repo.
 17. **This Next.js version has breaking changes.** Check `node_modules/next/dist/docs/` before writing Next.js-specific code (see `AGENTS.md`).
