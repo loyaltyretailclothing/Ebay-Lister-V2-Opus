@@ -122,17 +122,13 @@ const perItem = (n) => (n === null || n === undefined ? "—" : `${(n * 100).toF
 function spend(aiEntries, listed) {
   const total = aiEntries.reduce((s, e) => s + (e.cost || 0), 0);
   const batched = aiEntries.filter((e) => e.batch);
-  // Queue waits answer two different questions, so they're kept apart:
-  // phase 1 is how long until the draft was WORKABLE; the two phases added
-  // together are how long until it was FINISHED. A draft writes one entry
-  // per phase. See docs/Plans/Batch Analysis Plan.md.
-  const usable = batched.filter((e) => e.phase === 1 && e.waitMs > 0).map((e) => e.waitMs);
-  const perDraft = new Map();
-  for (const e of batched) {
-    if (!e.draftId || !e.waitMs) continue;
-    perDraft.set(e.draftId, (perDraft.get(e.draftId) || 0) + e.waitMs);
-  }
-  const totals = [...perDraft.values()];
+  // Each trip through the queue is timed on its own, named the same way the
+  // draft rows name them. Phase 1 is the wait before the draft is workable;
+  // phase 2 is the wait for eBay's questions after that.
+  // See docs/Plans/Batch Analysis Plan.md.
+  const waitsIn = (phase) =>
+    batched.filter((e) => e.phase === phase && e.waitMs > 0).map((e) => e.waitMs);
+  const allWaits = batched.map((e) => e.waitMs).filter((n) => n > 0);
   return {
     total,
     runs: aiEntries.length,
@@ -140,10 +136,10 @@ function spend(aiEntries, listed) {
     batchedRuns: batched.length,
     // A batched run costs half, so what it saved equals what it cost.
     batchSaved: batched.reduce((s, e) => s + (e.cost || 0), 0),
-    usableMedian: median(usable),
-    doneMedian: median(totals),
+    phase1Median: median(waitsIn(1)),
+    phase2Median: median(waitsIn(2)),
     // What you're risking, not what to expect.
-    waitLongest: totals.length ? Math.max(...totals) : null,
+    waitLongest: allWaits.length ? Math.max(...allWaits) : null,
   };
 }
 
@@ -329,12 +325,12 @@ export default function EfficiencyPage() {
                       <span className="text-ink-3">
                         {" · "}
                         {cost.cur.batchedRuns} batched, saved {money(cost.cur.batchSaved)}
-                        {cost.cur.usableMedian !== null && (
+                        {cost.cur.phase1Median !== null && (
                           <>
-                            {" · queue: workable in "}
-                            <b className="text-ink-2">{fmtDuration(cost.cur.usableMedian)}</b>
-                            {", finished in "}
-                            <b className="text-ink-2">{fmtDuration(cost.cur.doneMedian)}</b>
+                            {" · queue: phase 1 "}
+                            <b className="text-ink-2">{fmtDuration(cost.cur.phase1Median)}</b>
+                            {", phase 2 "}
+                            <b className="text-ink-2">{fmtDuration(cost.cur.phase2Median)}</b>
                             {" (longest "}
                             <b className="text-ink-2">{fmtDuration(cost.cur.waitLongest)}</b>
                             {")"}

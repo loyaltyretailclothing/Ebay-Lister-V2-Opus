@@ -44,11 +44,11 @@ Aaron's wording, 2026-09-28: "by Force" is the app stepping in, *not* the user c
 - **Giving up:** a batch that fails, expires, or sits more than **20 hours** (before Anthropic's own 24-hour expiry) is run live automatically and marked `force`.
 - **Analyze now / Finish now** (`forceLive`): cancels the queue place and runs it live. On **phase 2 it only fills the specifics** — the photos were already read and the draft may have been edited since, so re-running everything would throw those edits away.
 - **Cost and waits:** each phase writes its **own** `ai` entry at half price, carrying `batch: true`, its `waitMs` and its `phase`. The phase is part of the entry's id (`ai_camera1_<draftId>` / `ai_camera2_<draftId>`) — without it phase 2 landed on top of phase 1 and **half of every batched draft's cost vanished** (found 2026-09-28 when Aaron asked whether the wait was one phase or both).
-- The two waits answer different questions and are shown apart:
+- Each trip is timed on its own and named the way the rows name them:
 
-  > 272 batched, saved $2.02 · queue: **workable in 34m**, **finished in 49m** (longest 3h 58m)
+  > 272 batched, saved $2.03 · queue: **phase 1 34m**, **phase 2 13m** (longest 3h 41m)
 
-  *Workable in* is phase 1 alone — when the draft became usable. *Finished in* adds both phases for the same draft. The longest is what you're risking, not what to expect.
+  Phase 1 is the wait before the draft is workable — the one that matters day to day. Phase 2 is the wait for eBay's questions after that, which happens behind you. The longest is any single wait: what you're risking, not what to expect.
 
 ## Code
 `src/lib/batchAnalyze.js` (submit / check / cancel), `src/lib/batchCollect.js` (the state machine and the live fallback), `src/lib/runAnalysis.js` (one copy of the full live analysis, shared by the camera route, Analyze now and the fallback), `src/app/api/batches/collect/route.js`, `src/components/photos/BatchCollector.js`. The prompts stay in `listingPipeline.js`, split into `visionRequest`/`readVisionReply` and `specificsRequest`/`readSpecificsReply` so the live and queued paths send byte-identical requests.
