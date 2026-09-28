@@ -1,5 +1,5 @@
 import { getDraft, listDrafts, saveDraft } from "./drafts";
-import { GIVE_UP_MS, cancelOne, checkOne, halveTally, submitOne } from "./batchAnalyze";
+import { cancelOne, checkOne, halveTally, submitOne } from "./batchAnalyze";
 import { analyzeDraftLive } from "./runAnalysis";
 import {
   applyDescriptionTemplate,
@@ -32,10 +32,10 @@ const PER_RUN = 25; // drafts advanced per sweep, so one call can't run away
 const cost = (usage) =>
   ((usage?.input_tokens || 0) / 1e6) * 2 + ((usage?.output_tokens || 0) / 1e6) * 10;
 
-// The queue let this draft down (it expired, errored, or has been sitting
-// too long). Run the whole analysis live so the draft is usable, and mark it
-// "force" — that label is a warning light, not a receipt: it means the app
-// had to step in, which you'd otherwise never know about.
+// Anthropic gave up on this one — it expired at 24 hours, or errored. Run
+// the analysis live so there's something to review, and mark it "force":
+// that label is a warning light, not a receipt. It means the app had to
+// step in, which you'd otherwise never know about.
 export async function forceLive(draftId, why = "") {
   const draft = await getDraft(draftId);
   if (!draft) return null;
@@ -192,10 +192,10 @@ async function advance(row) {
   const waited = Date.now() - Date.parse(draft.batch.at || "");
   const answer = await checkOne(batchId);
 
-  if (answer.state === "waiting") {
-    if (waited < GIVE_UP_MS) return "waiting";
-    return "give-up"; // caller runs it live
-  }
+  // Still queued is just still queued, however long it takes — the row goes
+  // on saying which phase it's in. Only Anthropic giving up (it expires a
+  // batch at 24 hours) makes the app step in.
+  if (answer.state === "waiting") return "waiting";
   if (answer.state === "failed") {
     console.error(`Batch ${batchId} failed for ${row.id}: ${answer.reason}`);
     return "give-up";

@@ -14,10 +14,10 @@ import client from "./claude";
 //
 // See docs/Plans/Batch Analysis Plan.md.
 
-// A batch that hasn't answered by this long is treated as lost and the draft
-// is run live instead. Anthropic expires them at 24 hours; we give up first
-// so a draft is never stuck for a whole day with nothing to show.
-export const GIVE_UP_MS = 20 * 60 * 60 * 1000;
+// There is no deadline of our own. A draft waits as long as the queue takes
+// and keeps saying which phase it's in; only when Anthropic itself gives up
+// — it expires a batch at 24 hours — does the app step in and analyze it
+// live so there's something to review. Users' call 2026-09-28.
 
 // Submit one request. Returns the batch id to write on the draft.
 export async function submitOne(params, customId = "job") {

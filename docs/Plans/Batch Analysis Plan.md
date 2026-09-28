@@ -31,7 +31,7 @@ A queued draft opens like any other (a phase-1 one is just empty apart from its 
 | `◌ Phase 1 · 14 min` | photos still in the queue; the draft opens but is empty |
 | `◌ Phase 2 · 3 min` | workable now; eBay's questions still queued |
 | `● Ready by Batch` | came back from the queue, complete |
-| `● Ready by Force` | **the queue let it down and the app re-ran it live at full price.** A warning light, not a receipt — you'd otherwise never know |
+| `● Ready by Force` | **Anthropic gave up on it (expired at 24 hours, or errored) and the app analyzed it live at full price**, so there's something to review. A warning light, not a receipt — you'd otherwise never know |
 | `● Ready` | you asked for it (Analyze Photos, or Analyze now). You already know, so it says nothing |
 
 Aaron's wording, 2026-09-28: "by Force" is the app stepping in, *not* the user clicking Analyze.
@@ -41,7 +41,7 @@ Aaron's wording, 2026-09-28: "by Force" is the app stepping in, *not* the user c
 - **One batch per draft**, not one batch per pile — cancelling works on a batch, so a shared one would mean pulling out twenty drafts to rescue one.
 - **Collecting:** Anthropic never calls back. `POST /api/batches/collect` advances every queued draft; it's called by any open tab (`BatchCollector`, every minute while anything is queued, every 5 minutes otherwise) and by the morning cron. Results wait **29 days** at Anthropic, so nothing is lost if nobody opens the app.
 - **Everything lives on the draft** in Cloudinary — a queued draft survives a closed laptop, a redeploy, or a week away.
-- **Giving up:** a batch that fails, expires, or sits more than **20 hours** (before Anthropic's own 24-hour expiry) is run live automatically and marked `force`.
+- **No deadline of our own.** However long the queue takes, the row goes on saying which phase it's in — users' call 2026-09-28 ("if it doesn't go overnight it just needs to continue saying what phase it's in"). Only when **Anthropic** gives up — it expires a batch at 24 hours — or the batch errors does the app step in, analyze it live so there's something to review, and mark it `force`. An earlier 20-hour timeout of mine was removed: it invented a deadline nobody asked for and produced a `force` the users hadn't chosen.
 - **Analyze now / Finish now** (`forceLive`): cancels the queue place and runs it live. On **phase 2 it only fills the specifics** — the photos were already read and the draft may have been edited since, so re-running everything would throw those edits away.
 - **Cost and waits:** each phase writes its **own** `ai` entry at half price, carrying `batch: true`, its `waitMs` and its `phase`. The phase is part of the entry's id (`ai_camera1_<draftId>` / `ai_camera2_<draftId>`) — without it phase 2 landed on top of phase 1 and **half of every batched draft's cost vanished** (found 2026-09-28 when Aaron asked whether the wait was one phase or both).
 - Each trip is timed on its own and named the way the rows name them:
