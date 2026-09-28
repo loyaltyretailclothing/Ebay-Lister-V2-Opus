@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { analyzeListing } from "@/lib/listingPipeline";
+import { analyzeListing, newTally } from "@/lib/listingPipeline";
+import { logAiCost } from "@/lib/costLog";
 
 // POST /api/generate
 //
@@ -15,7 +16,7 @@ export async function POST(request) {
       );
     }
 
-    const { photos, notes } = await request.json();
+    const { photos, notes, draftId } = await request.json();
 
     if (!photos?.length) {
       return NextResponse.json(
@@ -24,7 +25,9 @@ export async function POST(request) {
       );
     }
 
-    const listing = await analyzeListing(photos, notes);
+    const tally = newTally();
+    const listing = await analyzeListing(photos, notes, tally);
+    await logAiCost(tally, { source: "analyze", draftId, category: listing?.categoryName });
     return NextResponse.json({ success: true, listing });
   } catch (error) {
     console.error("AI analysis error:", error);

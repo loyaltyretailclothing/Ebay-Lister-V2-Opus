@@ -34,12 +34,24 @@ Cloudinary, **one small raw file per event** under `ebay-listings/logs/efficienc
 - **Drafts section:** headline draft time per item; items listed and per active hour; outliers count; graphs — draft time week by week, by category; category table; outliers.
 - Graphs are plain SVG; hover a point or bar for its numbers. Desktop only.
 
+## AI cost, measured (added 2026-09-28)
+A second summary line under the time line, sharing the same date range and compare control:
+
+> AI cost **$0.68** over **19** analyses · **3.4¢** per listing · *22% cheaper*
+
+A third kind of log entry, `ai` — one per AI run, holding the real token counts Anthropic returns with every reply (free; the app used to print them to a Vercel log and discard them). Written by all four routes that call Claude and by the camera pipeline's **failure** path, since a run that broke halfway was still charged. Keyed `ai_<source>_<draftId>` so a retried camera request rewrites its own entry rather than doubling, while a later manual re-analysis is its own entry.
+
+"Per listing" divides by items listed, not by analyses — abandoned and re-analyzed drafts are a real cost of each listing that does go up, so this is the number that reflects what a listing actually costs. The compare control makes it the scoreboard for prompt changes: the brand trim of 2026-09-28 should show up here as a drop.
+
+`batch` is on every entry and always false today — it is there so the log doesn't need rewriting if [[Future Features|batch analysis]] is ever built, and the line already reports "N batched, saved $X" when any are. See [[Costs]].
+
 ## How it's built
 - `src/lib/activeClock.js` — the active-time clock.
 - `src/app/camera/page.js` — times shooting/review, sends `timing` with Create Draft.
 - `src/app/api/drafts/process/route.js` — writes the camera entry (before and after the AI picks the category). Camera timing is not stored on the draft.
 - `src/hooks/useListingEditor.js` — draft time per listing (`listing.timing.finishMs`, `analyses` saved on the draft — never sent to eBay; the publish route only reads the fields it needs); on a successful List on eBay posts the draft entry to `POST /api/efficiency`. Best-effort: a failed log never blocks listing or drafts.
 - `src/lib/efficiency.js` (entries, median, outliers, weeks start Monday), `src/lib/efficiencyLog.js` (Cloudinary), `src/app/api/efficiency/route.js`, `src/app/efficiency/page.js`.
+- **Cost:** `newTally()` in `src/lib/listingPipeline.js` is handed to each pass and adds up its tokens — passed in by the caller, never module-level state, which two requests at once would mix together. `src/lib/costLog.js` writes the entry; `buildAiEntry` in `src/lib/efficiency.js` cleans it.
 
 ## Test results (2026-09-19, all faked — nothing written)
 - 60 s activity + 10 min away → ~1.5 min logged.

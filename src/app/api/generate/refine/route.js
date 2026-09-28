@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { refineStyleName } from "@/lib/listingPipeline";
+import { newTally, refineStyleName } from "@/lib/listingPipeline";
+import { logAiCost } from "@/lib/costLog";
 
 // POST /api/generate/refine
 //
@@ -15,8 +16,10 @@ export async function POST(request) {
       );
     }
 
-    const { listing } = await request.json();
-    const merge = await refineStyleName(listing);
+    const { listing, draftId } = await request.json();
+    const tally = newTally();
+    const merge = await refineStyleName(listing, tally);
+    await logAiCost(tally, { source: "refine", draftId, category: listing?.categoryName });
 
     // The Generate page treats `listing: null` as "no style name found".
     return NextResponse.json({ success: true, listing: merge });

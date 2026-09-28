@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { fillItemSpecifics } from "@/lib/listingPipeline";
+import { fillItemSpecifics, newTally } from "@/lib/listingPipeline";
+import { logAiCost } from "@/lib/costLog";
 
 // POST /api/generate/specifics
 //
@@ -14,7 +15,8 @@ export async function POST(request) {
       );
     }
 
-    const { observations, specifics, title, themeManaged } = await request.json();
+    const { observations, specifics, title, themeManaged, draftId, categoryName } =
+      await request.json();
 
     if (!specifics?.length) {
       return NextResponse.json(
@@ -23,9 +25,12 @@ export async function POST(request) {
       );
     }
 
+    const tally = newTally();
     const filled = await fillItemSpecifics(observations, specifics, title, {
       themeManaged: !!themeManaged,
+      tally,
     });
+    await logAiCost(tally, { source: "specifics", draftId, category: categoryName });
     return NextResponse.json({ success: true, specifics: filled });
   } catch (error) {
     console.error("Pass 2 specifics error:", error);

@@ -5,11 +5,12 @@ import {
   lookupCategory,
   fetchCategorySpecifics,
   fillItemSpecifics,
+  newTally,
   refineStyleName,
   applyDescriptionTemplate,
 } from "@/lib/listingPipeline";
 import { applyKeywordTheme } from "@/lib/titleKeywords";
-import { buildCameraEntry, cleanCameraTiming } from "@/lib/efficiency";
+import { buildAiEntry, buildCameraEntry, cleanCameraTiming } from "@/lib/efficiency";
 import { writeEntry } from "@/lib/efficiencyLog";
 
 // Efficiency Tracker: write (or update) this camera session's entry.
@@ -21,6 +22,18 @@ async function logCamera(timing, draftId, category, categoryId) {
     await writeEntry(entry);
   } catch (err) {
     console.error("Efficiency camera log failed:", err);
+  }
+}
+
+// What this analysis cost, from the token counts Anthropic already sent
+// back. Also best-effort — cost bookkeeping never breaks a draft.
+async function logCost(tally, draftId, category, categoryId) {
+  const entry = buildAiEntry({ tally, source: "camera", draftId, category, categoryId });
+  if (!entry) return;
+  try {
+    await writeEntry(entry);
+  } catch (err) {
+    console.error("AI cost log failed:", err);
   }
 }
 
@@ -49,6 +62,8 @@ export async function POST(request) {
   let aiNote = "";
   let draftNote = "";
   let timing = null;
+  // Adds up what every pass of this run cost (see logCost below).
+  const tally = newTally();
 
   try {
     const body = await request.json();
@@ -94,7 +109,7 @@ export async function POST(request) {
 
     // 2. Run the full pipeline. aiNote is the user's hint for Claude.
     const analysisPhotos = aiPhotos.length > 0 ? aiPhotos : listingPhotos.slice(0, 3);
-    const listing = await analyzeListing(analysisPhotos, aiNote);
+    const listing = await analyzeListing(analysisPhotos, aiNote, tally);
 
     // Empty title = Claude couldn't make sense of the photos (wrong subject,
     // blurry, bad lighting, etc.). Technically the pipeline "succeeded" but
@@ -111,7 +126,7 @@ export async function POST(request) {
     //    decide which SEO keywords to push into the Theme field; running
     //    refine first keeps this flow in lockstep with the Generate page.
     try {
-      const refined = await refineStyleName(listing);
+      const refined = await refineStyleName(listing, tally);
       if (refined) Object.assign(listing, refined);
     } catch (refineErr) {
       console.error("Refine step failed:", refineErr);
@@ -130,7 +145,7 @@ export async function POST(request) {
           listing.observations,
           specificsSchema,
           listing.title,
-          { themeManaged: hasKeywords }
+          { themeManaged: hasKeywords, tally }
         );
         // Overflow keywords → Theme; if this category has no Theme field,
         // drop them so no keyword chip is left unplaced.
@@ -160,6 +175,7 @@ export async function POST(request) {
     listing.aiNote = aiNote;
     listing.draftNote = draftNote;
     await logCamera(timing, draftId, listing.categoryName, listing.categoryId);
+    await logCost(tally, draftId, listing.categoryName, listing.categoryId);
 
     // 6. Save the completed draft.
     await saveDraft(draftId, {
@@ -176,6 +192,9 @@ export async function POST(request) {
     console.error("Draft processing error:", error);
     // body parsing may have failed before draftId was assigned.
     if (!draftId) draftId = newDraftId();
+    // Whatever ran before it broke was still charged — record it, or the
+    // tracker would quietly understate what the month cost.
+    await logCost(tally, draftId);
     // Preserve photos + surface the error on the draft row so the user can
     // see what went wrong and either retry or finish manually.
     try {

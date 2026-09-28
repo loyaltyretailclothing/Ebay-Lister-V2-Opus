@@ -25,6 +25,19 @@ Cost is per **analysis**, not per posted listing. Publishing costs $0 in AI. Dra
 
 Claude Code development work is on a separate subscription and is **not** part of this bill.
 
+## The app measures itself now (2026-09-28)
+Every Anthropic reply already carries its own token counts — free, no extra call. The app read them, printed a `[COST]` line to the Vercel log, and threw them away. Those numbers are now **written down** and shown in the [[Efficiency Tracker Plan|Efficiency Tracker]], so cost per listing is measured rather than estimated:
+
+> AI cost **$0.68** over **19** analyses · **3.4¢** per listing · *22% cheaper*
+
+- One `kind: "ai"` entry per AI run in the efficiency log (`src/lib/costLog.js`, `buildAiEntry`): tokens in/out, the cost at the prices of the day, where it came from (camera / analyze / specifics / refine), and a `batch` flag that is always false for now.
+- Written by all four routes that call Claude, including the **failure** path of the camera pipeline — a run that broke halfway was still charged, and hiding it would understate the month.
+- Keyed `ai_<source>_<draftId>`, so the camera's retried request rewrites its own entry instead of counting twice, while a later manual re-analysis of the same draft is its own entry.
+- **Per listing divides by items listed, not by analyses** — abandoned and re-analyzed drafts are a real cost of each listing that does go up.
+- Never blocks anything: a failed write is logged and ignored.
+
+This replaces the estimates below. Anything in this note from before 2026-09-28 was worked out by measuring prompt sizes and guessing at tokens-per-character; treat the tracker as the truth once a few days of entries exist, and cross-check the total against the Anthropic Console.
+
 ## How to measure
 Vercel dashboard → Logs:
 - Filter `[COST] pass1-vision` → number of analyses

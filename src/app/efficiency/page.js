@@ -113,6 +113,33 @@ function change(before, after) {
 }
 const addTimes = (a, b) => (a === null || a === undefined || b === null || b === undefined ? null : a + b);
 
+// "$4.18" / "3.1¢" — a whole period runs to dollars, one listing to cents.
+const money = (n) => (n === null || n === undefined ? "—" : `$${n.toFixed(2)}`);
+const perItem = (n) => (n === null || n === undefined ? "—" : `${(n * 100).toFixed(1)}¢`);
+
+// What the AI cost over a set of entries. These are the real token counts
+// Anthropic returned, not an estimate — see lib/costLog.
+function spend(aiEntries, listed) {
+  const total = aiEntries.reduce((s, e) => s + (e.cost || 0), 0);
+  const batched = aiEntries.filter((e) => e.batch);
+  return {
+    total,
+    runs: aiEntries.length,
+    perListing: listed > 0 ? total / listed : null,
+    batchedRuns: batched.length,
+    // A batched run costs half, so what it saved equals what it cost.
+    batchSaved: batched.reduce((s, e) => s + (e.cost || 0), 0),
+  };
+}
+
+// "12% cheaper" / "6% dearer" — lower cost is better.
+function costChange(before, after) {
+  if (!before || after === null || after === undefined) return null;
+  const pct = Math.round(((before - after) / before) * 100);
+  if (pct === 0) return { text: "same", good: null };
+  return pct > 0 ? { text: `${pct}% cheaper`, good: true } : { text: `${-pct}% dearer`, good: false };
+}
+
 export default function EfficiencyPage() {
   const [entries, setEntries] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -169,6 +196,18 @@ export default function EfficiencyPage() {
   const combined = addTimes(stats.camera.cur.total, stats.draft.cur.total);
   const combinedPrev = cmpRange ? addTimes(stats.camera.prev.total, stats.draft.prev.total) : null;
   const combinedDelta = cmpRange ? change(combinedPrev, combined) : null;
+
+  // What the AI actually cost over the same range. "Per listing" divides by
+  // items listed, not by analyses — abandoned and re-analyzed drafts are a
+  // real cost of each listing that does go up.
+  const cost = useMemo(() => {
+    const ai = all.filter((e) => e.kind === "ai");
+    const cur = spend(ai.filter((e) => inRange(e, range)), stats.draft.cur.count);
+    const prev = cmpRange
+      ? spend(ai.filter((e) => inRange(e, cmpRange)), stats.draft.prev?.count || 0)
+      : null;
+    return { cur, prev, delta: prev ? costChange(prev.perListing, cur.perListing) : null };
+  }, [all, range, cmpRange, stats]);
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -244,6 +283,40 @@ export default function EfficiencyPage() {
                   <span className={`ml-2 font-semibold ${combinedDelta.good ? "text-ok" : combinedDelta.good === false ? "text-bad" : ""}`}>
                     {combinedDelta.text}
                   </span>
+                )}
+              </span>
+            </div>
+
+            {/* What the AI cost over the same range — measured from the token
+                counts Anthropic returns, not estimated. */}
+            <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 px-4 pt-1.5">
+              <span className="text-sm text-ink-3">AI cost</span>
+              <div className="grow" />
+              <span className="text-md text-ink-2">
+                {cost.cur.runs === 0 ? (
+                  <span className="text-ink-3">Nothing recorded yet in this range</span>
+                ) : (
+                  <>
+                    <b className="text-[17px] text-ink">{money(cost.cur.total)}</b> over{" "}
+                    <b className="text-ink">{cost.cur.runs}</b> analys{cost.cur.runs === 1 ? "is" : "es"}
+                    {cost.cur.perListing !== null && (
+                      <>
+                        {" · "}
+                        <b className="text-ink">{perItem(cost.cur.perListing)}</b> per listing
+                      </>
+                    )}
+                    {cost.delta && (
+                      <span className={`ml-2 font-semibold ${cost.delta.good ? "text-ok" : cost.delta.good === false ? "text-bad" : ""}`}>
+                        {cost.delta.text}
+                      </span>
+                    )}
+                    {cost.cur.batchedRuns > 0 && (
+                      <span className="text-ink-3">
+                        {" · "}
+                        {cost.cur.batchedRuns} batched, saved {money(cost.cur.batchSaved)}
+                      </span>
+                    )}
+                  </>
                 )}
               </span>
             </div>

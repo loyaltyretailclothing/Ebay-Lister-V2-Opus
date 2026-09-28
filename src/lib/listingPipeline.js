@@ -36,7 +36,14 @@ function replyText(response) {
     .map((b) => b.text)
     .join("\n");
 }
-function logUsage(pass, usage) {
+// A running total for one analysis, so what it cost can be written down
+// rather than only printed. Passed in by the caller — never module-level
+// state, which two requests running at once would mix together.
+export function newTally() {
+  return { inTokens: 0, outTokens: 0, cost: 0, passes: [] };
+}
+
+function logUsage(pass, usage, tally) {
   if (!usage) return;
   const inTok = usage.input_tokens || 0;
   const outTok = usage.output_tokens || 0;
@@ -45,6 +52,12 @@ function logUsage(pass, usage) {
   console.log(
     `[COST] ${pass} in=${inTok} out=${outTok} est=$${est.toFixed(4)}`
   );
+  if (tally) {
+    tally.inTokens += inTok;
+    tally.outTokens += outTok;
+    tally.cost += est;
+    tally.passes.push(pass);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -123,7 +136,7 @@ function parseListingJson(text) {
   }
 }
 
-export async function analyzeListing(photos, notes) {
+export async function analyzeListing(photos, notes, tally) {
   if (!photos?.length) throw new Error("No photos provided");
 
   const content = [];
@@ -152,7 +165,7 @@ export async function analyzeListing(photos, notes) {
     system: VISION_SYSTEM_PROMPT,
     messages: [{ role: "user", content }],
   });
-  logUsage("pass1-vision", response.usage);
+  logUsage("pass1-vision", response.usage, tally);
 
   const responseText = replyText(response);
   const parsed = parseListingJson(responseText);
@@ -326,7 +339,7 @@ export async function fillItemSpecifics(
   observations,
   specifics,
   title,
-  { themeManaged = false } = {}
+  { themeManaged = false, tally } = {}
 ) {
   if (!specifics?.length) throw new Error("No specifics provided");
 
@@ -363,7 +376,7 @@ Return the filled specifics as JSON.`;
     system: SPECIFICS_SYSTEM_PROMPT,
     messages: [{ role: "user", content: userPrompt }],
   });
-  logUsage("pass2-specifics", response.usage);
+  logUsage("pass2-specifics", response.usage, tally);
 
   const responseText = replyText(response);
   let result;
@@ -437,7 +450,7 @@ async function braveSearch(query) {
 
 // Returns { title?, observations? } to merge into the listing, or null if no
 // style name was found (or Brave wasn't configured / returned nothing).
-export async function refineStyleName(listing) {
+export async function refineStyleName(listing, tally) {
   const styleNumber = listing.observations?.style_number;
   const brand = listing.observations?.brand;
   if (!styleNumber) return null;
@@ -494,7 +507,7 @@ If no style name found, return {"updated": false}.`;
     system: REFINE_SYSTEM_PROMPT,
     messages: [{ role: "user", content: userPrompt }],
   });
-  logUsage("pass3-refine", response.usage);
+  logUsage("pass3-refine", response.usage, tally);
 
   const responseText = replyText(response);
   let result;

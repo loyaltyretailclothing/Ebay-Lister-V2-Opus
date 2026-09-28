@@ -11,6 +11,13 @@
 //            { kind:"draft", at (when listed), category, categoryId,
 //              finishMs, totalMs, analyses, listingId }
 // Times are ACTIVE milliseconds (see lib/activeClock).
+//
+//   ai     — what one run of the AI actually cost. Every Anthropic reply
+//            already carries its own token counts, free; this writes them
+//            down instead of printing them to a server log nobody reads, so
+//            the tracker can show real money rather than an estimate.
+//            { kind:"ai", at, category, categoryId, source, inTokens,
+//              outTokens, cost (US$), batch, draftId }
 
 const MAX_MS = 24 * 60 * 60 * 1000; // anything above a day is junk
 
@@ -24,6 +31,13 @@ function cleanDate(v) {
 }
 const cleanInt = (v, max) => Math.max(0, Math.min(max, parseInt(v, 10) || 0));
 const cleanCategory = (v) => String(v || "").slice(0, 120) || "Uncategorized";
+// Dollars, to the hundredth of a cent — one analysis costs a few cents.
+const cleanMoney = (v) => {
+  const n = Number(v);
+  return Number.isFinite(n) && n >= 0 && n < 1000 ? Math.round(n * 1e6) / 1e6 : 0;
+};
+// Where an AI run came from, for reading the log later.
+const AI_SOURCES = new Set(["camera", "analyze", "specifics", "refine"]);
 
 // What the camera page sends with Create Draft.
 export function cleanCameraTiming(t) {
@@ -64,6 +78,25 @@ export function buildDraftEntry({ listing, finishMs, analyses, listingId, listed
   };
 }
 
+// What one AI run cost. `tally` is the running total from listingPipeline.
+export function buildAiEntry({ tally, source, draftId, category, categoryId, at }) {
+  if (!tally || (!tally.inTokens && !tally.outTokens)) return null;
+  return {
+    kind: "ai",
+    at: cleanDate(at) || new Date().toISOString(),
+    category: cleanCategory(category),
+    categoryId: String(categoryId || "").slice(0, 20),
+    source: AI_SOURCES.has(source) ? source : "analyze",
+    inTokens: cleanInt(tally.inTokens, 5e6),
+    outTokens: cleanInt(tally.outTokens, 5e6),
+    cost: cleanMoney(tally.cost),
+    // Answered by Anthropic's batch queue rather than on the spot. Always
+    // false today; here so the log doesn't need rewriting if batching lands.
+    batch: tally.batch === true,
+    draftId: String(draftId || "").slice(0, 60),
+  };
+}
+
 // Clean an entry read back from storage (or received by the API).
 export function cleanEntry(e) {
   if (!e || typeof e !== "object") return null;
@@ -98,12 +131,32 @@ export function cleanEntry(e) {
       listingId: String(e.listingId || "").slice(0, 30),
     };
   }
+  if (e.kind === "ai") {
+    return {
+      kind: "ai",
+      ...base,
+      source: AI_SOURCES.has(e.source) ? e.source : "analyze",
+      inTokens: cleanInt(e.inTokens, 5e6),
+      outTokens: cleanInt(e.outTokens, 5e6),
+      cost: cleanMoney(e.cost),
+      batch: e.batch === true || e.batch === "true",
+      draftId: String(e.draftId || "").slice(0, 60),
+    };
+  }
   return null;
 }
 
 // Stable storage id, so a repeat of the same event overwrites instead of
 // double counting (the camera's draft request can be retried by the host).
 export function entryId(e) {
+  // An AI run is keyed by the draft AND where it came from, so the camera's
+  // retried request rewrites its own entry rather than counting twice, while
+  // a later manual re-analysis of the same draft is its own entry.
+  if (e.kind === "ai") {
+    const safe = String(e.draftId || "").replace(/[^A-Za-z0-9_-]/g, "");
+    const tail = safe || `${Date.parse(e.at)}_${Math.random().toString(36).slice(2, 8)}`;
+    return `ai_${e.source}_${tail}`;
+  }
   const key = e.kind === "camera" ? e.draftId : e.listingId;
   const safe = String(key || "").replace(/[^A-Za-z0-9_-]/g, "");
   return `${e.kind}_${safe || `${Date.parse(e.at)}_${Math.random().toString(36).slice(2, 8)}`}`;
