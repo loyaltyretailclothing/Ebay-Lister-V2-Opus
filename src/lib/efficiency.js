@@ -79,7 +79,7 @@ export function buildDraftEntry({ listing, finishMs, analyses, listingId, listed
 }
 
 // What one AI run cost. `tally` is the running total from listingPipeline.
-export function buildAiEntry({ tally, source, draftId, category, categoryId, at }) {
+export function buildAiEntry({ tally, source, draftId, category, categoryId, at, waitMs }) {
   if (!tally || (!tally.inTokens && !tally.outTokens)) return null;
   return {
     kind: "ai",
@@ -90,9 +90,11 @@ export function buildAiEntry({ tally, source, draftId, category, categoryId, at 
     inTokens: cleanInt(tally.inTokens, 5e6),
     outTokens: cleanInt(tally.outTokens, 5e6),
     cost: cleanMoney(tally.cost),
-    // Answered by Anthropic's batch queue rather than on the spot. Always
-    // false today; here so the log doesn't need rewriting if batching lands.
+    // Answered by Anthropic's batch queue rather than on the spot.
     batch: tally.batch === true,
+    // How long that queue took to answer. The number that decides whether
+    // batching is worth keeping — see docs/Plans/Batch Analysis Plan.md.
+    waitMs: cleanMs(waitMs),
     draftId: String(draftId || "").slice(0, 60),
   };
 }
@@ -140,6 +142,7 @@ export function cleanEntry(e) {
       outTokens: cleanInt(e.outTokens, 5e6),
       cost: cleanMoney(e.cost),
       batch: e.batch === true || e.batch === "true",
+      waitMs: cleanMs(e.waitMs),
       draftId: String(e.draftId || "").slice(0, 60),
     };
   }

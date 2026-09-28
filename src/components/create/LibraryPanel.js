@@ -36,6 +36,26 @@ function writePref(key, value) {
 
 const folderLabel = (f) => (f === "All Photos" ? "All" : f);
 
+// How a finished draft got finished. Plain "Ready" when you asked for it —
+// you already know. The others say something you'd otherwise never learn:
+// it came back from Anthropic's queue, or the queue let it down and the app
+// re-ran it live at full price. See docs/Plans/Batch Analysis Plan.md.
+export function readyLabel(readyBy) {
+  if (readyBy === "batch") return "Ready by Batch";
+  if (readyBy === "force") return "Ready by Force";
+  return "Ready";
+}
+
+// "14 min" / "2 hr 05 min" — how long a queued draft has been waiting.
+export function waitedFor(since) {
+  const ms = Date.now() - Date.parse(since || "");
+  if (!Number.isFinite(ms) || ms < 0) return "just now";
+  const min = Math.floor(ms / 60000);
+  if (min < 1) return "just now";
+  if (min < 60) return `${min} min`;
+  return `${Math.floor(min / 60)} hr ${String(min % 60).padStart(2, "0")} min`;
+}
+
 // Desktop Create Listing, left panel: the photo library and the draft queue
 // in one panel with a Photos | Drafts switch. Collapses to a 40px spine;
 // below 1500px of app width it collapses by itself until the user touches
@@ -405,6 +425,11 @@ function DraftsBody({ editor }) {
         )}
         {e.drafts.map((d) => {
           const processing = d.status === "processing";
+          // Phase 1 is the only one that blocks: there's no listing yet.
+          // After it lands the draft is workable and the specifics (phase 2)
+          // fill themselves in behind you.
+          const waitingOnPhotos = d.batchPhase === 1;
+          const fillingSpecifics = d.batchPhase === 2;
           const isError = d.status === "error";
           const current = d.id === e.draftId;
           const opening = d.id === e.openingId;
@@ -428,6 +453,12 @@ function DraftsBody({ editor }) {
                     <Spinner className="size-[11px]" />
                     Processing
                   </span>
+                ) : waitingOnPhotos ? (
+                  // Nothing to open yet — the photos are still in the queue.
+                  <span className="dstat text-ink-3">
+                    <Spinner className="size-[11px]" />
+                    Phase 1 · {waitedFor(d.batchAt)}
+                  </span>
                 ) : isError ? (
                   <span className="dstat text-bad">
                     <span className="dot bg-bad" />
@@ -437,7 +468,11 @@ function DraftsBody({ editor }) {
                 ) : (
                   <span className="dstat text-ok">
                     <span className="dot bg-ok" />
-                    Ready
+                    {readyLabel(d.readyBy)}
+                    {/* Usable already; eBay's questions are still in the queue. */}
+                    {fillingSpecifics && (
+                      <span className="skipped">Phase 2 · {waitedFor(d.batchAt)}</span>
+                    )}
                     {d.skipped && <span className="skipped">Skipped</span>}
                   </span>
                 )}
@@ -445,11 +480,32 @@ function DraftsBody({ editor }) {
             </>
           );
           // Processing rows have no handler at all.
-          return processing ? (
-            <div key={d.id} className="drow drow-off">
-              {inner}
-            </div>
-          ) : (
+          if (processing) {
+            return (
+              <div key={d.id} className="drow drow-off">
+                {inner}
+              </div>
+            );
+          }
+          // Phase 1 can't be opened yet, but it can be pulled out of the
+          // queue and run on the spot.
+          if (waitingOnPhotos) {
+            return (
+              <div key={d.id} className="drow drow-off items-center">
+                {inner}
+                <button
+                  type="button"
+                  className="btn btn-sm shrink-0"
+                  disabled={e.forcing === d.id}
+                  onClick={() => e.forceDraft(d.id)}
+                >
+                  {e.forcing === d.id ? <Spinner className="size-3" /> : null}
+                  Analyze now
+                </button>
+              </div>
+            );
+          }
+          return (
             <button
               key={d.id}
               type="button"

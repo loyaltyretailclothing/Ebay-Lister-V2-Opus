@@ -18,8 +18,8 @@ Statuses: `processing` → `ready`, or `error` (photos and notes are kept so not
     - Each picked photo is **shrunk to 1600px and re-encoded as JPEG on the phone first** (`resizeImage`). A camera shot is already sized for upload; one from the camera roll is several times bigger and, on an iPhone, usually HEIC — both of which the upload refuses. Measured: a 4.37 MB 4032×3024 photo became a 251 KB 1600×1200 JPEG.
     - Anything that still can't be read is skipped with "1 photo couldn't be added — try taking a screenshot of it and adding that", and the rest of the draft is unaffected.
 3. **Create Draft:** photos upload to Cloudinary **one at a time** (Vercel's ~4.5 MB request cap).
-4. The client sends `POST /api/drafts/process` **fire-and-forget**, then navigates to `/drafts`.
-5. The server writes a `processing` draft, runs the pipeline (~30–50s), then saves as `ready`. The title is assembled from SEO keywords and overflow keywords go to Theme (or are dropped if the category has no Theme). See [[Title Keywords Plan]].
+4. The client sends `POST /api/drafts/process` **fire-and-forget** with `queued: true`, then navigates to `/drafts`.
+5. **Queued (2026-09-28):** the photos go to Anthropic's batch queue at **half price** and the draft shows `Phase 1 · 14 min` until the answer lands; **Analyze now** pulls it out and runs it on the spot. See [[Batch Analysis Plan]]. Without `queued`, the server writes a `processing` draft and runs the pipeline on the line (~30–50s), then saves as `ready`. The title is assembled from SEO keywords and overflow keywords go to Theme (or are dropped if the category has no Theme). See [[Title Keywords Plan]].
 6. The Drafts list refreshes **only** when the page opens and when Refresh is tapped (the redesign removed the old 5-second re-check; not live until the redesign ships). Processing drafts show a spinner until a refresh.
 
 ## Duplicate drafts: fixed 2026-06-22 (commit `07df266`)

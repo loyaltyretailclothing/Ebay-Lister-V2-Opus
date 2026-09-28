@@ -136,7 +136,12 @@ function parseListingJson(text) {
   }
 }
 
-export async function analyzeListing(photos, notes, tally) {
+// Each pass is split in two: the request it would send, and how to read the
+// reply. The live path builds a request, sends it, and reads the answer; the
+// batch path sends the same request to Anthropic's queue and reads the answer
+// whenever it comes back (see src/lib/batchAnalyze.js). One prompt, one
+// parser, two ways of posting it — nothing can drift between them.
+export function visionRequest(photos, notes) {
   if (!photos?.length) throw new Error("No photos provided");
 
   const content = [];
@@ -158,16 +163,22 @@ export async function analyzeListing(photos, notes, tally) {
     text: "Analyze these photos and generate the eBay listing details as JSON. Look at every photo carefully for brand, tags, labels, condition, measurements, and defects.",
   });
 
-  const response = await client.messages.create({
+  return {
     model: MODEL,
     thinking: NO_THINKING,
     max_tokens: 6000,
     system: VISION_SYSTEM_PROMPT,
     messages: [{ role: "user", content }],
-  });
-  logUsage("pass1-vision", response.usage, tally);
+  };
+}
 
-  const responseText = replyText(response);
+export async function analyzeListing(photos, notes, tally) {
+  const response = await client.messages.create(visionRequest(photos, notes));
+  logUsage("pass1-vision", response.usage, tally);
+  return readVisionReply(replyText(response));
+}
+
+export function readVisionReply(responseText) {
   const parsed = parseListingJson(responseText);
 
   // Title pieces + SEO keywords → the app assembles the final title. The NWT
@@ -335,12 +346,7 @@ function sendableValues(s) {
 // themeManaged: true when the listing has SEO keywords — the app puts
 // overflow keywords in Theme itself, so Pass 2 must leave Theme empty.
 // Listings without keywords (older drafts) keep the original Theme behavior.
-export async function fillItemSpecifics(
-  observations,
-  specifics,
-  title,
-  { themeManaged = false, tally } = {}
-) {
+export function specificsRequest(observations, specifics, title, { themeManaged = false } = {}) {
   if (!specifics?.length) throw new Error("No specifics provided");
 
   const specificsForPrompt = specifics.map((s) => ({
@@ -369,16 +375,24 @@ ${JSON.stringify(specificsForPrompt)}
 
 Return the filled specifics as JSON.`;
 
-  const response = await client.messages.create({
+  return {
     model: MODEL,
     thinking: NO_THINKING,
     max_tokens: 6000,
     system: SPECIFICS_SYSTEM_PROMPT,
     messages: [{ role: "user", content: userPrompt }],
-  });
-  logUsage("pass2-specifics", response.usage, tally);
+  };
+}
 
-  const responseText = replyText(response);
+export async function fillItemSpecifics(observations, specifics, title, opts = {}) {
+  const response = await client.messages.create(
+    specificsRequest(observations, specifics, title, opts)
+  );
+  logUsage("pass2-specifics", response.usage, opts.tally);
+  return readSpecificsReply(replyText(response));
+}
+
+export function readSpecificsReply(responseText) {
   let result;
   try {
     result = JSON.parse(responseText);

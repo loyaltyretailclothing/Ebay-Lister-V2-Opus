@@ -53,6 +53,14 @@ export async function saveDraft(draftId, payload) {
           holdSeason: payload.listing?.holdSeason || "",
           price: String(payload.listing?.price ?? ""),
           sku: String(payload.listing?.sku || "").slice(0, 60),
+          // Waiting on Anthropic's queue: which phase, and since when, so
+          // the drafts list can show "Phase 1 · 12 min" without opening
+          // every draft. See src/lib/batchAnalyze.js.
+          batchPhase: String(payload.batch?.phase || ""),
+          batchAt: payload.batch?.at || "",
+          // How it was finished: "" (you asked for it), "batch", or "force"
+          // (the queue let us down and the app ran it live).
+          readyBy: payload.readyBy || "",
         },
       },
       (error, result) => {
@@ -107,6 +115,9 @@ export async function listDrafts() {
         holdSeason: ctx.holdSeason || "",
         price: parseFloat(ctx.price) || 0,
         sku: ctx.sku || "",
+        batchPhase: parseInt(ctx.batchPhase, 10) || 0,
+        batchAt: ctx.batchAt || "",
+        readyBy: ctx.readyBy || "",
         createdAt: draftCreatedAt(id, r.created_at),
         url: r.secure_url,
       };

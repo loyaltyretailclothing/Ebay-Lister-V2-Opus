@@ -1,15 +1,8 @@
 import { NextResponse } from "next/server";
 import { isDraftId, newDraftId, saveDraft } from "@/lib/drafts";
-import {
-  analyzeListing,
-  lookupCategory,
-  fetchCategorySpecifics,
-  fillItemSpecifics,
-  newTally,
-  refineStyleName,
-  applyDescriptionTemplate,
-} from "@/lib/listingPipeline";
-import { applyKeywordTheme } from "@/lib/titleKeywords";
+import { newTally, visionRequest } from "@/lib/listingPipeline";
+import { analyzeDraftLive } from "@/lib/runAnalysis";
+import { submitOne } from "@/lib/batchAnalyze";
 import { buildAiEntry, buildCameraEntry, cleanCameraTiming } from "@/lib/efficiency";
 import { writeEntry } from "@/lib/efficiencyLog";
 
@@ -86,6 +79,9 @@ export async function POST(request) {
     draftNote = body.draftNote || "";
     // Efficiency Tracker (camera tracker): active shooting / review time.
     timing = cleanCameraTiming(body.timing);
+    // Queue it with Anthropic (half price, answers later) rather than
+    // waiting on the line. The camera asks for this; "Analyze now" doesn't.
+    const queued = body.queued === true;
 
     if (listingPhotos.length === 0) {
       return NextResponse.json(
@@ -94,8 +90,31 @@ export async function POST(request) {
       );
     }
 
-    // 1. Write the processing record immediately so the Drafts tab shows it
-    //    the moment the client fires this request.
+    const analysisPhotos = aiPhotos.length > 0 ? aiPhotos : listingPhotos.slice(0, 3);
+
+    // 1a. Queued: hand the photos to Anthropic's batch queue (half price)
+    //     and stop here. The draft sits in the list showing its phase until
+    //     a browser tab or the morning cron collects the answer — see
+    //     src/lib/batchCollect.js. Timing is saved on the draft because the
+    //     camera entry can only get its category once the answer comes back.
+    if (queued) {
+      const batchId = await submitOne(visionRequest(analysisPhotos, aiNote), `${draftId}-vision`);
+      await saveDraft(draftId, {
+        id: draftId,
+        listing: { aiNote, draftNote },
+        aiPhotos,
+        listingPhotos,
+        timing,
+        status: "queued",
+        batch: { id: batchId, phase: 1, at: new Date().toISOString() },
+        savedAt: new Date().toISOString(),
+      });
+      await logCamera(timing, draftId);
+      return NextResponse.json({ success: true, draftId, queued: true });
+    }
+
+    // 1b. Live: write the processing record immediately so the Drafts tab
+    //     shows it the moment the client fires this request.
     await saveDraft(draftId, {
       id: draftId,
       listing: { aiNote, draftNote },
@@ -107,73 +126,10 @@ export async function POST(request) {
     // Camera entry now (no category yet); updated with the category below.
     await logCamera(timing, draftId);
 
-    // 2. Run the full pipeline. aiNote is the user's hint for Claude.
-    const analysisPhotos = aiPhotos.length > 0 ? aiPhotos : listingPhotos.slice(0, 3);
-    const listing = await analyzeListing(analysisPhotos, aiNote, tally);
+    // 2. Run the whole analysis on the spot (shared with "Analyze now" and
+    //    the fallback when the queue lets a draft down).
+    const listing = await analyzeDraftLive({ analysisPhotos, aiNote, draftNote, tally });
 
-    // Empty title = Claude couldn't make sense of the photos (wrong subject,
-    // blurry, bad lighting, etc.). Technically the pipeline "succeeded" but
-    // there's nothing to list, so surface it as an error row instead of a
-    // silent "Untitled" draft the user has to open to realize was useless.
-    if (!listing?.title || !listing.title.trim()) {
-      throw new Error(
-        "AI couldn't identify the item — retry with clearer photos of clothing/items."
-      );
-    }
-
-    // 3. Brave refine (best-effort) — runs BEFORE specifics so Pass 2 sees
-    //    the final refined title. The SPECIFICS prompt uses the title to
-    //    decide which SEO keywords to push into the Theme field; running
-    //    refine first keeps this flow in lockstep with the Generate page.
-    try {
-      const refined = await refineStyleName(listing, tally);
-      if (refined) Object.assign(listing, refined);
-    } catch (refineErr) {
-      console.error("Refine step failed:", refineErr);
-    }
-
-    // 4. Category + specifics (best-effort — continue without if this fails).
-    try {
-      const cat = await lookupCategory(listing.category_keywords);
-      if (cat) {
-        listing.categoryId = cat.categoryId;
-        listing.categoryName = cat.categoryName;
-        const specificsSchema = await fetchCategorySpecifics(cat.categoryId);
-        const hasKeywords =
-          Array.isArray(listing.keywords) && listing.keywords.length > 0;
-        const filled = await fillItemSpecifics(
-          listing.observations,
-          specificsSchema,
-          listing.title,
-          { themeManaged: hasKeywords, tally }
-        );
-        // Overflow keywords → Theme; if this category has no Theme field,
-        // drop them so no keyword chip is left unplaced.
-        const applied = applyKeywordTheme({
-          keywords: listing.keywords,
-          itemSpecifics: filled,
-          hasTheme: specificsSchema.some((s) => s.name === "Theme"),
-        });
-        listing.itemSpecifics = applied.itemSpecifics;
-        listing.keywords = applied.keywords;
-      }
-    } catch (catErr) {
-      console.error("Category/specifics step failed:", catErr);
-      // Don't fail the whole draft — user can fix the category manually.
-    }
-
-    // 5. Apply description template — must run LAST so the final title
-    //    (post-refine) is the one that lands in the description body.
-    //    This overwrites condition_description with the static boilerplate
-    //    and builds item_description from the template, keeping camera
-    //    drafts in sync with Generate-page output.
-    Object.assign(listing, applyDescriptionTemplate(listing));
-
-    // Attach the notes so they persist on the draft. aiNote is kept for
-    // reference/re-analysis; draftNote is the internal reviewer note. The
-    // publish route ignores unknown fields, so neither reaches eBay.
-    listing.aiNote = aiNote;
-    listing.draftNote = draftNote;
     await logCamera(timing, draftId, listing.categoryName, listing.categoryId);
     await logCost(tally, draftId, listing.categoryName, listing.categoryId);
 

@@ -45,6 +45,9 @@ Vercel dashboard → Logs:
 - Each `[COST]` line shows `est=$`. The Anthropic Console shows the exact daily total.
 - Logs only keep a short window, so check the same day.
 
+## Batch analysis — half price (built 2026-09-28)
+Camera drafts go to Anthropic's batch queue instead of being analyzed on the line: **50% off every token**, both passes, photos included. Most batches answer inside an hour; the guarantee is 24 hours, and a draft is never blocked because it becomes workable after phase 1. The tracker records `waitMs` on every batched run, so the median and longest wait — the numbers that decide whether this stays on — come from real use rather than a promise. See [[Batch Analysis Plan]].
+
 ## Levers not pulled yet
 - Cut Pass 2 value lists (200 → ~50). Risky, measure first. See [[Open Issues]] #6.
 - Make Pass 3 optional.

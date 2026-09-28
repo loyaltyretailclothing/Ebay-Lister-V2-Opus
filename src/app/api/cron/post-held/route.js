@@ -3,6 +3,7 @@ import { deleteDraft, draftPhotoIds, getDraft, listDrafts, markPhotosHeld, saveD
 import { dueTime, sweepPhotos } from "@/lib/photoSweep";
 import { describeFailure, readReply } from "@/lib/publishError";
 import { findPublishedListing } from "@/lib/skuInspect";
+import { collectBatches } from "@/lib/batchCollect";
 import { writeRun } from "@/lib/holdRuns";
 import { writeEntry } from "@/lib/efficiencyLog";
 import { buildDraftEntry } from "@/lib/efficiency";
@@ -80,11 +81,19 @@ export async function GET(request) {
   // is the backstop for when nobody opens the app — usually a browser tab
   // has already done it.
   let swept = null;
+  let collected = null;
   if (batchNo === 1) {
     try {
       swept = await sweepPhotos();
     } catch (err) {
       console.error("Photo sweep failed during the hold run:", err);
+    }
+    // Drafts waiting on Anthropic's queue. A browser tab normally collects
+    // these; this is the backstop for when nobody has the app open.
+    try {
+      collected = await collectBatches();
+    } catch (err) {
+      console.error("Batch collection failed during the hold run:", err);
     }
   }
 
@@ -96,6 +105,7 @@ export async function GET(request) {
       success: true,
       skipped: `not posting time (${hour}:00 local)`,
       swept,
+      collected,
     });
   }
   if (batchNo * BATCH > DAILY_MAX) {
@@ -261,5 +271,5 @@ export async function GET(request) {
     }).catch((err) => console.error("Next hold batch kickoff failed:", err));
   }
 
-  return NextResponse.json({ success: true, ...run, remaining: more, swept });
+  return NextResponse.json({ success: true, ...run, remaining: more, swept, collected });
 }

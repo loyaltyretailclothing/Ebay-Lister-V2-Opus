@@ -232,6 +232,10 @@ export default function CameraPage() {
           aiPhotoIndices,
           aiNote,
           draftNote,
+          // Hand it to Anthropic's queue: half price, answers later. The
+          // draft appears straight away showing which phase it's in, and
+          // "Analyze now" pulls it out if you need it immediately.
+          queued: true,
           timing: {
             shootMs: Math.round(timingRef.current.shootMs),
             reviewMs: Math.round(timingRef.current.reviewMs),

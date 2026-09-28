@@ -18,7 +18,8 @@ Open this `docs` folder in Obsidian with **"Open folder as vault."**
 - [[Redesign Build Plan]] — step-by-step plan to build the finished redesign (design files in `design/`)
 - [[Listed Report Plan]] — cost + place captured when holding; a permanent record of everything listed, for Flipwise (planned)
 - [[Seasonal Hold Plan]] — hold finished drafts out of the queue and auto-post them on their season's date; On Hold tab (live)
-- [[Efficiency Tracker Plan]] — two trackers — camera time and draft time (active time only), by category, dates, compare, graphs; desktop tab "Track" (live)
+- [[Efficiency Tracker Plan]] — two trackers — camera time and draft time (active time only), by category, dates, compare, graphs; desktop tab "Track" (live). Also shows what the AI really costs, measured (2026-09-28)
+- [[Batch Analysis Plan]] — camera drafts analyzed through Anthropic's queue at half price; drafts show their phase and can be pulled out (built 2026-09-28, not pushed)
 - [[Old Listings (Parked)]] — desktop report of listings live 90+ days (watchers, views, click rate); built and tested, parked on branch `old-listings`, not live
 
 ## How the app works

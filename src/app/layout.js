@@ -2,6 +2,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import AppFrame from "@/components/nav/AppFrame";
 import DevWriteGuard from "@/components/dev/DevWriteGuard";
 import PhotoSweeper from "@/components/photos/PhotoSweeper";
+import BatchCollector from "@/components/photos/BatchCollector";
 import { PhotoTransferProvider } from "@/contexts/PhotoTransferContext";
 import "./globals.css";
 
@@ -36,6 +37,7 @@ export default function RootLayout({ children }) {
       <body className="h-full text-md">
         <DevWriteGuard />
         <PhotoSweeper />
+        <BatchCollector />
         <PhotoTransferProvider>
           <AppFrame>{children}</AppFrame>
         </PhotoTransferProvider>

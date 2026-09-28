@@ -7,6 +7,7 @@ import Dialog from "@/components/ui/Dialog";
 import { DraftsIcon, RefreshIcon, Spinner, TrashIcon } from "@/components/ui/Icons";
 import { CONDITION_MAP } from "@/lib/conditions";
 import { thumbUrl } from "@/lib/resizeImage";
+import { waitedFor } from "@/components/create/LibraryPanel";
 
 function formatDate(iso) {
   if (!iso) return "";
@@ -28,6 +29,8 @@ export default function DraftsPage() {
   const [error, setError] = useState("");
   const [deleting, setDeleting] = useState(null);
   const [confirmFor, setConfirmFor] = useState(null);
+  // "Analyze now" on a draft waiting in Anthropic's queue — the id running.
+  const [forcing, setForcing] = useState(null);
 
   const fetchDrafts = useCallback(async () => {
     setLoading(true);
@@ -54,6 +57,29 @@ export default function DraftsPage() {
   useEffect(() => {
     fetchDrafts();
   }, [fetchDrafts]);
+
+  // Pull a draft out of Anthropic's queue and analyze it on the spot (~45s,
+  // full price). Anthropic doesn't bill a request it hadn't started yet, so
+  // this normally costs nothing extra.
+  async function forceNow(id) {
+    if (forcing) return;
+    setForcing(id);
+    setError("");
+    try {
+      const res = await fetch("/api/batches/collect", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ draftId: id }),
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error || "Couldn't analyze that draft");
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setForcing(null);
+      fetchDrafts();
+    }
+  }
 
   async function handleDelete(id) {
     setConfirmFor(null);
@@ -118,6 +144,10 @@ export default function DraftsPage() {
         <div className="min-h-0 grow overflow-y-auto pb-[58px]">
           {drafts.map((d) => {
             const processing = d.status === "processing";
+            // Only phase 1 blocks — after it lands the draft is workable and
+            // the specifics (phase 2) fill in behind you.
+            const waitingOnPhotos = d.batchPhase === 1;
+            const fillingSpecifics = d.batchPhase === 2;
             const isError = d.status === "error";
             const cond = CONDITION_MAP[d.condition]?.label || d.condition || "";
             const created = `Created ${formatDate(d.createdAt || d.updatedAt)}`;
@@ -138,9 +168,18 @@ export default function DraftsPage() {
                         Processing
                       </span>
                     )}
+                    {(waitingOnPhotos || fillingSpecifics) && (
+                      // Waiting on Anthropic's queue — which phase, how long.
+                      <span className="pill pill-busy mt-px">
+                        <Spinner className="size-[11px]" />
+                        Phase {d.batchPhase} · {waitedFor(d.batchAt)}
+                      </span>
+                    )}
+                    {d.readyBy === "batch" && !isError && <span className="pill pill-skip mt-px">by Batch</span>}
+                    {d.readyBy === "force" && !isError && <span className="pill pill-err mt-px">by Force</span>}
                     {isError && <span className="pill pill-err mt-px">Error</span>}
                     {d.skipped && !processing && <span className="pill pill-skip mt-px">Skipped</span>}
-                    {cond && !processing && !isError && (
+                    {cond && !processing && !isError && !waitingOnPhotos && !fillingSpecifics && (
                       <>
                         <span className="rmeta-cond">{cond}</span>
                         <span className="rmeta-date" aria-hidden="true">
@@ -148,7 +187,12 @@ export default function DraftsPage() {
                         </span>
                       </>
                     )}
-                    <span className="rmeta-date">{created}</span>
+                    {/* While it's in the queue, the wait matters and the
+                        created date doesn't — and the row needs the room
+                        for the Analyze now button. */}
+                    {!waitingOnPhotos && !fillingSpecifics && (
+                      <span className="rmeta-date">{created}</span>
+                    )}
                   </span>
                   {isError && d.errorMessage && <span className="rmeta-err">{d.errorMessage}</span>}
                 </span>
@@ -156,8 +200,9 @@ export default function DraftsPage() {
             );
             return (
               <div key={d.id} className="lrow">
-                {processing ? (
-                  // Processing: no handler at all — it's still being written.
+                {processing || waitingOnPhotos ? (
+                  // Still being written, or its photos are still in the
+                  // queue — nothing to open yet. It can be pulled out below.
                   <div className="rowmain rowmain-off">{body}</div>
                 ) : (
                   <button
@@ -166,6 +211,22 @@ export default function DraftsPage() {
                     onClick={() => router.push(`/generate?draft=${encodeURIComponent(d.id)}`)}
                   >
                     {body}
+                  </button>
+                )}
+                {(waitingOnPhotos || fillingSpecifics) && (
+                  <button
+                    type="button"
+                    className="btn btn-sm mr-1.5 shrink-0 self-center"
+                    disabled={forcing === d.id}
+                    onClick={() => forceNow(d.id)}
+                    title={
+                      fillingSpecifics
+                        ? "Fill the item specifics now instead of waiting"
+                        : "Analyze this draft now instead of waiting"
+                    }
+                  >
+                    {forcing === d.id ? <Spinner className="size-3" /> : null}
+                    {fillingSpecifics ? "Finish now" : "Analyze now"}
                   </button>
                 )}
                 <button

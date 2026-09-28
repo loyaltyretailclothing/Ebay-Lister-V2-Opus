@@ -99,6 +99,8 @@ export default function useListingEditor() {
 
   const [skipSaving, setSkipSaving] = useState(false);
   const [skipFlash, setSkipFlash] = useState(false);
+  // "Analyze now" on a draft waiting in Anthropic's queue — the id being run.
+  const [forcing, setForcing] = useState(null);
 
   const [drafts, setDrafts] = useState([]);
   const [draftsLoading, setDraftsLoading] = useState(false);
@@ -504,6 +506,33 @@ export default function useListingEditor() {
     });
   }, [guardSwitch, refreshDrafts, drafts, draftId, loadDraft, clearToBlank]);
 
+  // --- Analyze now: pull a draft out of Anthropic's queue -----------------
+  // Cancels its place in the queue and runs the analysis on the spot (~45s
+  // at full price). Anthropic doesn't bill a request it hadn't started, so
+  // this normally costs nothing extra.
+  const forceDraft = useCallback(
+    async (id) => {
+      if (!id || forcing) return;
+      setForcing(id);
+      setDraftsError("");
+      try {
+        const res = await fetch("/api/batches/collect", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ draftId: id }),
+        });
+        const data = await res.json();
+        if (!data.success) throw new Error(data.error || "Couldn't analyze that draft");
+      } catch (err) {
+        setDraftsError(err.message);
+      } finally {
+        setForcing(null);
+        refreshDrafts();
+      }
+    },
+    [forcing, refreshDrafts]
+  );
+
   // --- Skip Draft: saves the instant it is ticked, and only that ----------
   const toggleSkip = useCallback(
     async (checked) => {
@@ -872,6 +901,8 @@ export default function useListingEditor() {
     nextDraft,
     newListing,
     toggleSkip,
+    forcing,
+    forceDraft,
     // prompts
     leavePrompt,
     leaveCancel,

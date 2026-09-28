@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { RefreshIcon, Spinner } from "@/components/ui/Icons";
-import { OUTLIER_MS, fmtDuration, summarize, weekStart } from "@/lib/efficiency";
+import { OUTLIER_MS, fmtDuration, median, summarize, weekStart } from "@/lib/efficiency";
 
 // Efficiency Tracker (desktop tab "Track"). Two separate trackers, ACTIVE
 // time only (see lib/activeClock):
@@ -122,6 +122,7 @@ const perItem = (n) => (n === null || n === undefined ? "—" : `${(n * 100).toF
 function spend(aiEntries, listed) {
   const total = aiEntries.reduce((s, e) => s + (e.cost || 0), 0);
   const batched = aiEntries.filter((e) => e.batch);
+  const waits = batched.map((e) => e.waitMs).filter((n) => n > 0);
   return {
     total,
     runs: aiEntries.length,
@@ -129,6 +130,10 @@ function spend(aiEntries, listed) {
     batchedRuns: batched.length,
     // A batched run costs half, so what it saved equals what it cost.
     batchSaved: batched.reduce((s, e) => s + (e.cost || 0), 0),
+    // How long the queue took. The median is what to expect; the longest is
+    // what you're risking. See docs/Plans/Batch Analysis Plan.md.
+    waitMedian: median(waits),
+    waitLongest: waits.length ? Math.max(...waits) : null,
   };
 }
 
@@ -314,6 +319,14 @@ export default function EfficiencyPage() {
                       <span className="text-ink-3">
                         {" · "}
                         {cost.cur.batchedRuns} batched, saved {money(cost.cur.batchSaved)}
+                        {cost.cur.waitMedian !== null && (
+                          <>
+                            {" · queue waits: median "}
+                            <b className="text-ink-2">{fmtDuration(cost.cur.waitMedian)}</b>
+                            {", longest "}
+                            <b className="text-ink-2">{fmtDuration(cost.cur.waitLongest)}</b>
+                          </>
+                        )}
                       </span>
                     )}
                   </>
