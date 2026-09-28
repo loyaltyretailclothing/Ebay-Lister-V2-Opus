@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Camera from "@/components/Camera";
-import { CheckIcon, ChevronLeftIcon, XIcon } from "@/components/ui/Icons";
+import { CheckIcon, ChevronLeftIcon, PlusIcon, Spinner, XIcon } from "@/components/ui/Icons";
+import { resizeImage } from "@/lib/resizeImage";
 import MicButton, { VoiceStatus } from "@/components/ui/MicButton";
 import useVoiceNote, { appendSpoken } from "@/hooks/useVoiceNote";
 import { createActiveClock } from "@/lib/activeClock";
@@ -35,6 +36,10 @@ export default function CameraPage() {
   const [submitting, setSubmitting] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(null); // { done, total }
   const [error, setError] = useState("");
+  // Adding photos from the phone's own library (a tag photographed while
+  // washing, say). They join the camera shots and behave the same.
+  const [adding, setAdding] = useState(false);
+  const pickRef = useRef(null);
   // aiNote is read by Claude during analysis; draftNote is internal only.
   const [aiNote, setAiNote] = useState("");
   const [draftNote, setDraftNote] = useState("");
@@ -110,6 +115,42 @@ export default function CameraPage() {
       else next.add(url);
       return next;
     });
+  }
+
+  // Photos picked from the phone's library. A camera shot is already sized
+  // for upload; one straight from the camera roll is several times bigger
+  // and, on an iPhone, usually HEIC rather than JPEG — both of which the
+  // upload refuses. Shrinking each one here (the same 1600px step the rest
+  // of the app uses) fixes the size and the format in one go.
+  async function addFromLibrary(fileList) {
+    const files = Array.from(fileList || []).filter((f) => f.type.startsWith("image/"));
+    if (!files.length) return;
+    setAdding(true);
+    setError("");
+    const added = [];
+    let skipped = 0;
+    for (const file of files) {
+      try {
+        const small = await resizeImage(file);
+        // Unreadable files come back as the original; those are the ones
+        // that would fail the upload, so leave them out rather than break
+        // the whole draft.
+        if (small === file && file.size > 4_000_000) {
+          skipped += 1;
+          continue;
+        }
+        added.push({ blob: small, url: URL.createObjectURL(small) });
+      } catch {
+        skipped += 1;
+      }
+    }
+    if (added.length) setPhotos((prev) => [...prev, ...added]);
+    if (skipped) {
+      setError(
+        `${skipped} photo${skipped === 1 ? "" : "s"} couldn't be added — try taking a screenshot of ${skipped === 1 ? "it" : "them"} and adding that.`
+      );
+    }
+    setAdding(false);
   }
 
   function removePhoto(index) {
@@ -345,14 +386,42 @@ export default function CameraPage() {
               )}
             </div>
           ) : (
-            <button
-              type="button"
-              onClick={handleCreateDraft}
-              disabled={photos.length === 0}
-              className="btn btn-primary btn-touch w-full"
-            >
-              Create Draft ({photos.length} photo{photos.length === 1 ? "" : "s"}, {aiCount} AI)
-            </button>
+            <div className="flex gap-[7px]">
+              {/* Photos taken outside the app — a washing tag, say. No
+                  `capture` attribute, so the phone offers its library. */}
+              <input
+                ref={pickRef}
+                type="file"
+                accept="image/*"
+                multiple
+                className="hidden"
+                onChange={(e) => {
+                  addFromLibrary(e.target.files);
+                  e.target.value = ""; // so the same photo can be picked again
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => pickRef.current?.click()}
+                disabled={adding}
+                className="btn btn-touch shrink-0"
+              >
+                {adding ? (
+                  <Spinner className="size-[15px]" />
+                ) : (
+                  <PlusIcon className="size-[15px]" strokeWidth={2.6} />
+                )}
+                {adding ? "Adding…" : "Add"}
+              </button>
+              <button
+                type="button"
+                onClick={handleCreateDraft}
+                disabled={photos.length === 0 || adding}
+                className="btn btn-primary btn-touch min-w-0 grow"
+              >
+                Create Draft ({photos.length} photo{photos.length === 1 ? "" : "s"}, {aiCount} AI)
+              </button>
+            </div>
           )}
         </div>
       </div>
