@@ -36,7 +36,11 @@ Ideas we want to come back to. Nothing here is built or agreed in detail yet. Se
 - **Open questions:** which photos the AI reads when there's no review step (first few? all?), and where voice notes fit in.
 - **Why:** fewer taps per item across a sourcing trip.
 
-## 7. Prompt caching on the item specifics step (AI cost)
+## 7. Prompt caching on the item specifics step (AI cost) — DECLINED 2026-09-28
+**Aaron's call: "a couple bucks a month doesn't seem worth it."** Don't raise it again unless AI spend changes shape (many more listings, or a much dearer model). The reasoning below stands if it's ever revisited.
+
+A question worth keeping, since it came up: caching doesn't mean the AI answers before it has looked. **Pass 2 never sees the photos** — Pass 1 looks and writes down `observations`, and Pass 2 fills the boxes from that summary, the title and the category list. And a model reads its whole prompt before writing anything, so moving a section earlier doesn't change what it can take into account; order only matters because a cache matches on the *prefix*.
+
 - The item specifics step (Pass 2) is the expensive one (~$0.036 of ~$0.055 per analysis on Sonnet 5). ~90% of what it sends is eBay's specifics list for the category — identical for every item in that category.
 - Move that list to the front of the request (instructions unchanged, only the order) and mark it reusable. Same category within 5 minutes → that step ~80% cheaper (~$0.006); otherwise ~20% more (~$0.043) for the first one.
 - Estimated savings ~$0–7/month depending on how often back-to-back items share a category (break-even ~25%). No quality change.

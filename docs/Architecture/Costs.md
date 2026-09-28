@@ -35,7 +35,7 @@ Vercel dashboard → Logs:
 ## Levers not pulled yet
 - Cut Pass 2 value lists (200 → ~50). Risky, measure first. See [[Open Issues]] #6.
 - Make Pass 3 optional.
-- Prompt caching.
+- ~~Prompt caching~~ — **declined 2026-09-28**, worth only a few dollars a month and only when back-to-back items share a category. See [[Future Features]] #7.
 
 ## Other services
 - Cloudinary: free plan. See [[Photos and Cloudinary]].
