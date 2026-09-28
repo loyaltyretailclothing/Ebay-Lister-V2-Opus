@@ -3,6 +3,7 @@
 import { AlertIcon, CheckCircleIcon, CheckIcon, Spinner } from "@/components/ui/Icons";
 import { DismissX } from "@/components/create/parts";
 import { fmtHoldDate } from "@/lib/seasons";
+import { waitedFor } from "@/lib/queueWait";
 
 // Status messages: desktop shows them all centered in the action bar; the
 // phone has two strips. Results of List on
@@ -30,6 +31,16 @@ export function promoInfo(pr) {
     return { text: `Promotion failed${reason} The listing is live.`, warn: true };
   }
   return { text: pr, warn: false };
+}
+
+// What a draft is waiting on. Phase 1 is the photos; phase 2 is only
+// eBay's item specifics, and the draft is already workable.
+// See docs/Plans/Batch Analysis Plan.md.
+function queuedText(batch) {
+  const waited = waitedFor(batch.at);
+  return batch.phase === 2
+    ? `Item specifics are still in Anthropic's queue · ${waited}. Everything else is here.`
+    : `Photos are in Anthropic's queue · ${waited}. It's half price, and usually back within the hour.`;
 }
 
 function focusSku() {
@@ -138,6 +149,23 @@ export function TopMessage({ editor }) {
       </Pill>
     );
   }
+  // Still in Anthropic's queue. The only place it can be pulled out, so a
+  // stray tap in the drafts list can't do it by accident.
+  if (e.openBatch) {
+    return (
+      <Pill
+        tone="info"
+        icon={<Spinner className="size-3.5 shrink-0" />}
+        actions={
+          <button type="button" className="btn btn-sm shrink-0" disabled={e.forcing} onClick={e.forceDraft}>
+            {e.openBatch.phase === 2 ? "Finish now" : "Analyze now"}
+          </button>
+        }
+      >
+        {queuedText(e.openBatch)}
+      </Pill>
+    );
+  }
   if (e.held) {
     return (
       <Pill tone="ok" icon={<CheckCircleIcon className="size-3.5 shrink-0" />} onDismiss={e.dismissHeld}>
@@ -206,6 +234,17 @@ export function PhoneTopLane({ editor }) {
       <div className="lane lane-bad shrink-0 px-3">
         <AlertIcon className="size-[13px]" />
         <p>{e.draftError}</p>
+      </div>
+    );
+  }
+  if (e.openBatch) {
+    return (
+      <div className="lane lane-info shrink-0 items-center px-3">
+        <Spinner className="size-[13px]" />
+        <p>{queuedText(e.openBatch)}</p>
+        <button type="button" className="btn btn-sm shrink-0" disabled={e.forcing} onClick={e.forceDraft}>
+          {e.openBatch.phase === 2 ? "Finish now" : "Analyze now"}
+        </button>
       </div>
     );
   }

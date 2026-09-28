@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import usePhotoLibrary from "@/hooks/usePhotoLibrary";
 import { FOLDERS } from "@/lib/constants";
 import { photoName, thumbUrl } from "@/lib/resizeImage";
+import { readyLabel, waitedFor } from "@/lib/queueWait";
 import Dialog from "@/components/ui/Dialog";
 import Lightbox from "@/components/ui/Lightbox";
 import {
@@ -35,26 +36,6 @@ function writePref(key, value) {
 }
 
 const folderLabel = (f) => (f === "All Photos" ? "All" : f);
-
-// How a finished draft got finished. Plain "Ready" when you asked for it —
-// you already know. The others say something you'd otherwise never learn:
-// it came back from Anthropic's queue, or the queue let it down and the app
-// re-ran it live at full price. See docs/Plans/Batch Analysis Plan.md.
-export function readyLabel(readyBy) {
-  if (readyBy === "batch") return "Ready by Batch";
-  if (readyBy === "force") return "Ready by Force";
-  return "Ready";
-}
-
-// "14 min" / "2 hr 05 min" — how long a queued draft has been waiting.
-export function waitedFor(since) {
-  const ms = Date.now() - Date.parse(since || "");
-  if (!Number.isFinite(ms) || ms < 0) return "just now";
-  const min = Math.floor(ms / 60000);
-  if (min < 1) return "just now";
-  if (min < 60) return `${min} min`;
-  return `${Math.floor(min / 60)} hr ${String(min % 60).padStart(2, "0")} min`;
-}
 
 // Desktop Create Listing, left panel: the photo library and the draft queue
 // in one panel with a Photos | Drafts switch. Collapses to a 40px spine;
@@ -484,24 +465,9 @@ function DraftsBody({ editor }) {
               </div>
             );
           }
-          // Phase 1 can't be opened yet, but it can be pulled out of the
-          // queue and run on the spot.
-          if (waitingOnPhotos) {
-            return (
-              <div key={d.id} className="drow drow-off items-center">
-                {inner}
-                <button
-                  type="button"
-                  className="btn btn-sm shrink-0"
-                  disabled={e.forcing === d.id}
-                  onClick={() => e.forceDraft(d.id)}
-                >
-                  {e.forcing === d.id ? <Spinner className="size-3" /> : null}
-                  Analyze now
-                </button>
-              </div>
-            );
-          }
+          // A queued draft opens like any other — pulling it out of the
+          // queue is done inside it, deliberately, so it can't be set off by
+          // a stray tap in the list.
           return (
             <button
               key={d.id}

@@ -1,5 +1,13 @@
 import { NextResponse } from "next/server";
-import { listDrafts, saveDraft, newDraftId, draftPhotoIds, isDraftId, markPhotosHeld } from "@/lib/drafts";
+import {
+  draftPhotoIds,
+  getDraft,
+  isDraftId,
+  listDrafts,
+  markPhotosHeld,
+  newDraftId,
+  saveDraft,
+} from "@/lib/drafts";
 
 // GET /api/drafts — list all drafts (summary only)
 export async function GET() {
@@ -27,11 +35,19 @@ export async function POST(request) {
     }
     const id = body.id || newDraftId();
 
+    // Saving from the editor sends the listing and its photos, nothing more.
+    // A draft can also be waiting in Anthropic's queue, and that state lives
+    // on the draft — so carry it over rather than letting an ordinary save
+    // quietly drop it and strand the answer. See lib/batchCollect.js.
+    const existing = body.id ? await getDraft(body.id).catch(() => null) : null;
     const payload = {
       id,
       listing: body.listing || {},
       aiPhotos: body.aiPhotos || [],
       listingPhotos: body.listingPhotos || [],
+      ...(existing?.batch ? { batch: existing.batch, status: existing.status } : {}),
+      ...(existing?.timing ? { timing: existing.timing } : {}),
+      ...(existing?.readyBy ? { readyBy: existing.readyBy } : {}),
       savedAt: new Date().toISOString(),
     };
 

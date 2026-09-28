@@ -7,7 +7,7 @@ import Dialog from "@/components/ui/Dialog";
 import { DraftsIcon, RefreshIcon, Spinner, TrashIcon } from "@/components/ui/Icons";
 import { CONDITION_MAP } from "@/lib/conditions";
 import { thumbUrl } from "@/lib/resizeImage";
-import { waitedFor } from "@/components/create/LibraryPanel";
+import { waitedFor } from "@/lib/queueWait";
 
 function formatDate(iso) {
   if (!iso) return "";
@@ -29,8 +29,6 @@ export default function DraftsPage() {
   const [error, setError] = useState("");
   const [deleting, setDeleting] = useState(null);
   const [confirmFor, setConfirmFor] = useState(null);
-  // "Analyze now" on a draft waiting in Anthropic's queue — the id running.
-  const [forcing, setForcing] = useState(null);
 
   const fetchDrafts = useCallback(async () => {
     setLoading(true);
@@ -57,29 +55,6 @@ export default function DraftsPage() {
   useEffect(() => {
     fetchDrafts();
   }, [fetchDrafts]);
-
-  // Pull a draft out of Anthropic's queue and analyze it on the spot (~45s,
-  // full price). Anthropic doesn't bill a request it hadn't started yet, so
-  // this normally costs nothing extra.
-  async function forceNow(id) {
-    if (forcing) return;
-    setForcing(id);
-    setError("");
-    try {
-      const res = await fetch("/api/batches/collect", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ draftId: id }),
-      });
-      const data = await res.json();
-      if (!data.success) throw new Error(data.error || "Couldn't analyze that draft");
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setForcing(null);
-      fetchDrafts();
-    }
-  }
 
   async function handleDelete(id) {
     setConfirmFor(null);
@@ -204,9 +179,10 @@ export default function DraftsPage() {
             );
             return (
               <div key={d.id} className="lrow">
-                {processing || waitingOnPhotos ? (
-                  // Still being written, or its photos are still in the
-                  // queue — nothing to open yet. It can be pulled out below.
+                {processing ? (
+                  // Still being written — nothing to open yet. A queued
+                  // draft DOES open; pulling it out of the queue happens
+                  // inside it, so a stray tap here can't set it off.
                   <div className="rowmain rowmain-off">{body}</div>
                 ) : (
                   <button
@@ -215,22 +191,6 @@ export default function DraftsPage() {
                     onClick={() => router.push(`/generate?draft=${encodeURIComponent(d.id)}`)}
                   >
                     {body}
-                  </button>
-                )}
-                {(waitingOnPhotos || fillingSpecifics) && (
-                  <button
-                    type="button"
-                    className="btn btn-sm mr-1.5 shrink-0 self-center"
-                    disabled={forcing === d.id}
-                    onClick={() => forceNow(d.id)}
-                    title={
-                      fillingSpecifics
-                        ? "Fill the item specifics now instead of waiting"
-                        : "Analyze this draft now instead of waiting"
-                    }
-                  >
-                    {forcing === d.id ? <Spinner className="size-3" /> : null}
-                    {fillingSpecifics ? "Finish now" : "Analyze now"}
                   </button>
                 )}
                 <button

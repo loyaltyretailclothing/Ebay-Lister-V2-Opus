@@ -19,10 +19,17 @@ Sending several categories' question lists so Claude could pick was measured and
 **The two trips don't compound in practice, because the draft doesn't wait for the second one.** Everything that makes a draft workable — title, category, description, keywords — comes out of phase 1, so the draft goes **Ready** then, and the specifics fill in behind it.
 
 ## What you see
+**The drafts list has no buttons** — Aaron's call 2026-09-28, so a stray tap can't spend money. Pulling a draft out of the queue happens **inside the draft**, in the status lane, on both phone and desktop:
+
+> ◌ Photos are in Anthropic's queue · 14 min. It's half price, and usually back within the hour. **[Analyze now]**
+> ◌ Item specifics are still in Anthropic's queue · 3 min. Everything else is here. **[Finish now]**
+
+A queued draft opens like any other (a phase-1 one is just empty apart from its photos). Because of that, an ordinary **Update Draft** must not quietly drop it from the queue — `POST /api/drafts` carries the existing `batch`, `timing` and `readyBy` over when the caller doesn't send them.
+
 | Row | Meaning |
 |---|---|
-| `◌ Phase 1 · 14 min` | photos still in the queue; the draft can't be opened yet. **Analyze now** pulls it out |
-| `● Ready by Batch` + `Phase 2 · 3 min` | workable now; eBay's questions still queued. **Finish now** (phone) fills them live |
+| `◌ Phase 1 · 14 min` | photos still in the queue; the draft opens but is empty |
+| `◌ Phase 2 · 3 min` | workable now; eBay's questions still queued |
 | `● Ready by Batch` | came back from the queue, complete |
 | `● Ready by Force` | **the queue let it down and the app re-ran it live at full price.** A warning light, not a receipt — you'd otherwise never know |
 | `● Ready` | you asked for it (Analyze Photos, or Analyze now). You already know, so it says nothing |
@@ -45,6 +52,5 @@ Aaron's wording, 2026-09-28: "by Force" is the app stepping in, *not* the user c
 22 checks on the state machine with Anthropic, eBay and Cloudinary stubbed: phase 1 → usable draft + phase 2 queued; phase 2 → specifics land; waiting left alone; expired → run live and marked `force`; stuck over 20 hours → run live; **Analyze now** stays plain `Ready`; **Finish now** fills only the specifics and keeps edits made since; no category → still a usable draft with nothing further queued. Cost recorded at exactly half. In the browser, all five row states render on phone and desktop, and only phase 1 is locked.
 
 ## Known gaps
-- **No "Finish now" on the desktop drafts panel.** A phase-2 row is itself a button (it opens the draft), and a button can't contain another button. The phone has it, which covers the camera flow. Better home: a line inside the open draft next to Item Specifics.
 - **Nothing has been through the real queue yet** — the wait times are the whole point and are unknown until it runs. The tracker will answer it within a week.
 - If the real median wait turns out to be hours rather than minutes, the fix already scoped is Aaron's one-tap category at review, which collapses the whole thing to a single call and a single trip. See [[AI Pipeline]].

@@ -99,8 +99,11 @@ export default function useListingEditor() {
 
   const [skipSaving, setSkipSaving] = useState(false);
   const [skipFlash, setSkipFlash] = useState(false);
-  // "Analyze now" on a draft waiting in Anthropic's queue — the id being run.
-  const [forcing, setForcing] = useState(null);
+  // The open draft's place in Anthropic's queue, if it has one:
+  // { id, phase, at }. Pulling it out happens here, inside the draft, so a
+  // stray tap in the drafts list can't set it off.
+  const [openBatch, setOpenBatch] = useState(null);
+  const [forcing, setForcing] = useState(false);
 
   const [drafts, setDrafts] = useState([]);
   const [draftsLoading, setDraftsLoading] = useState(false);
@@ -300,6 +303,9 @@ export default function useListingEditor() {
           });
           setAiPhotosState(data.draft.aiPhotos || []);
           setListingPhotosState(data.draft.listingPhotos || []);
+          // Still waiting on Anthropic's queue? The lane says so and offers
+          // to run it now. See docs/Plans/Batch Analysis Plan.md.
+          setOpenBatch(data.draft.batch?.phase ? data.draft.batch : null);
           startTiming(id, l.timing);
           setDraftId(id);
           setDraftInUrl(id);
@@ -331,6 +337,7 @@ export default function useListingEditor() {
       setListing((prev) => blankListingKeepingDefaults(prev));
       setAiPhotosState([]);
       setListingPhotosState([]);
+      setOpenBatch(null);
       startTiming(null, null);
       setDraftId(null);
       setDraftInUrl(null);
@@ -510,28 +517,27 @@ export default function useListingEditor() {
   // Cancels its place in the queue and runs the analysis on the spot (~45s
   // at full price). Anthropic doesn't bill a request it hadn't started, so
   // this normally costs nothing extra.
-  const forceDraft = useCallback(
-    async (id) => {
-      if (!id || forcing) return;
-      setForcing(id);
-      setDraftsError("");
-      try {
-        const res = await fetch("/api/batches/collect", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ draftId: id }),
-        });
-        const data = await res.json();
-        if (!data.success) throw new Error(data.error || "Couldn't analyze that draft");
-      } catch (err) {
-        setDraftsError(err.message);
-      } finally {
-        setForcing(null);
-        refreshDrafts();
-      }
-    },
-    [forcing, refreshDrafts]
-  );
+  const forceDraft = useCallback(async () => {
+    if (!draftId || forcing) return;
+    setForcing(true);
+    setError("");
+    try {
+      const res = await fetch("/api/batches/collect", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ draftId }),
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error || "Couldn't analyze that draft");
+      // Re-open it so the form shows what came back.
+      await loadDraft(draftId);
+      refreshDrafts();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setForcing(false);
+    }
+  }, [draftId, forcing, loadDraft, refreshDrafts]);
 
   // --- Skip Draft: saves the instant it is ticked, and only that ----------
   const toggleSkip = useCallback(
@@ -901,6 +907,7 @@ export default function useListingEditor() {
     nextDraft,
     newListing,
     toggleSkip,
+    openBatch,
     forcing,
     forceDraft,
     // prompts
