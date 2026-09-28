@@ -43,7 +43,12 @@ Aaron's wording, 2026-09-28: "by Force" is the app stepping in, *not* the user c
 - **Everything lives on the draft** in Cloudinary — a queued draft survives a closed laptop, a redeploy, or a week away.
 - **Giving up:** a batch that fails, expires, or sits more than **20 hours** (before Anthropic's own 24-hour expiry) is run live automatically and marked `force`.
 - **Analyze now / Finish now** (`forceLive`): cancels the queue place and runs it live. On **phase 2 it only fills the specifics** — the photos were already read and the draft may have been edited since, so re-running everything would throw those edits away.
-- **Cost:** each phase writes an `ai` entry at **half price** with `batch: true` and the `waitMs` it waited. The tracker shows `N batched, saved $X · queue waits: median 22m, longest 4h 10m`.
+- **Cost and waits:** each phase writes its **own** `ai` entry at half price, carrying `batch: true`, its `waitMs` and its `phase`. The phase is part of the entry's id (`ai_camera1_<draftId>` / `ai_camera2_<draftId>`) — without it phase 2 landed on top of phase 1 and **half of every batched draft's cost vanished** (found 2026-09-28 when Aaron asked whether the wait was one phase or both).
+- The two waits answer different questions and are shown apart:
+
+  > 272 batched, saved $2.02 · queue: **workable in 34m**, **finished in 49m** (longest 3h 58m)
+
+  *Workable in* is phase 1 alone — when the draft became usable. *Finished in* adds both phases for the same draft. The longest is what you're risking, not what to expect.
 
 ## Code
 `src/lib/batchAnalyze.js` (submit / check / cancel), `src/lib/batchCollect.js` (the state machine and the live fallback), `src/lib/runAnalysis.js` (one copy of the full live analysis, shared by the camera route, Analyze now and the fallback), `src/app/api/batches/collect/route.js`, `src/components/photos/BatchCollector.js`. The prompts stay in `listingPipeline.js`, split into `visionRequest`/`readVisionReply` and `specificsRequest`/`readSpecificsReply` so the live and queued paths send byte-identical requests.

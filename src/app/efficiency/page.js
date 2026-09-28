@@ -122,7 +122,17 @@ const perItem = (n) => (n === null || n === undefined ? "—" : `${(n * 100).toF
 function spend(aiEntries, listed) {
   const total = aiEntries.reduce((s, e) => s + (e.cost || 0), 0);
   const batched = aiEntries.filter((e) => e.batch);
-  const waits = batched.map((e) => e.waitMs).filter((n) => n > 0);
+  // Queue waits answer two different questions, so they're kept apart:
+  // phase 1 is how long until the draft was WORKABLE; the two phases added
+  // together are how long until it was FINISHED. A draft writes one entry
+  // per phase. See docs/Plans/Batch Analysis Plan.md.
+  const usable = batched.filter((e) => e.phase === 1 && e.waitMs > 0).map((e) => e.waitMs);
+  const perDraft = new Map();
+  for (const e of batched) {
+    if (!e.draftId || !e.waitMs) continue;
+    perDraft.set(e.draftId, (perDraft.get(e.draftId) || 0) + e.waitMs);
+  }
+  const totals = [...perDraft.values()];
   return {
     total,
     runs: aiEntries.length,
@@ -130,10 +140,10 @@ function spend(aiEntries, listed) {
     batchedRuns: batched.length,
     // A batched run costs half, so what it saved equals what it cost.
     batchSaved: batched.reduce((s, e) => s + (e.cost || 0), 0),
-    // How long the queue took. The median is what to expect; the longest is
-    // what you're risking. See docs/Plans/Batch Analysis Plan.md.
-    waitMedian: median(waits),
-    waitLongest: waits.length ? Math.max(...waits) : null,
+    usableMedian: median(usable),
+    doneMedian: median(totals),
+    // What you're risking, not what to expect.
+    waitLongest: totals.length ? Math.max(...totals) : null,
   };
 }
 
@@ -319,12 +329,15 @@ export default function EfficiencyPage() {
                       <span className="text-ink-3">
                         {" · "}
                         {cost.cur.batchedRuns} batched, saved {money(cost.cur.batchSaved)}
-                        {cost.cur.waitMedian !== null && (
+                        {cost.cur.usableMedian !== null && (
                           <>
-                            {" · queue waits: median "}
-                            <b className="text-ink-2">{fmtDuration(cost.cur.waitMedian)}</b>
-                            {", longest "}
+                            {" · queue: workable in "}
+                            <b className="text-ink-2">{fmtDuration(cost.cur.usableMedian)}</b>
+                            {", finished in "}
+                            <b className="text-ink-2">{fmtDuration(cost.cur.doneMedian)}</b>
+                            {" (longest "}
                             <b className="text-ink-2">{fmtDuration(cost.cur.waitLongest)}</b>
+                            {")"}
                           </>
                         )}
                       </span>

@@ -79,7 +79,7 @@ export function buildDraftEntry({ listing, finishMs, analyses, listingId, listed
 }
 
 // What one AI run cost. `tally` is the running total from listingPipeline.
-export function buildAiEntry({ tally, source, draftId, category, categoryId, at, waitMs }) {
+export function buildAiEntry({ tally, source, draftId, category, categoryId, at, waitMs, phase }) {
   if (!tally || (!tally.inTokens && !tally.outTokens)) return null;
   return {
     kind: "ai",
@@ -95,6 +95,11 @@ export function buildAiEntry({ tally, source, draftId, category, categoryId, at,
     // How long that queue took to answer. The number that decides whether
     // batching is worth keeping — see docs/Plans/Batch Analysis Plan.md.
     waitMs: cleanMs(waitMs),
+    // Which trip through the queue: 1 (the photos) or 2 (eBay's questions).
+    // 0 when it wasn't queued at all. A draft writes one entry per phase,
+    // and the phase is part of the entry's id so the second can't land on
+    // top of the first.
+    phase: cleanInt(phase, 2),
     draftId: String(draftId || "").slice(0, 60),
   };
 }
@@ -143,6 +148,7 @@ export function cleanEntry(e) {
       cost: cleanMoney(e.cost),
       batch: e.batch === true || e.batch === "true",
       waitMs: cleanMs(e.waitMs),
+      phase: cleanInt(e.phase, 2),
       draftId: String(e.draftId || "").slice(0, 60),
     };
   }
@@ -152,13 +158,14 @@ export function cleanEntry(e) {
 // Stable storage id, so a repeat of the same event overwrites instead of
 // double counting (the camera's draft request can be retried by the host).
 export function entryId(e) {
-  // An AI run is keyed by the draft AND where it came from, so the camera's
-  // retried request rewrites its own entry rather than counting twice, while
-  // a later manual re-analysis of the same draft is its own entry.
+  // An AI run is keyed by the draft, where it came from, AND which queue
+  // phase it was — so the camera's retried request rewrites its own entry
+  // rather than counting twice, a later manual re-analysis is its own entry,
+  // and phase 2 can't land on top of phase 1 and hide half the cost.
   if (e.kind === "ai") {
     const safe = String(e.draftId || "").replace(/[^A-Za-z0-9_-]/g, "");
     const tail = safe || `${Date.parse(e.at)}_${Math.random().toString(36).slice(2, 8)}`;
-    return `ai_${e.source}_${tail}`;
+    return `ai_${e.source}${e.phase || ""}_${tail}`;
   }
   const key = e.kind === "camera" ? e.draftId : e.listingId;
   const safe = String(key || "").replace(/[^A-Za-z0-9_-]/g, "");

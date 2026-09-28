@@ -119,7 +119,7 @@ export async function forceLive(draftId, why = "") {
   }
 }
 
-async function logCost(tally, draft, waitMs) {
+async function logCost(tally, draft, waitMs, phase) {
   try {
     const entry = buildAiEntry({
       tally,
@@ -128,6 +128,7 @@ async function logCost(tally, draft, waitMs) {
       category: draft.listing?.categoryName,
       categoryId: draft.listing?.categoryId,
       waitMs,
+      phase,
     });
     if (entry) await writeEntry(entry);
   } catch (err) {
@@ -211,7 +212,7 @@ async function advance(row) {
       batch: nextBatch,
       savedAt: new Date().toISOString(),
     });
-    await logCost(tally, { ...draft, listing }, waited);
+    await logCost(tally, { ...draft, listing }, waited, 1);
     // The camera entry gets its category now that we know it.
     try {
       const entry = buildCameraEntry({
@@ -250,7 +251,7 @@ async function advance(row) {
     batch: null,
     savedAt: new Date().toISOString(),
   });
-  await logCost(tally, { ...draft, listing }, waited);
+  await logCost(tally, { ...draft, listing }, waited, 2);
   return "done";
 }
 
