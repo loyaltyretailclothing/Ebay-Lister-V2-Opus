@@ -15,7 +15,7 @@
 // Listings without titleParts (existing drafts, or an AI response missing the
 // pieces) are left completely untouched.
 
-import { applyTwoInchAsterisk } from "./descriptionTemplate";
+import { applyTwoInchAsterisk, titleSizeOverride } from "./descriptionTemplate";
 
 export const TITLE_MAX = 80;
 export const MAX_KEYWORDS = 15;
@@ -108,13 +108,17 @@ export function shortItemName(title, observations) {
 // Fixed part of the title: [NWT] Brand [Style Name] Item Type Gender Size Color
 export function buildBaseTitle(parts, observations) {
   if (!parts) return "";
+  // When the 2-inch rule fires the size is decided here, not by the AI —
+  // otherwise a model that wrote the tag size into the title made the rule
+  // do nothing at all. See titleSizeOverride.
+  const size = titleSizeOverride(observations) || cleanPart(parts.size);
   const base = [
     parts.nwt ? "NWT" : "",
     cleanPart(parts.brand),
     cleanPart(parts.style_name),
     cleanPart(parts.type),
     cleanPart(parts.gender),
-    cleanPart(parts.size),
+    size,
     cleanPart(parts.color),
   ]
     .filter(Boolean)
