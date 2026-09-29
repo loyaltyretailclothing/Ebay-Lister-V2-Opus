@@ -2,6 +2,18 @@
 
 Ideas we want to come back to. Nothing here is built or agreed in detail yet. See [[Home]], [[Open Issues]], [[Decision Log]].
 
+## 0. Learn from what you correct (users' pick 2026-09-28 — "a great idea and we need to save that")
+**The idea:** every time the AI proposes a title, a keyword or an item specific and you change it before listing, that's a graded answer. You produce ~450 of them a month and the app throws every one away.
+
+**What it does:** record the difference between what the AI proposed and what was actually listed. Once a week, one cheap pass over the last couple of hundred differences looks for patterns — *"you rewrite Slim Fit to Tailored Fit on every Bonobos"*, *"you delete Preppy from keywords 80% of the time"*, *"Size Type is wrong 30% of the time on Big & Tall"*. Those become house rules in the prompt.
+
+**Why it's the big one:** it compounds. Every month it's more accurate on *your* inventory rather than clothing in general. And it's the only route to the biggest prize in the app — **selective review instead of checking everything**. Draft finishing is 3m 06s × 450 = **23 hours a month**; knowing which fields are reliable is what turns that into "three things need you" and gives a dozen hours back. Every other saving discussed is rounding error next to it.
+
+**Cost:** capturing the differences costs nothing (a diff of two objects already in memory at List on eBay). Only the weekly pattern-read costs anything — pennies.
+
+**Open questions:** telling "the AI was wrong" apart from "I changed my mind"; how many weeks before the patterns mean anything; whether the house rules go in the prompt or into a per-category memory.
+
+
 ## 1. Selling what's already listed: offers to watchers + automatic markdowns (top pick)
 - **What:** on a schedule (e.g. every morning), the app checks active eBay listings and applies rules the users set once. No AI — just rules and arithmetic.
   - **Offers:** e.g. listed 14+ days with watchers, no offer sent in the last 7 days → send watchers 10% off (eBay's own "send offer to interested buyers").
