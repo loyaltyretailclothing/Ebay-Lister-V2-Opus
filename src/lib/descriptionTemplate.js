@@ -1,4 +1,4 @@
-﻿// Pure description-template helpers â€” safe to import from client components.
+// Pure description-template helpers — safe to import from client components.
 //
 // These were originally in listingPipeline.js, but that module pulls in the
 // Anthropic SDK and eBay API helpers at the top level, which breaks when
@@ -7,8 +7,8 @@
 // Camera server pipeline uses.
 
 // A bottom's size, in whatever shape it was written:
-//   "32x30" Â· "Waist 27, Inseam 7" Â· "W32" Â· "Men's 33" Â· "30"
-// Returns { waist, inseam } with null for anything not stated â€” shorts very
+//   "32x30" · "Waist 27, Inseam 7" · "W32" · "Men's 33" · "30"
+// Returns { waist, inseam } with null for anything not stated — shorts very
 // often have a waist and no inseam. A letter size (M, L, XL) is NOT a waist
 // measurement and returns null, so the 2-inch rule can never touch it.
 export function parseBottomSize(sizeStr) {
@@ -17,7 +17,7 @@ export function parseBottomSize(sizeStr) {
   const bare = s.replace(/^men'?s\s*/i, "").replace(/\s+/g, " ").trim();
   if (/^(XS|S|M|L|XL|XXL|[2-7]XL|SMALL|MEDIUM|LARGE)$/i.test(bare)) return null;
 
-  const both = /(\d{1,2}(?:\.\d)?)\s*[xÃ—]\s*(\d{1,2}(?:\.\d)?)/i.exec(s);
+  const both = /(\d{1,2}(?:\.\d)?)\s*[x×]\s*(\d{1,2}(?:\.\d)?)/i.exec(s);
   if (both) return { waist: Number(both[1]), inseam: Number(both[2]) };
 
   const waist = /waist\D{0,6}(\d{1,2}(?:\.\d)?)/i.exec(s);
@@ -63,7 +63,7 @@ export function checkTwoInchRule(observations) {
   return diffs.some((d) => d >= 2);
 }
 
-// Static condition boilerplate â€” used for BOTH the eBay conditionDescription
+// Static condition boilerplate — used for BOTH the eBay conditionDescription
 // field and the opening of the main item description.
 export function getConditionBoilerplate(condition) {
   const boilerplate =
@@ -96,7 +96,7 @@ export function buildDescription(title, condition, observations) {
 //
 // The app used to only add an asterisk to whatever size the AI had already
 // written, so if the model put the TAG size in the title the rule fired and
-// achieved nothing â€” no asterisk, and the wrong size shown. Deciding it here
+// achieved nothing — no asterisk, and the wrong size shown. Deciding it here
 // makes it certain rather than instructed.
 //
 // The shape follows the tag: a tag reading W34 gives "31*", not "31x9*",
@@ -111,7 +111,7 @@ export function titleSizeOverride(observations) {
     : `${measured.waist}*`;
 }
 
-// Apply the 2-inch-rule asterisk to pant size in a title (e.g. "32x30" â†’
+// Apply the 2-inch-rule asterisk to pant size in a title (e.g. "32x30" →
 // "32x30*"). No-op if not a pants item or the rule doesn't apply. Also
 // re-truncates to 80 chars if the added asterisk pushed past the limit.
 export function applyTwoInchAsterisk(title, observations) {
@@ -129,7 +129,7 @@ export function applyTwoInchAsterisk(title, observations) {
     tag?.inseam != null && measured.waist != null && measured.inseam != null;
 
   // With both halves it's an unmistakable "32x30". With a waist alone it's
-  // a bare number, which could just as easily be the 7 in "7 Inch Inseam" â€”
+  // a bare number, which could just as easily be the 7 in "7 Inch Inseam" —
   // so only mark it when that number appears exactly once in the title.
   let sizeStr;
   if (useBoth) {
@@ -143,7 +143,7 @@ export function applyTwoInchAsterisk(title, observations) {
     return title;
   }
   if (!title.includes(sizeStr)) return title;
-  // Already applied (the assembled title adds it up front) â€” don't double it.
+  // Already applied (the assembled title adds it up front) — don't double it.
   if (title.includes(`${sizeStr}*`)) return title;
   let next = title.replace(new RegExp(`\\b${sizeStr}\\b`), sizeStr + "*");
   if (next.length > 80) next = next.substring(0, 80);
@@ -164,7 +164,7 @@ export function applyDescriptionTemplate(listing) {
     next.condition,
     next.observations
   );
-  // Always overwrite condition_description with the static boilerplate â€”
+  // Always overwrite condition_description with the static boilerplate —
   // the AI's attempt is discarded (decision: we don't trust AI flaw lists).
   next.condition_description = getConditionBoilerplate(next.condition);
   return next;
