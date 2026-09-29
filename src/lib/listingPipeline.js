@@ -113,7 +113,8 @@ You must return a JSON object with these fields:
 Rules:
 - KEYWORDS: follow the KEYWORDS rules above — SEO-ranked (Tier 1 best), 12-15 keywords, true for this item, no keyword spam
 - Be precise with brand names — spell them exactly as shown
-- 2-INCH RULE (pants/shorts/jeans only): If measured waist OR inseam differs from tag by 2+ inches, use the MEASURED size in the title and in observations.size. Always populate observations.tag_size and observations.measured_size with their respective values — the app will auto-build the 'Tag - X / Measures Y' lines in the description.
+- SIZE COMES FROM THE TAG. The size in the title and in observations.size is the size printed on the tag, always. NEVER change it because a measurement suggests a different size — a 48" chest on a shirt tagged M is still an M. If a measurement disagrees with the tag, say so in notes_for_seller and leave the size alone.
+- 2-INCH RULE — the ONE exception to the rule above, and it applies ONLY to trousers, jeans and shorts whose tag size is a waist x inseam number such as 32x30. It NEVER applies to anything sized S/M/L/XL, and NEVER to a top of any kind. If the measured waist OR inseam differs from the tag by 2+ inches, use the MEASURED waist x inseam in the title and in observations.size. Always populate observations.tag_size and observations.measured_size with their respective values — the app will auto-build the 'Tag - X / Measures Y' lines in the description.
 - NWT = tags are visibly attached in photos
 - Look at ALL photos carefully — tags, labels, measurements, defects
 - If you cannot determine a field, use null

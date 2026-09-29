@@ -16,7 +16,11 @@ Rules: `src/lib/titleRules.js`. Assembly: `src/lib/titleKeywords.js`.
 - Overflow keywords go to **Theme**; keyword chips move them between title and Theme. Full details: [[Title Keywords Plan]].
 - NWT only for New With Tags (set from condition); never NWOT/NWD in titles.
 - No fabric filler words, fluff, RN numbers or style codes. Words already in the title are stripped from keywords.
-- **2-inch rule** (pants/shorts): if the measured waist or inseam differs from the tag by 2+ inches, use the measured size (asterisk added once).
+- **Size comes from the tag** (2026-09-29). The size in the title and in `observations.size` is what the tag says — the AI must never substitute a size it inferred from a measurement. A shirt tagged M with a 48" chest is still an M; the disagreement goes in the check-this notes instead.
+  - **Why:** the AI had been doing exactly that. A Tommy Bahama jumper went out titled **Large** while its tag said **M** and the AI's own `size` field said Medium. The prompt stated the 2-inch rule as "(pants/shorts/jeans only)" and the model generalised the principle — trust the measurement over the tag — to tops. The code couldn't stop it: `titleParts.size` comes straight from the AI and nothing cross-checked it.
+- **2-inch rule** — the single exception, narrowed 2026-09-29 to **trousers, jeans and shorts whose tag size is a waist × inseam number** such as `32x30`. Never on anything sized S/M/L/XL, never on a top. If the measured waist or inseam differs by 2+ inches, the measured size is used (asterisk added once).
+  - `checkTwoInchRule` already enforced the numeric part — `parsePantSize` only understands `32x30`, so letter-sized shorts could never trigger it. The leak was the prompt, not the code.
+  - **Known gap:** the rule is effectively dead on real shorts, because the AI writes measurements as `"Waist 27, Inseam 7"` rather than `32x30`, which `parsePantSize` can't read. To fix when bottoms' descriptions are done.
 
 ## Notes
 - **AI Note:** sent to Pass 1. Editing it after analysis only matters if you re-analyze.
