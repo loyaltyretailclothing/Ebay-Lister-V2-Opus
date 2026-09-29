@@ -3,7 +3,14 @@
 import { useState, useEffect } from "react";
 import SettingsShell from "@/components/settings/SettingsShell";
 import Dialog from "@/components/ui/Dialog";
-import { PlusIcon, Spinner, StarIcon, TrashIcon } from "@/components/ui/Icons";
+import {
+  ChevronDownIcon,
+  ChevronUpIcon,
+  PlusIcon,
+  Spinner,
+  StarIcon,
+  TrashIcon,
+} from "@/components/ui/Icons";
 
 const GROUPS = [
   { type: "payment", title: "Payment" },
@@ -77,6 +84,18 @@ export default function PoliciesPage() {
     const updated = { ...policies, [type]: list, [defaultKey(type)]: defaultId };
     setPolicies(updated);
     if (persist) save(updated);
+  }
+
+  // Move a policy up or down. The stored order is the order the Create
+  // Listing dropdown shows, so this is purely for reading order — eBay never
+  // sees it. The starred default follows its row rather than its position.
+  function move(type, index, dir) {
+    const list = policies[type] || [];
+    const to = index + dir;
+    if (to < 0 || to >= list.length) return;
+    const next = [...list];
+    [next[index], next[to]] = [next[to], next[index]];
+    change(type, next, policies[defaultKey(type)]);
   }
 
   function confirmRemove() {
@@ -170,6 +189,24 @@ export default function PoliciesPage() {
                           aria-label="eBay policy ID"
                           className={`polid input mono ${touch ? "h-9" : ""}`}
                         />
+                        <div className="polmove">
+                          <button
+                            type="button"
+                            aria-label={`Move ${p.label || p.id || "policy"} up`}
+                            disabled={i === 0}
+                            onClick={() => move(type, i, -1)}
+                          >
+                            <ChevronUpIcon className="size-[15px]" />
+                          </button>
+                          <button
+                            type="button"
+                            aria-label={`Move ${p.label || p.id || "policy"} down`}
+                            disabled={i === list.length - 1}
+                            onClick={() => move(type, i, 1)}
+                          >
+                            <ChevronDownIcon className="size-[15px]" />
+                          </button>
+                        </div>
                         <button
                           type="button"
                           className="btn btn-dq polremove"

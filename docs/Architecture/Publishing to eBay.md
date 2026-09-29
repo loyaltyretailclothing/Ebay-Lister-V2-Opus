@@ -43,6 +43,16 @@ The route asks for **60 seconds** (`maxDuration`), like the posting run. It had 
 ## Conditions
 Our condition keys map to eBay condition IDs in `src/lib/conditions.js`. See [[Conditions by Category]].
 
+## Policy order is yours to set (2026-09-29)
+Settings → Policies lists each group in the order it is stored, and the Create
+Listing dropdown reads that same list with no sorting of its own
+(`useListingForm.js`). So the stored order is what you pick from. Up/down
+arrows on every row set it — eBay never sees the order.
+
+Added because the shipping policies read `$6.50, $8.50, $15, $12`. The starred
+default follows its own row when moved, so it never needs re-starring, and a
+policy can only move within its own group.
+
 ## Where listings say they ship from (fixed 2026-09-27)
 The **"Item location"** buyers see, and the origin zip for calculated shipping, come from the **inventory location** the offer names (`merchantLocationKey`) — **not** from the shipping business policy. A policy cannot set item location, which is why changing the policy never moved it.
 
