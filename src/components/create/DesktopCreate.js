@@ -95,6 +95,7 @@ function ActionBar({ editor: e, missing }) {
       </div>
 
       <div className="flex shrink-0 items-center gap-2">
+        <QueueButton editor={e} />
         <button type="button" className="btn" disabled={!canAnalyze} onClick={e.analyze}>
           {e.analyzing ? <Spinner className="size-3.5" /> : <AnalyzeIcon className="size-3.5" />}
           {e.analyzing ? "Analyzing…" : "Analyze Photos"}
@@ -108,9 +109,26 @@ function ActionBar({ editor: e, missing }) {
           {e.savingDraft && <Spinner className="size-3.5" />}
           {saveLabel}
         </button>
-        <ListButton editor={e} missing={missing} className="btn btn-primary btn-lg" />
       </div>
     </header>
+  );
+}
+
+// Top right. The only List on eBay is the one at the bottom of the details
+// column — a second copy up here was just another way to press it by
+// accident (users' call 2026-10-02). This slot sends a draft that never
+// reached Anthropic's queue back into it, at half price.
+function QueueButton({ editor: e }) {
+  // Only a draft the AI never finished with. One that has a title has been
+  // analyzed, and re-queueing would throw that away; one already waiting has
+  // nothing to re-send. The route refuses both as well.
+  const canQueue =
+    !!e.draftId && !e.listing.title?.trim() && !e.openBatch && !e.queueing && !e.loadingDraft;
+  return (
+    <button type="button" className="btn" disabled={!canQueue} onClick={e.sendToQueue}>
+      {e.queueing && <Spinner className="size-3.5" />}
+      {e.queueing ? "Sending…" : "Send To Queue"}
+    </button>
   );
 }
 

@@ -104,6 +104,7 @@ export default function useListingEditor() {
   // stray tap in the drafts list can't set it off.
   const [openBatch, setOpenBatch] = useState(null);
   const [forcing, setForcing] = useState(false);
+  const [queueing, setQueueing] = useState(false);
 
   const [drafts, setDrafts] = useState([]);
   const [draftsLoading, setDraftsLoading] = useState(false);
@@ -539,6 +540,36 @@ export default function useListingEditor() {
     }
   }, [draftId, forcing, loadDraft, refreshDrafts]);
 
+  // --- Send To Queue: put a draft that never reached the queue back in ----
+  // The opposite of Analyze now. When the submission fails — the Anthropic
+  // account out of funds was the real case (2026-10-02), but any hiccup
+  // reaching them does it — the draft is saved as an error with its photos
+  // and there is no way back: "Analyze now" cancels a place in the queue,
+  // and a draft that never got submitted has no place to cancel. Without
+  // this the only way on was a fresh live analysis at full price.
+  const sendToQueue = useCallback(async () => {
+    if (!draftId || queueing) return;
+    setQueueing(true);
+    setError("");
+    try {
+      const res = await fetch("/api/drafts/requeue", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ draftId }),
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error || "Couldn't send that draft to the queue");
+      const mine = (data.results || [])[0];
+      if (mine?.error) throw new Error(mine.error);
+      await loadDraft(draftId);
+      refreshDrafts();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setQueueing(false);
+    }
+  }, [draftId, queueing, loadDraft, refreshDrafts]);
+
   // --- Skip Draft: saves the instant it is ticked, and only that ----------
   const toggleSkip = useCallback(
     async (checked) => {
@@ -910,6 +941,8 @@ export default function useListingEditor() {
     openBatch,
     forcing,
     forceDraft,
+    queueing,
+    sendToQueue,
     // prompts
     leavePrompt,
     leaveCancel,

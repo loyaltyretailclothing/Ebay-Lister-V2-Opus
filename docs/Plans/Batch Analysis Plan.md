@@ -56,6 +56,36 @@ Aaron's wording, 2026-09-28: "by Force" is the app stepping in, *not* the user c
 ## Tested locally 2026-09-28 — nothing queued for real
 22 checks on the state machine with Anthropic, eBay and Cloudinary stubbed: phase 1 → usable draft + phase 2 queued; phase 2 → specifics land; waiting left alone; expired → run live and marked `force`; stuck over 20 hours → run live; **Analyze now** stays plain `Ready`; **Finish now** fills only the specifics and keeps edits made since; no category → still a usable draft with nothing further queued. Cost recorded at exactly half. In the browser, all five row states render on phone and desktop, and only phase 1 is locked.
 
+## Send To Queue — the way back in (2026-10-02)
+**What went wrong:** the Anthropic account ran out of funds and nine camera
+drafts failed to submit. `submitOne` threw, and `/api/drafts/process` saved
+each one as `error` with its photos, carrying Anthropic's own sentence:
+*"Your credit balance is too low to access the Anthropic API."* Nothing was
+charged and no batch exists.
+
+**Why there was no way back:** "Analyze now" is not a retry — it **cancels a
+place in the queue** and runs live. A draft that never got submitted has no
+place to cancel, so the button never even appears for it. The only route on
+was a fresh live analysis at full price.
+
+**The fix:** `POST /api/drafts/requeue` ( `{ draftIds }` or `{ draftId }` )
+reads the saved draft and submits the same `visionRequest` the camera would
+have — nothing is re-shot or re-uploaded, and the AI photo picks and AI note
+come with it. The draft flips to `queued`, phase 1, and its old error is
+cleared. It refuses a draft that has a title (analyzed — re-queueing would
+throw away typed work), one already waiting, and one with no photos. The
+route answers per draft, so one failure doesn't hide the rest, and an
+out-of-funds reply is turned into plain words rather than a wall of JSON.
+
+**Where the button is:** top right of Create Listing, desktop only —
+**Send To Queue · Analyze Photos · Update Draft**. It took the slot of a
+second **List on eBay**, which was removed: the one at the bottom of the
+details column is now the only way to list (users' call 2026-10-02).
+Mobile was deliberately left alone.
+
+**Not yet exercised for real.** Submitting costs money and the account was
+empty, so the first live press is still to come.
+
 ## Known gaps
 - **Nothing has been through the real queue yet** — the wait times are the whole point and are unknown until it runs. The tracker will answer it within a week.
 - If the real median wait turns out to be hours rather than minutes, the fix already scoped is Aaron's one-tap category at review, which collapses the whole thing to a single call and a single trip. See [[AI Pipeline]].
