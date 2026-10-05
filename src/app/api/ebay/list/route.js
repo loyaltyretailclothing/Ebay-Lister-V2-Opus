@@ -3,6 +3,7 @@ import { EBAY_BASE_URL } from "@/lib/constants";
 import { CONDITION_MAP } from "@/lib/conditions";
 import { evaluateSkuLookup, offerWasListed } from "@/lib/skuGuard";
 import { localToUtcIso } from "@/lib/localTime";
+import { htmlForEbay } from "@/lib/descriptionTemplate";
 import { NextResponse } from "next/server";
 
 // CONDITION_MAP (our enum -> { condition, conditionId }) is now the shared
@@ -123,9 +124,10 @@ export async function POST(request) {
     if (!price) return NextResponse.json({ success: false, error: "Price is required" }, { status: 400 });
     if (!photos?.length) return NextResponse.json({ success: false, error: "At least one photo is required" }, { status: 400 });
 
-    // Convert plain-text newlines to HTML <br> so eBay renders line breaks
-    // (stored in state as \n for a clean textarea UX)
-    const itemDescriptionHtml = (item_description || "").replace(/\n/g, "<br>");
+    // The description is stored as plain text so the textarea reads cleanly.
+    // Bold the headings and turn the newlines into <br> on the way out — see
+    // htmlForEbay in descriptionTemplate.js.
+    const itemDescriptionHtml = htmlForEbay(item_description);
 
     const token = await getUserToken();
 

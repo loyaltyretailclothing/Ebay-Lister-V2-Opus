@@ -138,10 +138,6 @@ export function isTop(observations) {
   return TOP_WORDS.some((w) => type.includes(w));
 }
 
-// "90% Cotton, 10% Polyester" → "90% cotton, 10% polyester" mid-sentence,
-// but leave brand-ish words alone (Brrr Nylon, Supima).
-const lowerFirst = (s) => (s ? s.charAt(0).toLowerCase() + s.slice(1) : "");
-
 const CONDITION_WORDS = {
   NEW_WITH_TAGS: "New with tags",
   NEW_WITHOUT_TAGS: "New without tags",
@@ -151,23 +147,10 @@ const CONDITION_WORDS = {
   PRE_OWNED_FAIR: "Pre-owned, fair",
 };
 
-// One line saying what it is, built from what the AI saw. Anything missing is
-// simply left out rather than padded — a half-known sentence reads worse than
-// a short one.
-function openerSentence(o) {
-  const bits = [];
-  const shape = [o?.neckline, o?.style, o?.type].filter(Boolean).join(" ").trim();
-  if (shape) bits.push(shape);
-  const first = bits.length ? bits.join(" ") : o?.type || "";
-  const sentences = [];
-  if (first) {
-    sentences.push(o?.features ? `${first} with ${lowerFirst(o.features)}.` : `${first}.`);
-  } else if (o?.features) {
-    sentences.push(`${o.features}.`);
-  }
-  if (o?.material) sentences.push(`${o.material}.`);
-  return sentences.join(" ");
-}
+// There is no opening sentence. One built from the observation fields read
+// like what it was — "Hooded Regular Fit Hooded Flannel Jacket with
+// drawstring hood" — and an AI-written one was judged not worth the effort
+// for what it adds (users' call 2026-10-05). The title says what the item is.
 
 // The AI's observations bag is free-form, so a measurement turns up under
 // whatever key it felt like: chest_measurement_in, chest_measurement_inches,
@@ -245,17 +228,11 @@ export function flawLines(flaws) {
 function buildBody(title, condition, o, flaws, measures) {
   const lines = [];
 
-  lines.push(`<b>${title || ""}</b>`);
+  lines.push(title || "");
   lines.push("");
 
-  const opener = openerSentence(o);
-  if (opener) {
-    lines.push(opener);
-    lines.push("");
-  }
-
   if (measures.length) {
-    lines.push("<b>Measurements</b>");
+    lines.push("Measurements");
     // Tag size first — it's what the buyer looked for in the title, and the
     // measurements are there to check it against.
     if (o.tag_size) lines.push(`Tag size: ${o.tag_size}`);
@@ -270,7 +247,7 @@ function buildBody(title, condition, o, flaws, measures) {
     lines.push("");
   }
 
-  lines.push(`<b>Condition</b> — ${CONDITION_WORDS[condition] || "Pre-owned"}`);
+  lines.push(`Condition — ${CONDITION_WORDS[condition] || "Pre-owned"}`);
   const found = flawLines(flaws);
   lines.push(found.length === 1 ? `Flaws: ${found[0]}` : "Flaws:");
   if (found.length > 1) for (const f of found) lines.push(`• ${f}`);
@@ -288,14 +265,41 @@ function buildBody(title, condition, o, flaws, measures) {
   // docs/Plans/AI Notes Plan.md.
   lines.push("");
 
-  const footer = [];
-  if (o.style_number) footer.push(`Style ${o.style_number}`);
-  footer.push("Ships USPS Ground Advantage");
-  lines.push(footer.join(" · "));
+  lines.push("Ships USPS Ground Advantage");
   if (measures.length) {
     lines.push("Compare these measurements with something in your own wardrobe for the best fit.");
   }
   return lines.join("\n");
+}
+
+// The description is stored as plain text so the box on the Create Listing
+// page reads cleanly — markup in a field you edit by hand is noise (users'
+// call 2026-10-05). The bold goes on here, on the way out to eBay: the title
+// line, the Measurements heading and the Condition label.
+//
+// Matching on the line's own text means a heading the seller has renamed
+// simply isn't bolded, which is the right failure. Lines that already carry
+// tags — drafts written before this change — are left exactly as they are.
+export function htmlForEbay(text) {
+  const src = String(text || "");
+  if (!src.trim()) return "";
+  let seenFirst = false;
+  const out = src.split("\n").map((raw) => {
+    const line = raw.trimEnd();
+    if (!line.trim()) return line;
+    // The first line with anything on it is the title — count it even when it
+    // already carries tags, or an older draft's title is skipped and the next
+    // bare line gets bolded in its place.
+    const isTitle = !seenFirst;
+    seenFirst = true;
+    if (line.includes("<b>")) return line;
+    if (isTitle) return `<b>${line}</b>`;
+    if (line === "Measurements") return "<b>Measurements</b>";
+    const cond = /^(Condition)( — .*)$/.exec(line);
+    if (cond) return `<b>${cond[1]}</b>${cond[2]}`;
+    return line;
+  });
+  return out.join("\n").replace(/\n/g, "<br>");
 }
 
 // Tops: chest and length. Nothing is estimated — a measurement the AI didn't
