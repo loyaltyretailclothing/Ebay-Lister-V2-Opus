@@ -114,7 +114,7 @@ You must return a JSON object with these fields:
     "style_number": "Style number, model number, or product code from tag — NOT RN numbers, NOT UPC/barcodes, NOT care codes. null if not found.",
     "...any other details you observe": "Include ALL details you can identify from the photos"
   },
-  "flaws": [{ "color": "One of: red, orange, blue, green, black, white — the colour of the arrow marking this flaw", "photo": "Which AI photo the arrow is in, as a number", "where": "Where on the garment, a few words (e.g. 'left cuff', 'right front thigh')", "text": "One short sentence describing the flaw, or null for a white arrow — see FLAWS" }],
+  "flaws": [{ "color": "One of: red, purple, blue, green, black, white — the colour of the arrow marking this flaw", "photo": "Which AI photo the arrow is in, as a number", "where": "Where on the garment, a few words (e.g. 'left cuff', 'right front thigh')", "text": "One short sentence describing the flaw, or null for a white arrow — see FLAWS" }],
   "notes_for_seller": ["Short 'check this' note for the seller — see NOTES FOR SELLER. Empty array when you are confident."]
 }
 
@@ -124,14 +124,17 @@ Rules:
     * A flaw entry REQUIRES a coloured arrow you can actually SEE lying on the garment in one of these photos. No visible arrow, no entry. There is no other way for a flaw to get into the list.
     * If you see NO arrow in any photo, "flaws" is [] — an empty array. This is the normal case and it is the correct answer even when the garment plainly shows wear, pilling, fading, marks, loose threads or damage. Say NOTHING about any of it — not in flaws, not in notes_for_seller, not anywhere. An unmarked mark is not a flaw. A worn-looking garment with no arrows has no flaws.
     * NEVER infer a flaw from the condition of the garment, from how used it looks, or from your own judgement. If you find yourself writing a flaw because you noticed something rather than because you saw an arrow, stop and delete it.
-  When an arrow IS visible, the COLOUR tells you what kind of flaw it is — do not work it out yourself:
-    red = hole, tear or rip · orange = stain or discoloration · blue = pilling or fabric wear · green = fading · black = broken or missing hardware (button, zip, drawstring) · white = the seller will describe this one himself
+  When an arrow IS visible, the COLOUR tells you what kind of flaw it is — do not work it out yourself. Each colour allows a SHORT LIST of words, and you pick exactly ONE of them, whichever fits what you can see:
+    red = hole / tear / rip · purple = stain / discoloration · blue = pilling / fabric wear · green = fading · black = the broken or missing part, named (button, zip pull, drawstring) · white = the seller will describe this one himself
+  A black arrow is the hard one to spot: it is a smooth tapered arrow with a sharp point, and on a dark garment it can look like a drawcord or a strap. Look again before deciding there is no arrow.
   And then:
-    1. The colour decides the kind. A red arrow is a hole even if it looks like a stain to you. Never contradict the colour.
-    2. NEVER say how big a flaw is. No "small", "large", "quarter-sized", no measurements. The photos show it.
-    3. Two or more arrows of the SAME colour on one garment = ONE entry covering both, naming both places (e.g. "Holes at the left cuff and right elbow"). Never two entries of the same colour.
-    4. WHITE IS DIFFERENT. Set "text": null and describe nothing at all — the seller writes that one. Each white arrow is its own entry; white NEVER merges with anything, not even another white.
-    5. "photo" is which AI photo the arrow appears in, counting the photos you were given in order — the same numbering as notes_for_seller.
+    1. PICK ONE WORD from that colour's list — never two, never joined by "or". Do NOT write "hole or tear", "pilling or fabric wear", "stain or discoloration". Choose the one that matches what you can see and write only that: "Tear at the left cuff", not "Hole or tear at the left cuff".
+    2. You may ONLY use words from the arrow's own list. A green arrow is fading — never "fabric wear", which belongs to blue. A red arrow is a hole, tear or rip even if it looks like a stain to you. Never cross from one colour's list to another's.
+    3. Write it as a short plain sentence: the thing, then where it is. "Hole at the left cuff." "Discoloration on the right front." "Pilling under both arms." "Fading across the shoulders." Nothing else — no hedging, no "visible", no "appears to be".
+    4. NEVER say how big a flaw is. No "small", "large", "quarter-sized", no measurements. The photos show it.
+    5. Two or more arrows of the SAME colour on one garment = ONE entry covering both, naming both places (e.g. "Holes at the left cuff and right elbow"). Never two entries of the same colour.
+    6. WHITE IS DIFFERENT. Set "text": null and describe nothing at all — the seller writes that one. Each white arrow is its own entry; white NEVER merges with anything, not even another white.
+    7. "photo" is which AI photo the arrow appears in, counting the photos you were given in order — the same numbering as notes_for_seller.
 - KEYWORDS: follow the KEYWORDS rules above — SEO-ranked (Tier 1 best), 12-15 keywords, true for this item, no keyword spam
 - Be precise with brand names — spell them exactly as shown
 - SIZE COMES FROM THE TAG. The size in the title and in observations.size is the size printed on the tag, always. NEVER change it because a measurement suggests a different size — a 48" chest on a shirt tagged M is still an M. If a measurement disagrees with the tag, say so in notes_for_seller and leave the size alone.
@@ -148,7 +151,7 @@ Rules:
 - Return ONLY valid JSON, no markdown or explanation`;
 
 // The six arrow colours and nothing else. See docs/Plans/Flaws Plan.md.
-const ARROW_COLORS = ["red", "orange", "blue", "green", "black", "white"];
+const ARROW_COLORS = ["red", "purple", "blue", "green", "black", "white"];
 
 // Tidy the AI's flaws array into something the app can trust. Anything whose
 // colour isn't one of the six is dropped — a flaw whose kind we can't read

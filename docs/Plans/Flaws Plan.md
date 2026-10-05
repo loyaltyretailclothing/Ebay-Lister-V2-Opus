@@ -19,22 +19,49 @@ whether a shadow is a stain. Flaws are marked; anything unmarked is not a
 flaw. That is what makes `Flaws: None` a statement instead of a guess, and it
 is what stops invented flaws.
 
-## The colours (Aaron's call 2026-09-29)
-| Colour | Meaning |
-|---|---|
-| Red | Hole, tear or rip |
-| Orange | Stain or discoloration |
-| Blue | Pilling or fabric wear |
-| Green | Fading |
-| Black | Broken or missing hardware — button, zip, drawstring |
-| **White** | **Hands off. A real flaw, but the seller writes the words.** |
+## The colours (Aaron's call 2026-09-29; purple corrected 2026-10-05)
+Each colour allows a **short list of words**, and the AI picks exactly **one**
+of them — whichever matches what it can see.
+
+| Colour | Pick one of | |
+|---|---|---|
+| Red | hole / tear / rip | |
+| Purple | stain / discoloration | |
+| Blue | pilling / fabric wear | |
+| Green | fading | |
+| Black | name the part | broken or missing button, zip pull, drawstring |
+| **White** | **nothing** | **a real flaw, but the seller writes the words** |
+
+**Never two words joined by "or"**, and never a word from another colour's
+list. Those are two different faults and both turned up on the first real
+test (2026-10-05): the hedging — *"Hole or tear at the left cuff"*, *"Pilling
+or fabric wear at the left side seam"* — which reads badly to a buyer; and a
+**green** arrow described as *"Fabric wear visible near pocket opening"*,
+which is blue's meaning. Reciting the list is what let it drift.
+
+A single fixed word per colour was tried first and rejected the same day: it
+would have called every purple arrow a stain even when the mark was plainly
+discoloration. **Picking one from a list is not the same as reciting the
+list** — the first is accuracy, the second is hedging.
+
+**It is purple, not orange** (2026-10-05). The shop's stock photo showed an
+orange arrow and the key was written from it; the arrows that arrived are
+purple. This matters: `cleanFlaws` drops any colour outside the six, so a
+purple arrow against an "orange" key would have been thrown away silently.
 
 - **Black gets the rarest type on purpose.** It is the hardest colour to see,
   and black clothing is common. Missing hardware is rare, so the risk is low.
+- **Black was missed on the first real test** (2026-10-05). The arrow was
+  pointing at a zip pull and lying along the navy drawcords of a dark flannel
+  — same darkness, same thickness, same tapered shape. It read as a third
+  drawstring. The prompt now tells the model to look twice for it, but this is
+  a contrast problem, not a prompt problem: **lay a black arrow against lighter
+  fabric** where it can't be mistaken for a cord. Rule of thumb — if you would
+  struggle to spot the arrow in the photo yourself, so will the AI.
 - **White is a flaw, not just a flag** (Aaron, 2026-09-29). It means something
   IS wrong. Used when the AI would struggle, or when the wording has to be
   exact.
-- Red, orange, blue and green read clearly against almost anything and should
+- Red, purple, blue and green read clearly against almost anything and should
   carry the everyday work.
 
 ## The field — 8b, BUILT 2026-10-02
