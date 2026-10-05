@@ -86,7 +86,6 @@ You must return a JSON object with these fields:
   "title": "Your own complete title following the TITLE FORMULA — used only as a backup if title_parts is missing.",
   "category_keywords": "2-3 keywords to search eBay categories (e.g. 'mens dress shirt')",
   "condition": "One of: NEW_WITH_TAGS, NEW_WITHOUT_TAGS, NEW_WITH_DEFECTS, PRE_OWNED_EXCELLENT, PRE_OWNED_GOOD, PRE_OWNED_FAIR",
-  "condition_description": "For pre-owned items, describe the condition in detail including any flaws. For NWT or NWOT, leave as empty string.",
   "observations": {
     "brand": "The brand name exactly as shown",
     "style_name": "The specific product line or model name (e.g. 'Tech Fleece', 'Retro-X', 'Detroit Jacket', 'Crown Comfort', 'Soul Survivor Sun Protection'). Apply the SAME rules as the title's [Style Name] slot — skip fabric technologies (Dri-FIT, HeatGear, ClimaCool, Omni-Wick), marketing adjectives alone (Pro, Elite, Premium, Performance), and style codes/SKUs. Must match the [Style Name] slot in the title. null if no confident style name exists.",
@@ -120,6 +119,19 @@ You must return a JSON object with these fields:
 }
 
 Rules:
+- FLAWS — READ THIS FIRST, AND BEFORE YOU WRITE THE flaws FIELD.
+  You are NOT the one who decides whether this garment has a flaw. The seller decides, by laying a coloured magnetic arrow on the garment and photographing it. Your only job is to read arrows.
+    * A flaw entry REQUIRES a coloured arrow you can actually SEE lying on the garment in one of these photos. No visible arrow, no entry. There is no other way for a flaw to get into the list.
+    * If you see NO arrow in any photo, "flaws" is [] — an empty array. This is the normal case and it is the correct answer even when the garment plainly shows wear, pilling, fading, marks, loose threads or damage. Say NOTHING about any of it — not in flaws, not in notes_for_seller, not anywhere. An unmarked mark is not a flaw. A worn-looking garment with no arrows has no flaws.
+    * NEVER infer a flaw from the condition of the garment, from how used it looks, or from your own judgement. If you find yourself writing a flaw because you noticed something rather than because you saw an arrow, stop and delete it.
+  When an arrow IS visible, the COLOUR tells you what kind of flaw it is — do not work it out yourself:
+    red = hole, tear or rip · orange = stain or discoloration · blue = pilling or fabric wear · green = fading · black = broken or missing hardware (button, zip, drawstring) · white = the seller will describe this one himself
+  And then:
+    1. The colour decides the kind. A red arrow is a hole even if it looks like a stain to you. Never contradict the colour.
+    2. NEVER say how big a flaw is. No "small", "large", "quarter-sized", no measurements. The photos show it.
+    3. Two or more arrows of the SAME colour on one garment = ONE entry covering both, naming both places (e.g. "Holes at the left cuff and right elbow"). Never two entries of the same colour.
+    4. WHITE IS DIFFERENT. Set "text": null and describe nothing at all — the seller writes that one. Each white arrow is its own entry; white NEVER merges with anything, not even another white.
+    5. "photo" is which AI photo the arrow appears in, counting the photos you were given in order — the same numbering as notes_for_seller.
 - KEYWORDS: follow the KEYWORDS rules above — SEO-ranked (Tier 1 best), 12-15 keywords, true for this item, no keyword spam
 - Be precise with brand names — spell them exactly as shown
 - SIZE COMES FROM THE TAG. The size in the title and in observations.size is the size printed on the tag, always. NEVER change it because a measurement suggests a different size — a 48" chest on a shirt tagged M is still an M. If a measurement disagrees with the tag, say so in notes_for_seller and leave the size alone.
@@ -132,17 +144,7 @@ Rules:
 - STYLE NUMBER: If you see a style number, model number, or product code on any tag, capture it in the style_number field. Do NOT capture RN numbers, UPC/barcodes, or care instruction codes — those are not style numbers.
 - NECKLINE: Infer neckline from item type, not just visuals. Hoodies = Crew Neck. Quarter zips = Mock Neck. Polo shirts = Collared. V-neck sweaters = V-Neck. Always fill this field — never leave it null.
 - BUTTON-DOWN SHIRTS — CATEGORY RULE (does NOT affect title): The ONLY way to choose the category for button-down shirts is the SIZE TAG format. Letter sizes (S, M, L, XL, 2XL, 3XL, etc.) = category_keywords must be "mens casual button down shirt". Numeric neck sizes (14.5, 15, 15.5, 16, 16.5, 17, etc.) = category_keywords must be "mens dress shirt". Do NOT use the shirt's appearance, fabric, or style to decide the category — ONLY the size format on the tag matters. The title should describe the shirt naturally (brand, features, size, color, etc.) — do NOT force "Casual Button-Down" or "Dress Shirt" into the title.
-- FLAWS: the seller marks every flaw with a coloured magnetic arrow laid beside it. THE ARROW'S COLOUR TELLS YOU WHAT THE FLAW IS — do not work it out yourself:
-    red = hole, tear or rip · orange = stain or discoloration · blue = pilling or fabric wear · green = fading · black = broken or missing hardware (button, zip, drawstring) · white = the seller will describe this one himself
-  Rules, all of them absolute:
-    1. ONLY report a flaw that has an arrow pointing at it. If you can see something that looks like a flaw and there is no arrow on it, say NOTHING about it — not in flaws, not in notes_for_seller. An unmarked mark is not a flaw.
-    2. No arrows anywhere means the item has no flaws: return an empty array.
-    3. The colour decides the kind. A red arrow is a hole even if it looks like a stain to you. Never contradict the colour.
-    4. NEVER say how big a flaw is. No "small", "large", "quarter-sized", no measurements. The photos show it.
-    5. Two or more arrows of the SAME colour on one garment = ONE entry covering both, naming both places (e.g. "Holes at the left cuff and right elbow"). Do not write them separately.
-    6. WHITE IS DIFFERENT. Set "text": null and describe nothing at all — the seller writes that one. Each white arrow is its own entry; white NEVER merges with anything, not even another white.
-    7. "photo" is which AI photo the arrow appears in, counting the photos you were given in order — the same numbering as notes_for_seller.
-- NOTES FOR SELLER: notes_for_seller is a short "check this" list for the seller, read before listing. Add a note ONLY when you are genuinely unsure about something that could cause a return or a wrong listing — at most 3 notes, each one short sentence (under 20 words), starting with what to check. Good reasons: the size tag is not visible or unreadable and the size is a guess; the tag size and the measurements disagree; a possible flaw you are not sure about (say which photo as "AI photo N", counting the photos you were given in order — these are the AI Analysis Photos, not the listing photos); the brand or style is a best guess; a measurement you would expect is missing or unreadable (name which one). Do NOT add notes for things you are confident about, do NOT restate the listing, and do NOT give general advice. When you are confident about everything, return an empty array.
+- NOTES FOR SELLER: notes_for_seller is a short "check this" list for the seller, read before listing. Add a note ONLY when you are genuinely unsure about something that could cause a return or a wrong listing — at most 3 notes, each one short sentence (under 20 words), starting with what to check. Good reasons: the size tag is not visible or unreadable and the size is a guess; the tag size and the measurements disagree; the brand or style is a best guess; a measurement you would expect is missing or unreadable (name which one). Do NOT add notes for things you are confident about, do NOT restate the listing, and do NOT give general advice. When you are confident about everything, return an empty array.
 - Return ONLY valid JSON, no markdown or explanation`;
 
 // The six arrow colours and nothing else. See docs/Plans/Flaws Plan.md.

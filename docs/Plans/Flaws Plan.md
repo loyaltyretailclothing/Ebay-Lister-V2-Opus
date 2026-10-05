@@ -75,6 +75,46 @@ guess must never reach a buyer. `flawSeed`, `isFlawTodo` and `hasUnwrittenFlaw`
 (`descriptionTemplate.js`) turn the entries into the lines the Flaws box
 starts with, and answer the question the post block asks.
 
+## It invented flaws on the first real garment — fixed 2026-10-05
+An L.L.Bean flannel hooded jacket, no arrows on it anywhere, came back with
+**two blue flaws** citing "AI photo 1" — the plain front shot. All five AI
+photos were checked by hand: front, brand label, size tag, material tag, care
+tag. **Not one arrow.** It also broke the merge rule (two blue entries instead
+of one) and put *"Check hood edge and cuffs closely for fabric wear"* in the
+AI Note, which rule 1 forbids outright.
+
+**Cause: the prompt contradicted itself**, and the contradiction was older
+than the flaws system. Three places told it to hunt for flaws:
+
+1. `"condition_description": "...describe the condition in detail including
+   any flaws."` — in the schema, far ABOVE the flaws rules. **And the app
+   throws that field away** (`applyDescriptionTemplate` always overwrites it
+   with the boilerplate), so it was costing tokens, producing nothing, and
+   breaking the flaws system.
+2. `notes_for_seller` listed *"a possible flaw you are not sure about"* as a
+   good reason for a note.
+3. The FLAWS rules sat near the END of a long rules list.
+
+It obeyed the earlier instructions, found real wear on a used flannel, and
+expressed it through the new field — treating the colour key as a vocabulary
+("that's pilling, pilling is blue") rather than as something to look for.
+
+**The fix:** `condition_description` removed from the schema entirely, the
+flaw reason removed from `notes_for_seller`, and the FLAWS rules moved to
+**first** in the rules list with the point made plainly — *you are not the one
+who decides whether this garment has a flaw; the seller decides, by laying an
+arrow on it.* An empty array is stated as the correct answer **even when the
+garment plainly shows wear**.
+
+**Verified on the same five photos:** `flaws: []`, `notes_for_seller: []`, no
+flaw talk anywhere, measurements still read correctly (chest 42, length 24).
+
+**What this says about the 2026-10-04 test.** That run returned `[]` and was
+recorded as "rule 1 holds on a real call". Those photos had nothing obviously
+wrong with them, so an empty array proved almost nothing. **A negative test
+needs a garment with real, visible, unmarked wear** — that is the only version
+of it worth running.
+
 ## What the AI does
 - Reads **colour and position only.** Never judges severity, never describes a
   flaw that has no arrow.
@@ -161,6 +201,10 @@ white gets its own ⚠ line.
 ## Decided, not to be re-litigated
 - **Arrow photos go to buyers**, like any other listing photo. The arrow points
   at something real either way, and it shows nothing is being hidden.
+- **An arrow photo must ALSO be in the AI Analysis Photos.** The AI only ever
+  sees that set — a photo that is only in the eBay listing photos is invisible
+  to it, so the flaw will never be reported. Aaron confirmed 2026-10-05 that
+  arrow shots go in both from now on.
 - **No warning** when a line is deleted while an arrow is still visible in the
   photos. It is a judgment call made with the item in hand, and the app
   nagging would get old fast. (Noted consequence: `Flaws: None` can print with
