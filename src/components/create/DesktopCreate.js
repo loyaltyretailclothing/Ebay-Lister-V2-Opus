@@ -120,11 +120,14 @@ function ActionBar({ editor: e, missing }) {
 // accident (users' call 2026-10-02). This slot sends a draft that never
 // reached Anthropic's queue back into it, at half price.
 function QueueButton({ editor: e }) {
-  // Only a draft the AI never finished with. One that has a title has been
-  // analyzed, and re-queueing would throw that away; one already waiting has
-  // nothing to re-send. The route refuses both as well.
+  // The same rule as Analyze Photos, deliberately: AI photos picked, not
+  // already busy (users' call 2026-10-04 — "I just want the send to que
+  // button to work how the analyze button works"). It is the same job at
+  // half price, so it should not be fussier about when you can press it.
+  // A listing built from scratch has no draft yet; sendToQueue saves one
+  // first. Keying this on draftId greyed it out on every new listing.
   const canQueue =
-    !!e.draftId && !e.listing.title?.trim() && !e.openBatch && !e.queueing && !e.loadingDraft;
+    e.aiPhotos.length > 0 && !e.queueing && !e.savingDraft && !e.loadingDraft && !e.openBatch;
   return (
     <button type="button" className="btn" disabled={!canQueue} onClick={e.sendToQueue}>
       {e.queueing && <Spinner className="size-3.5" />}

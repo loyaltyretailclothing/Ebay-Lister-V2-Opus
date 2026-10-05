@@ -23,14 +23,15 @@ import { submitOne } from "@/lib/batchAnalyze";
 
 export const maxDuration = 60;
 
-// A draft is re-queueable only if the AI never finished with it. A draft
-// with a title has been analyzed — re-queueing would throw away whatever
-// has been typed since.
+// This is Analyze Photos at half price, so it refuses the same things Analyze
+// would and nothing more (users' call 2026-10-04). An ALREADY ANALYZED draft
+// is allowed through on purpose: queueing it re-runs the analysis, exactly as
+// pressing Analyze Photos again does, and replaces what the AI wrote the same
+// way. The button must never be enabled while the route would refuse.
 function whyNot(draft) {
   if (!draft) return "Draft not found";
   if (draft.status === "queued" && draft.batch?.id) return "Already in the queue";
   if (draft.status === "processing") return "Still being analyzed";
-  if (draft.listing?.title) return "Already analyzed — use Re-analyze instead";
   if (!(draft.listingPhotos || []).length) return "No photos on this draft";
   return null;
 }
@@ -54,7 +55,8 @@ async function requeueOne(id) {
     aiPhotos,
     listingPhotos,
     status: "queued",
-    // Phase 1 again from the top — nothing of this draft was ever analyzed.
+    // Phase 1 from the top, whether this draft has been analyzed before or
+    // not — the same fresh start Analyze Photos gives it.
     batch: { id: batchId, phase: 1, at: new Date().toISOString() },
     // The old failure is answered; don't leave it on the row.
     errorMessage: "",

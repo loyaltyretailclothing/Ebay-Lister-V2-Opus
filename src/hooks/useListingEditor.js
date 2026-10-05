@@ -398,7 +398,9 @@ export default function useListingEditor() {
         setSaveFlash(true);
         setTimeout(() => setSaveFlash(false), 3000);
         refreshDrafts();
-        return true;
+        // The id, not just true: setDraftId above won't be readable until the
+        // next render, and Send To Queue needs it in the same breath.
+        return data.id;
       }
       setSaveError(data.error || "Save failed");
     } catch (err) {
@@ -548,27 +550,32 @@ export default function useListingEditor() {
   // and a draft that never got submitted has no place to cancel. Without
   // this the only way on was a fresh live analysis at full price.
   const sendToQueue = useCallback(async () => {
-    if (!draftId || queueing) return;
+    if (queueing) return;
     setQueueing(true);
     setError("");
     try {
+      // A listing built from scratch has photos but no draft yet — the queue
+      // reads a SAVED draft, so save it first and queue the id that comes
+      // back. Nothing else to ask of the user.
+      const id = draftId || (await saveDraft());
+      if (!id) throw new Error("Couldn't save this draft, so it wasn't queued");
       const res = await fetch("/api/drafts/requeue", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ draftId }),
+        body: JSON.stringify({ draftId: id }),
       });
       const data = await res.json();
       if (!data.success) throw new Error(data.error || "Couldn't send that draft to the queue");
       const mine = (data.results || [])[0];
       if (mine?.error) throw new Error(mine.error);
-      await loadDraft(draftId);
+      await loadDraft(id);
       refreshDrafts();
     } catch (err) {
       setError(err.message);
     } finally {
       setQueueing(false);
     }
-  }, [draftId, queueing, loadDraft, refreshDrafts]);
+  }, [draftId, queueing, saveDraft, loadDraft, refreshDrafts]);
 
   // --- Skip Draft: saves the instant it is ticked, and only that ----------
   const toggleSkip = useCallback(
