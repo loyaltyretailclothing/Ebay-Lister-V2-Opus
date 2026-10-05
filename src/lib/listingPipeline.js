@@ -29,6 +29,7 @@ const SONNET_OUTPUT_PER_M = 10;
 const MODEL = "claude-sonnet-5";
 const NO_THINKING = { type: "disabled" };
 
+
 // The reply text (skips any non-text blocks).
 function replyText(response) {
   return response.content
@@ -93,6 +94,13 @@ You must return a JSON object with these fields:
     "size": "Size as shown on tag or measured",
     "measured_size": "Measured size if visible, otherwise null",
     "tag_size": "Tag size if visible, otherwise null",
+    "measurements": {
+      "chest_in": "Tops: chest in WHOLE inches, read off the tape in the photos. A number only — no quotes, no units, no text. null if not measured.",
+      "length_in": "Tops: length in WHOLE inches. Number only. null if not measured.",
+      "waist_in": "Bottoms: waist in WHOLE inches. Number only. null if not measured.",
+      "rise_in": "Bottoms: rise in WHOLE inches — the MEASURED rise off the tape, not the Low/Mid/High estimate above. Number only. null if not measured.",
+      "inseam_in": "Bottoms: inseam in WHOLE inches. Number only. null if not measured."
+    },
     "gender": "Mens, Womens, Unisex, Boys, Girls",
     "material": "Material/fabric if visible on tag",
     "country_of_manufacture": "Country if visible on tag/label, otherwise null",
@@ -107,6 +115,7 @@ You must return a JSON object with these fields:
     "style_number": "Style number, model number, or product code from tag — NOT RN numbers, NOT UPC/barcodes, NOT care codes. null if not found.",
     "...any other details you observe": "Include ALL details you can identify from the photos"
   },
+  "flaws": [{ "color": "One of: red, orange, blue, green, black, white — the colour of the arrow marking this flaw", "photo": "Which AI photo the arrow is in, as a number", "where": "Where on the garment, a few words (e.g. 'left cuff', 'right front thigh')", "text": "One short sentence describing the flaw, or null for a white arrow — see FLAWS" }],
   "notes_for_seller": ["Short 'check this' note for the seller — see NOTES FOR SELLER. Empty array when you are confident."]
 }
 
@@ -115,6 +124,7 @@ Rules:
 - Be precise with brand names — spell them exactly as shown
 - SIZE COMES FROM THE TAG. The size in the title and in observations.size is the size printed on the tag, always. NEVER change it because a measurement suggests a different size — a 48" chest on a shirt tagged M is still an M. If a measurement disagrees with the tag, say so in notes_for_seller and leave the size alone.
 - 2-INCH RULE — the ONE exception to the rule above, and it applies ONLY to trousers, jeans and shorts whose tag size is a waist x inseam number such as 32x30. It NEVER applies to anything sized S/M/L/XL, and NEVER to a top of any kind. If the measured waist OR inseam differs from the tag by 2+ inches, use the MEASURED waist x inseam in the title and in observations.size. Always populate observations.tag_size and observations.measured_size with their respective values — the app will auto-build the 'Tag - X / Measures Y' lines in the description.
+- MEASUREMENTS: fill observations.measurements by reading the tape measure in the photos. WHOLE inches, a plain number in each slot — never a sentence, never a unit, never a range. NEVER estimate a measurement you cannot see on a tape: if it isn't measured, the value is null. The seller measures every item, so a measurement you cannot read is probably there and unreadable rather than absent — say which one in notes_for_seller. Keep filling observations.measured_size as well, in your own words; the numbered slots are what the listing prints.
 - NWT = tags are visibly attached in photos
 - Look at ALL photos carefully — tags, labels, measurements, defects
 - If you cannot determine a field, use null
@@ -122,8 +132,45 @@ Rules:
 - STYLE NUMBER: If you see a style number, model number, or product code on any tag, capture it in the style_number field. Do NOT capture RN numbers, UPC/barcodes, or care instruction codes — those are not style numbers.
 - NECKLINE: Infer neckline from item type, not just visuals. Hoodies = Crew Neck. Quarter zips = Mock Neck. Polo shirts = Collared. V-neck sweaters = V-Neck. Always fill this field — never leave it null.
 - BUTTON-DOWN SHIRTS — CATEGORY RULE (does NOT affect title): The ONLY way to choose the category for button-down shirts is the SIZE TAG format. Letter sizes (S, M, L, XL, 2XL, 3XL, etc.) = category_keywords must be "mens casual button down shirt". Numeric neck sizes (14.5, 15, 15.5, 16, 16.5, 17, etc.) = category_keywords must be "mens dress shirt". Do NOT use the shirt's appearance, fabric, or style to decide the category — ONLY the size format on the tag matters. The title should describe the shirt naturally (brand, features, size, color, etc.) — do NOT force "Casual Button-Down" or "Dress Shirt" into the title.
-- NOTES FOR SELLER: notes_for_seller is a short "check this" list for the seller, read before listing. Add a note ONLY when you are genuinely unsure about something that could cause a return or a wrong listing — at most 3 notes, each one short sentence (under 20 words), starting with what to check. Good reasons: the size tag is not visible or unreadable and the size is a guess; the tag size and the measurements disagree; a possible flaw you are not sure about (say which photo as "AI photo N", counting the photos you were given in order — these are the AI Analysis Photos, not the listing photos); the brand or style is a best guess; no measurements are visible. Do NOT add notes for things you are confident about, do NOT restate the listing, and do NOT give general advice. When you are confident about everything, return an empty array.
+- FLAWS: the seller marks every flaw with a coloured magnetic arrow laid beside it. THE ARROW'S COLOUR TELLS YOU WHAT THE FLAW IS — do not work it out yourself:
+    red = hole, tear or rip · orange = stain or discoloration · blue = pilling or fabric wear · green = fading · black = broken or missing hardware (button, zip, drawstring) · white = the seller will describe this one himself
+  Rules, all of them absolute:
+    1. ONLY report a flaw that has an arrow pointing at it. If you can see something that looks like a flaw and there is no arrow on it, say NOTHING about it — not in flaws, not in notes_for_seller. An unmarked mark is not a flaw.
+    2. No arrows anywhere means the item has no flaws: return an empty array.
+    3. The colour decides the kind. A red arrow is a hole even if it looks like a stain to you. Never contradict the colour.
+    4. NEVER say how big a flaw is. No "small", "large", "quarter-sized", no measurements. The photos show it.
+    5. Two or more arrows of the SAME colour on one garment = ONE entry covering both, naming both places (e.g. "Holes at the left cuff and right elbow"). Do not write them separately.
+    6. WHITE IS DIFFERENT. Set "text": null and describe nothing at all — the seller writes that one. Each white arrow is its own entry; white NEVER merges with anything, not even another white.
+    7. "photo" is which AI photo the arrow appears in, counting the photos you were given in order — the same numbering as notes_for_seller.
+- NOTES FOR SELLER: notes_for_seller is a short "check this" list for the seller, read before listing. Add a note ONLY when you are genuinely unsure about something that could cause a return or a wrong listing — at most 3 notes, each one short sentence (under 20 words), starting with what to check. Good reasons: the size tag is not visible or unreadable and the size is a guess; the tag size and the measurements disagree; a possible flaw you are not sure about (say which photo as "AI photo N", counting the photos you were given in order — these are the AI Analysis Photos, not the listing photos); the brand or style is a best guess; a measurement you would expect is missing or unreadable (name which one). Do NOT add notes for things you are confident about, do NOT restate the listing, and do NOT give general advice. When you are confident about everything, return an empty array.
 - Return ONLY valid JSON, no markdown or explanation`;
+
+// The six arrow colours and nothing else. See docs/Plans/Flaws Plan.md.
+const ARROW_COLORS = ["red", "orange", "blue", "green", "black", "white"];
+
+// Tidy the AI's flaws array into something the app can trust. Anything whose
+// colour isn't one of the six is dropped — a flaw whose kind we can't read
+// off an arrow is exactly what this system exists to avoid. A white arrow is
+// forced back to text:null however chatty the model got, because the seller
+// writes those and a model's guess must never reach a buyer.
+export function cleanFlaws(raw) {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((f) => {
+      const color = String(f?.color || "").trim().toLowerCase();
+      if (!ARROW_COLORS.includes(color)) return null;
+      const photo = Number(f?.photo);
+      const text = String(f?.text || "").trim();
+      return {
+        color,
+        where: String(f?.where || "").trim().slice(0, 80),
+        photo: Number.isInteger(photo) && photo > 0 ? photo : null,
+        text: color === "white" || !text ? null : text.slice(0, 200),
+      };
+    })
+    .filter(Boolean)
+    .slice(0, 12);
+}
 
 function parseListingJson(text) {
   try {
@@ -207,6 +254,11 @@ export function readVisionReply(responseText) {
       .filter(Boolean)
       .slice(0, 3);
     delete parsed.notes_for_seller;
+    // Arrow-marked flaws (8b). Kept as the raw signal — colour, place, photo
+    // — because the colour is the thing we trust and the Flaws box is seeded
+    // from it. An unknown colour is dropped rather than guessed at: the whole
+    // point is that the colour, not the model, decides what a flaw is.
+    parsed.flaws = cleanFlaws(parsed.flaws);
   }
   return assembleListingTitle(parsed);
 }

@@ -1,3 +1,5 @@
+import { hasUnwrittenFlaw } from "./descriptionTemplate";
+
 // The blank listing Create Listing starts from.
 export const INITIAL_LISTING = {
   title: "",
@@ -67,13 +69,19 @@ export function blankListingKeepingDefaults(prev) {
   };
 }
 
-// Title, category, price and SKU are required to list.
+// Title, category, price and SKU are required to list — and no flaw may still
+// be waiting to be written. A white arrow means the seller words that one
+// himself; posting with the placeholder still in the description would send a
+// buyer "White arrow, front panel — describe this one" as the flaw. Type the
+// flaw, type None, or delete the line: all three clear it.
+// See docs/Plans/Flaws Plan.md.
 export function missingRequired(listing) {
   return (
     !listing?.title ||
     !listing?.categoryId ||
     !listing?.price ||
-    !String(listing?.sku || "").trim()
+    !String(listing?.sku || "").trim() ||
+    hasUnwrittenFlaw(listing?.item_description)
   );
 }
 

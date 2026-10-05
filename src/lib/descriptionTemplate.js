@@ -6,6 +6,25 @@
 // lets the Generate page (a client component) share the exact same logic the
 // Camera server pipeline uses.
 
+// A number the AI wrote next to a word, in either order:
+//   "Waist 30" · "Waist: 30" · "34 waist" · "6 inch inseam"
+//
+// The number must sit NEXT TO its word. The pattern this replaced allowed
+// six characters of anything between them, which was enough to hop over a
+// comma: "34 waist, 7 inseam" bound the waist to the 7 that belonged to the
+// inseam, and a 34" waist went out as 7". Found 2026-10-02 on real drafts —
+// two saved shorts were titled 7* and 6* because of it.
+function labelledInches(text, word) {
+  const s = String(text || "");
+  const num = "(\\d{1,2}(?:\\.\\d)?)";
+  // Word first: only spaces or a colon/dash may sit between it and the number.
+  const after = new RegExp(`${word}\\s*[:\\-]?\\s*${num}`, "i").exec(s);
+  if (after) return Number(after[1]);
+  // Number first, optionally with a unit: "34 waist", "6 inch inseam".
+  const before = new RegExp(`${num}\\s*(?:in(?:ch(?:es)?)?\\.?\\s*)?${word}`, "i").exec(s);
+  return before ? Number(before[1]) : null;
+}
+
 // A bottom's size, in whatever shape it was written:
 //   "32x30" · "Waist 27, Inseam 7" · "W32" · "Men's 33" · "30"
 // Returns { waist, inseam } with null for anything not stated — shorts very
@@ -20,14 +39,9 @@ export function parseBottomSize(sizeStr) {
   const both = /(\d{1,2}(?:\.\d)?)\s*[x×]\s*(\d{1,2}(?:\.\d)?)/i.exec(s);
   if (both) return { waist: Number(both[1]), inseam: Number(both[2]) };
 
-  const waist = /waist\D{0,6}(\d{1,2}(?:\.\d)?)/i.exec(s);
-  const inseam = /inseam\D{0,6}(\d{1,2}(?:\.\d)?)/i.exec(s);
-  if (waist || inseam) {
-    return {
-      waist: waist ? Number(waist[1]) : null,
-      inseam: inseam ? Number(inseam[1]) : null,
-    };
-  }
+  const waist = labelledInches(s, "waist");
+  const inseam = labelledInches(s, "inseam");
+  if (waist != null || inseam != null) return { waist, inseam };
 
   // A lone number, with or without a W: that's the waist.
   const only = /^w?\s*(\d{2}(?:\.\d)?)\s*w?$/i.exec(bare);
@@ -41,6 +55,25 @@ export function parsePantSize(sizeStr) {
   return p && p.waist != null && p.inseam != null ? [p.waist, p.inseam] : null;
 }
 
+// One measurement the AI put in its own named slot — observations.measurements
+// .waist_in and friends. Whole inches, a plain number, no sentence to read.
+// Null when it wasn't measured. See docs/Plans/Future Features.md #8a.
+export function namedInches(observations, key) {
+  const v = observations?.measurements?.[key];
+  const n = typeof v === "number" ? v : Number(String(v ?? "").replace(/[^0-9.]/g, ""));
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+// What the tape says, for the 2-inch rule. The named numbers first, because
+// nothing can misread them; the written sentence only for drafts saved before
+// 8a, which have no named fields. Returns null when neither has anything.
+function measuredBottom(o) {
+  const prose = parseBottomSize(o?.measured_size) || {};
+  const waist = namedInches(o, "waist_in") ?? prose.waist ?? null;
+  const inseam = namedInches(o, "inseam_in") ?? prose.inseam ?? null;
+  return waist == null && inseam == null ? null : { waist, inseam };
+}
+
 // 2-inch rule: for pants/shorts/jeans, if tag vs measured waist OR inseam
 // differ by 2+ inches, surface both in the description so buyers know the
 // real fit.
@@ -50,8 +83,10 @@ export function checkTwoInchRule(observations) {
     itemType.includes(t)
   );
   if (!isBottom) return false;
+  // The tag stays a tag reading — it's what's printed on the label, not
+  // something measured, so it has no named field.
   const tag = parseBottomSize(observations?.tag_size);
-  const measured = parseBottomSize(observations?.measured_size);
+  const measured = measuredBottom(observations);
   if (!tag || !measured) return false;
 
   // Compare only what BOTH sides state. Shorts often have a waist and no
@@ -72,6 +107,239 @@ export function getConditionBoilerplate(condition) {
   if (condition === "NEW_WITHOUT_TAGS") return `New Without Tags! ${boilerplate}`;
   if (condition === "NEW_WITH_DEFECTS") return `New With Defects! ${boilerplate}`;
   return `Pre-owned condition! ${boilerplate}`;
+}
+
+// --- Tops ------------------------------------------------------------------
+// Shirts, polos, tees, jumpers, hoodies, jackets and coats — everything worn
+// above the waist takes the same two measurements, so they share one shape.
+// Bottoms are still on the old template below until we design them.
+// See docs/Plans/Description Plan.md.
+
+const TOP_WORDS = [
+  "shirt", "polo", "tee", "t-shirt", "sweater", "jumper", "hoodie", "sweatshirt",
+  "pullover", "jacket", "coat", "vest", "blazer", "cardigan", "henley", "top",
+  "quarter zip", "1/4 zip", "flannel", "turtleneck", "parka", "windbreaker",
+];
+
+// Bottoms are matched on whole words, because "Short Sleeve Shirt" contains
+// "short" and is emphatically not a pair of shorts. Skirts are in neither
+// list — no inseam, so they stay on the old template until we design them.
+const BOTTOM_RE =
+  /\b(pants?|jeans?|shorts|trousers?|chinos?|joggers?|sweatpants?|leggings?|slacks?|khakis?)\b/i;
+
+export function isBottom(observations) {
+  return BOTTOM_RE.test(`${observations?.type || ""}`);
+}
+
+export function isTop(observations) {
+  const type = `${observations?.type || ""}`.toLowerCase();
+  if (!type) return false;
+  if (isBottom(observations)) return false;
+  return TOP_WORDS.some((w) => type.includes(w));
+}
+
+// "90% Cotton, 10% Polyester" → "90% cotton, 10% polyester" mid-sentence,
+// but leave brand-ish words alone (Brrr Nylon, Supima).
+const lowerFirst = (s) => (s ? s.charAt(0).toLowerCase() + s.slice(1) : "");
+
+const CONDITION_WORDS = {
+  NEW_WITH_TAGS: "New with tags",
+  NEW_WITHOUT_TAGS: "New without tags",
+  NEW_WITH_DEFECTS: "New with defects",
+  PRE_OWNED_EXCELLENT: "Pre-owned, excellent",
+  PRE_OWNED_GOOD: "Pre-owned, good",
+  PRE_OWNED_FAIR: "Pre-owned, fair",
+};
+
+// One line saying what it is, built from what the AI saw. Anything missing is
+// simply left out rather than padded — a half-known sentence reads worse than
+// a short one.
+function openerSentence(o) {
+  const bits = [];
+  const shape = [o?.neckline, o?.style, o?.type].filter(Boolean).join(" ").trim();
+  if (shape) bits.push(shape);
+  const first = bits.length ? bits.join(" ") : o?.type || "";
+  const sentences = [];
+  if (first) {
+    sentences.push(o?.features ? `${first} with ${lowerFirst(o.features)}.` : `${first}.`);
+  } else if (o?.features) {
+    sentences.push(`${o.features}.`);
+  }
+  if (o?.material) sentences.push(`${o.material}.`);
+  return sentences.join(" ");
+}
+
+// The AI's observations bag is free-form, so a measurement turns up under
+// whatever key it felt like: chest_measurement_in, chest_measurement_inches,
+// or packed into a measured_size string like `Chest 49" / Length 30"`. Look
+// everywhere rather than trust one spelling. Returns inches, or null.
+export function measurementOf(observations, what) {
+  const o = observations || {};
+  // 8a: its own named slot, a plain number. Everything below is the old hunt,
+  // kept for drafts analyzed before those fields existed.
+  const named = namedInches(o, `${what}_in`);
+  if (named != null) return named;
+
+  for (const [key, value] of Object.entries(o)) {
+    if (!key.toLowerCase().startsWith(what)) continue;
+    if (!/measure|_in$|_inches$/i.test(key)) continue;
+    const n = Number(String(value).replace(/[^0-9.]/g, ""));
+    if (Number.isFinite(n) && n > 0) return n;
+  }
+  // Packed into a sentence: "Chest 49" / Length 30"" or "34 waist, 7 inseam".
+  const packed = `${o.measured_size || ""} ${typeof o.measurements === "string" ? o.measurements : ""}`;
+  return labelledInches(packed, what);
+}
+
+// Flaws are ALWAYS stated — "None" when there are none (users' call
+// 2026-09-28). Silence reads as an oversight; a plain "None" is an answer.
+// The list comes from the seller's Flaws box on the draft, seeded by the AI
+// and corrected by eye, so what's printed here has been looked at.
+// The mark on a flaw line the seller still has to write. A white arrow means
+// "a real flaw, but I'll word this one myself" (users' call 2026-09-29), so
+// the AI never describes it — this placeholder holds its place in the list
+// instead, and nothing may post while one is still there.
+export const FLAW_TODO = "⚠";
+
+// Anywhere in the line, not just at the start: by the time it reaches the
+// description a bullet sits in front of it, and the seller may have typed
+// around it. The marker appears nowhere else, so finding it is enough.
+export function isFlawTodo(line) {
+  return String(line || "").includes(FLAW_TODO);
+}
+
+// Does this draft still have a flaw nobody has worded? The post block asks
+// this. Clearing it means typing the real flaw, typing None, or deleting the
+// line — all three are deliberate, which is all a safety check should want.
+export function hasUnwrittenFlaw(lines) {
+  return (Array.isArray(lines) ? lines : String(lines || "").split("\n")).some(isFlawTodo);
+}
+
+// Seed the Flaws box from the arrows the AI read (8b). One line per entry —
+// the AI has already merged same-coloured arrows into a single line. White
+// arrows become the placeholder, naming the spot and the photo so the seller
+// can find the thing without hunting.
+export function flawSeed(flaws) {
+  if (!Array.isArray(flaws)) return [];
+  return flaws
+    .map((f) => {
+      if (f?.color === "white") {
+        const place = f.where ? `, ${f.where}` : "";
+        const shot = f.photo ? ` (AI photo ${f.photo})` : "";
+        return `${FLAW_TODO} White arrow${place}${shot} — describe this one`;
+      }
+      return String(f?.text || "").trim();
+    })
+    .filter(Boolean);
+}
+
+export function flawLines(flaws) {
+  const list = (Array.isArray(flaws) ? flaws : String(flaws || "").split("\n"))
+    .map((f) => String(f || "").trim())
+    .filter(Boolean);
+  return list.length ? list : ["None"];
+}
+
+// Everything except the measurement line is the same on tops and bottoms, so
+// each template works out its own measurements and hands them over.
+function buildBody(title, condition, o, flaws, measures) {
+  const lines = [];
+
+  lines.push(`<b>${title || ""}</b>`);
+  lines.push("");
+
+  const opener = openerSentence(o);
+  if (opener) {
+    lines.push(opener);
+    lines.push("");
+  }
+
+  if (measures.length) {
+    lines.push("<b>Measurements</b>");
+    // Tag size first — it's what the buyer looked for in the title, and the
+    // measurements are there to check it against.
+    if (o.tag_size) lines.push(`Tag size: ${o.tag_size}`);
+    lines.push(measures.join(" · "));
+    lines.push("");
+  } else if (o.tag_size) {
+    // No tape numbers, but the tag size still shows (users' call 2026-09-29).
+    // It's the one size fact we have and a buyer shouldn't have to go back up
+    // to the title for it. No "Measurements" heading over a line that isn't
+    // a measurement.
+    lines.push(`Tag size: ${o.tag_size}`);
+    lines.push("");
+  }
+
+  lines.push(`<b>Condition</b> — ${CONDITION_WORDS[condition] || "Pre-owned"}`);
+  const found = flawLines(flaws);
+  lines.push(found.length === 1 ? `Flaws: ${found[0]}` : "Flaws:");
+  if (found.length > 1) for (const f of found) lines.push(`• ${f}`);
+  // One line under the whole list, not one per flaw (users' call 2026-09-29),
+  // pointing the buyer at the photos rather than making them wonder.
+  if (!(found.length === 1 && found[0] === "None")) {
+    lines.push(
+      found.length > 1
+        ? "Pictures included in the photos."
+        : "Picture included in the photos."
+    );
+  }
+  // No seller note goes in here (users' call 2026-09-29). The Draft Note is
+  // for whoever finishes the draft and has never gone to eBay — see
+  // docs/Plans/AI Notes Plan.md.
+  lines.push("");
+
+  const footer = [];
+  if (o.style_number) footer.push(`Style ${o.style_number}`);
+  footer.push("Ships USPS Ground Advantage");
+  lines.push(footer.join(" · "));
+  if (measures.length) {
+    lines.push("Compare these measurements with something in your own wardrobe for the best fit.");
+  }
+  return lines.join("\n");
+}
+
+// Tops: chest and length. Nothing is estimated — a measurement the AI didn't
+// read off the photos simply doesn't appear.
+export function buildTopDescription(title, condition, observations, flaws = []) {
+  const o = observations || {};
+  const chest = measurementOf(o, "chest");
+  const length = measurementOf(o, "length");
+  const measures = [];
+  if (chest) measures.push(`Chest ${chest}"`);
+  if (length) measures.push(`Length ${length}"`);
+  return buildBody(title, condition, o, flaws, measures);
+}
+
+// --- Bottoms ---------------------------------------------------------------
+// Waist, rise and inseam — the three the seller measures.
+export function bottomMeasures(o) {
+  // Named numbers first (8a), then the written size — "32x30" is a shape only
+  // parseBottomSize understands — then the old hunt through the whole bag.
+  const measured = parseBottomSize(o?.measured_size);
+  const waistIn = namedInches(o, "waist_in") ?? measured?.waist ?? measurementOf(o, "waist");
+  const inseamIn = namedInches(o, "inseam_in") ?? measured?.inseam ?? measurementOf(o, "inseam");
+  const riseIn = measurementOf(o, "rise");
+
+  const parts = [];
+  // A letter-sized bottom (M, L, XL) nearly always has a stretch waistband,
+  // so the relaxed tape number reads as mismarked and costs the sale. The tag
+  // letter is the honest answer for the waist; rise and inseam are fixed
+  // cloth and stay in inches (users' call 2026-09-29).
+  // Only alongside a real measurement though — "Measurements / Tag size: M /
+  // Waist M" says the same thing twice and measures nothing.
+  if (o?.tag_size && parseBottomSize(o.tag_size) === null) {
+    if (riseIn || inseamIn) parts.push(`Waist ${o.tag_size}`);
+  } else if (waistIn) {
+    parts.push(`Waist ${waistIn}"`);
+  }
+  if (riseIn) parts.push(`Rise ${riseIn}"`);
+  if (inseamIn) parts.push(`Inseam ${inseamIn}"`);
+  return parts;
+}
+
+export function buildBottomDescription(title, condition, observations, flaws = []) {
+  const o = observations || {};
+  return buildBody(title, condition, o, flaws, bottomMeasures(o));
 }
 
 // Build the main item description body from template.
@@ -104,7 +372,7 @@ export function buildDescription(title, condition, observations) {
 export function titleSizeOverride(observations) {
   if (!checkTwoInchRule(observations)) return null;
   const tag = parseBottomSize(observations?.tag_size);
-  const measured = parseBottomSize(observations?.measured_size);
+  const measured = measuredBottom(observations);
   if (!measured || measured.waist == null) return null;
   return tag?.inseam != null && measured.inseam != null
     ? `${measured.waist}x${measured.inseam}*`
@@ -117,7 +385,7 @@ export function titleSizeOverride(observations) {
 export function applyTwoInchAsterisk(title, observations) {
   if (!title) return title;
   if (!checkTwoInchRule(observations)) return title;
-  const measured = parseBottomSize(observations.measured_size);
+  const measured = measuredBottom(observations);
   if (!measured) return title;
 
   // The size in the title follows the shape of the TAG, not the tape. A tag
@@ -159,11 +427,19 @@ export function applyDescriptionTemplate(listing) {
     next.title = next.title.substring(0, 80);
   }
   next.title = applyTwoInchAsterisk(next.title, next.observations);
-  next.item_description = buildDescription(
-    next.title,
-    next.condition,
-    next.observations
-  );
+
+  // Tops and bottoms get their own template; anything else — skirts, and
+  // whatever isn't clothing — keeps the original one until it is designed.
+  // Flaws come from the arrows the AI read (8b); a white arrow arrives as a
+  // placeholder the seller must word before the listing will post.
+  const obs = next.observations;
+  const flaws = flawSeed(next.flaws);
+  next.item_description = isTop(obs)
+    ? buildTopDescription(next.title, next.condition, obs, flaws)
+    : isBottom(obs)
+      ? buildBottomDescription(next.title, next.condition, obs, flaws)
+      : buildDescription(next.title, next.condition, obs);
+
   // Always overwrite condition_description with the static boilerplate —
   // the AI's attempt is discarded (decision: we don't trust AI flaw lists).
   next.condition_description = getConditionBoilerplate(next.condition);

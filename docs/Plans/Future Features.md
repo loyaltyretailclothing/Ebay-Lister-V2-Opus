@@ -48,6 +48,53 @@ Ideas we want to come back to. Nothing here is built or agreed in detail yet. Se
 - **Open questions:** which photos the AI reads when there's no review step (first few? all?), and where voice notes fit in.
 - **Why:** fewer taps per item across a sourcing trip.
 
+## 8. Named fields instead of free text, so every listing comes back the same shape (2026-09-29)
+**8a is BUILT 2026-10-02**, sitting uncommitted for the
+[[Release - Descriptions and Flaws|description release]]. 8b still to do.
+**The problem:** the prompt asks for measurements as ONE free-text field —
+`"measured_size": "Measured size if visible, otherwise null"`
+([[AI Pipeline]], `listingPipeline.js`). No format is requested, so the AI
+picks its own wording every listing: `32x30`, `Waist 30, Inseam 31`,
+`Waist 30" Rise 11" Inseam 31"`. There is no chest, length, waist, rise or
+inseam field at all — everything has to be dug back out of that one string.
+Line 108 makes it worse by inviting `"...any other details you observe"`,
+which is why flaws land under `fading` on one listing and `condition_details`
+on the next.
+
+**The fix — 8a, measurements as named numbers:**
+```
+"measurements": {
+  "chest_in":  "Chest in inches, number only. null if not measured.",
+  "length_in": "Length in inches, number only. null if not measured.",
+  "waist_in":  "Waist in inches, number only. null if not measured.",
+  "rise_in":   "Rise in inches, number only. null if not measured.",
+  "inseam_in": "Inseam in inches, number only. null if not measured."
+}
+```
+A number has no wording to vary. Keep `measured_size` as well — the
+[[AI Pipeline|2-inch rule]] and every saved draft depend on it. Keep `rise`
+as the Low/Mid/High guess too, because eBay wants it as an item specific;
+`rise_in` is the tape measure, and only that one is ever printed.
+
+**8b, a named field for anything the app reads.** Starting with flaws when the
+flaws box is built. The open-ended "any other details" can stay for extras
+nobody reads, but the app must never depend on it again.
+
+**Note:** 8a is really a prerequisite for [[Description Plan]] going live, not
+a someday item. The description digs measurements out of that free-text pile,
+and if the AI phrases it a way the code doesn't recognise, a listing goes out
+with no measurements at all.
+
+**A `temperature: 0` change was paired with this and has been removed**
+(2026-10-04): `claude-sonnet-5` rejects the parameter with a 400, so it would
+have broken every AI call. The argument it was making — that named fields make
+the AI consistent with *the app* while temperature would have made it
+consistent with *itself* — no longer has a second half. Named fields are the
+only one of the two that exists on this model. See
+[[Release - Descriptions and Flaws]].
+
+**Cost:** nothing worth counting, a handful of tokens on replies already paid for.
+
 ## 7. Prompt caching on the item specifics step (AI cost) — DECLINED 2026-09-28
 **Aaron's call: "a couple bucks a month doesn't seem worth it."** Don't raise it again unless AI spend changes shape (many more listings, or a much dearer model). The reasoning below stands if it's ever revisited.
 

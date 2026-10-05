@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import useListingForm from "@/hooks/useListingForm";
 import { listButtonLabel, missingRequired } from "@/lib/listingDefaults";
+import { hasUnwrittenFlaw } from "@/lib/descriptionTemplate";
 import { AnalyzeIcon, CheckIcon, ClockIcon, PlusIcon, Spinner, TrashIcon } from "@/components/ui/Icons";
 import HoldDialog from "@/components/create/HoldDialog";
 import LibraryPanel from "@/components/create/LibraryPanel";
@@ -133,8 +134,18 @@ function QueueButton({ editor: e }) {
 }
 
 function ListButton({ editor: e, missing, className }) {
+  // A disabled button with no reason is worse than no block at all. The ⚠
+  // line is sitting in the description saying "describe this one", but say so
+  // on the button too.
+  const unwritten = hasUnwrittenFlaw(e.listing?.item_description);
   return (
-    <button type="button" className={className} disabled={missing || e.submitting || e.loadingDraft} onClick={e.submit}>
+    <button
+      type="button"
+      className={className}
+      disabled={missing || e.submitting || e.loadingDraft}
+      title={unwritten ? "A flaw in the description still needs writing — see the ⚠ line" : undefined}
+      onClick={e.submit}
+    >
       {e.submitting && <Spinner className="size-3.5" />}
       {e.submitting ? "Listing on eBay…" : listButtonLabel(e.listing)}
     </button>

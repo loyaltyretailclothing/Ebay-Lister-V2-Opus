@@ -28,6 +28,39 @@ One item was due (Johnnie-O Brevard Henley, SKU C2421, $27.97, 13 photos). The r
 1. `src/lib/publishError.js` — `readReply` (reads the body as text, so an error page doesn't become a parse error) and `describeFailure` (our own sentence when there is one; otherwise `HTTP 504 — FUNCTION_INVOCATION_TIMEOUT`, or an error page reduced to its words). Used by **both** the hold run and List on eBay by hand, which had the same blind spot. Verified in the browser: the top bar showed `Failed: HTTP 504 — FUNCTION_INVOCATION_TIMEOUT` against a mocked reply, with nothing sent to eBay.
 2. `/api/ebay/list` now declares `maxDuration = 60`, like the hold run already did. It had none, so it took the platform's short default (~10-15 s) while doing 13 photo uploads plus three eBay calls. A timeout is the leading suspect but **not proven** — the EPS uploads run in parallel, and the run recorded no status or body. Vercel's runtime log for that invocation is the only place the real cause is written down.
 
+## The second failed posting morning — 2026-09-29 (`HTTP 401 — 401`)
+The message was `Couldn't post automatically — HTTP 401 — 401`. The new
+`describeFailure` did its job: this is readable, and it rules things out.
+
+**It was not our code.** The app has exactly one 401 — the cron's own guard in
+`post-held/route.js` — and it answers `{"error":"Not allowed"}`, which would
+have printed as `Not allowed`. Getting `HTTP 401 — 401` instead means
+`data.error` was not a sentence, so **the reply wasn't ours**: the body was
+literally `401`. The request never reached `/api/ebay/list`.
+
+**Leading suspect: the address the cron calls itself on.** The run doesn't
+call the listing code directly — it makes an HTTP request back to the site
+(`siteUrl()`), which uses `NEXT_PUBLIC_SITE_URL` if set and otherwise falls
+back to Vercel's `VERCEL_URL`. `VERCEL_URL` is the **deployment-specific**
+hostname, which Vercel Deployment Protection guards; the production domain is
+open. A guarded deployment URL answers 401.
+
+**Fix applied 2026-09-29:** Aaron added `NEXT_PUBLIC_SITE_URL` in Vercel
+(Production). Vercel refuses `visibility: secret` for anything with the
+`NEXT_PUBLIC_` prefix — it is compiled into the browser bundle — so it must be
+**Config**. `CRON_SECRET` stays **Secret**: no public prefix, never leaves the
+server, and it is what stops a stranger triggering a posting morning.
+
+**`NEXT_PUBLIC_` values are baked in at build time.** Saving the variable does
+nothing until the app is **redeployed**. Skipping that makes the next morning
+fail identically and look like the fix failed.
+
+**Not yet confirmed.** Whether *every* item failed with the same 401 is
+unknown — that is the test of this explanation. All of them failing the same
+way fits it exactly; one failing while others posted would mean the address
+was fine and the cause is elsewhere. Verify by holding an item for the next
+day and letting the real 7am run happen.
+
 ## Fallback if the crons ever stop running
 Post the day's held drafts when the app is first opened that morning (the users are in it daily). Not needed as of 2026-09-22. See [[Home]], [[Draft Queue Plan]], [[Drafts and Camera Flow]], [[Future Features]].
 
