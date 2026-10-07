@@ -19,14 +19,14 @@ whether a shadow is a stain. Flaws are marked; anything unmarked is not a
 flaw. That is what makes `Flaws: None` a statement instead of a guess, and it
 is what stops invented flaws.
 
-## The colours (Aaron's call 2026-09-29; purple corrected 2026-10-05)
+## The colours (Aaron's call 2026-09-29; superseded by the words, 2026-10-06)
 Each colour allows a **short list of words**, and the AI picks exactly **one**
 of them — whichever matches what it can see.
 
 | Colour | Pick one of | |
 |---|---|---|
 | Red | hole / tear / rip | |
-| Purple | stain / discoloration | |
+| Orange | stain / discoloration | |
 | Blue | pilling / fabric wear | |
 | Green | fading | |
 | Black | name the part | broken or missing button, zip pull, drawstring |
@@ -40,14 +40,113 @@ or fabric wear at the left side seam"* — which reads badly to a buyer; and a
 which is blue's meaning. Reciting the list is what let it drift.
 
 A single fixed word per colour was tried first and rejected the same day: it
-would have called every purple arrow a stain even when the mark was plainly
+would have called every STAIN arrow a stain even when the mark was plainly
 discoloration. **Picking one from a list is not the same as reciting the
 list** — the first is accuracy, the second is hedging.
 
-**It is purple, not orange** (2026-10-05). The shop's stock photo showed an
-orange arrow and the key was written from it; the arrows that arrived are
-purple. This matters: `cleanFlaws` drops any colour outside the six, so a
-purple arrow against an "orange" key would have been thrown away silently.
+**It was briefly recorded as purple** (2026-10-05), from hearsay rather than
+the arrows themselves. Corrected to orange on 2026-10-06 when the finished set
+was photographed. The lesson is worth keeping: `cleanFlaws` drops anything it
+does not recognise, so a key that disagrees with the physical arrows fails
+silently — nothing errors, the flaw simply never appears.
+
+## The word is the signal — BUILT 2026-10-06
+The arrows are made and the code reads them. `flaws` entries now carry a
+**word**, not a colour:
+
+```json
+{ "word": "HOLE", "photo": 3, "where": "left cuff",
+  "text": "Tear at the left cuff." }
+```
+
+`cleanFlaws` accepts eight words — **hole, stain, wear, fade, snag, zip,
+button, see note** — and drops anything else, the same way it used to drop an
+unknown colour. The colour is kept on the entry, derived from the word, purely
+so a blurred word can still be placed.
+
+**Merging moved from the colour to the word.** Two BUTTON arrows become one
+line; a ZIP and a BUTTON stay separate even though both are black.
+
+**The border is never the colour.** Every arrow has a contrasting border so it
+shows against the fabric — white edging on the dark bodies, black on the
+yellow and white ones. That only matters in the fallback case, but it matters
+a lot there: a red HOLE arrow read by its *white edge* becomes "white", which
+maps to SEE NOTE, losing the flaw type and blocking the listing instead. And
+the set contains the exact confusable pair — **white body with black border**
+(SEE NOTE) against **black body with white border** (ZIP, BUTTON), each the
+other's inverse. The prompt says it plainly: the colour is the wide middle
+where the word is, never the edge.
+
+**Measured at the size the AI is actually sent** (600px, quality 70): all
+fourteen arrows read correctly, every word and every colour, including
+`SEE NOTE` on one line. That settles the sizing question — the words are
+comfortably legible and the single-line SEE NOTE is fine after all.
+
+**It is ORANGE, not purple.** Settled by looking at the finished arrows
+(2026-10-06). The key had been written from a shop stock photo, corrected to
+purple on hearsay, and is now corrected to orange from the real thing.
+
+**Yellow became SNAG**, chosen by Aaron rather than left spare — a pulled
+thread is the most common flaw none of the other six cover.
+
+## Hand-made arrows with the word on them (made 2026-10-06)
+The magnetic arrows are being replaced by larger hand-painted cardboard ones
+with a thick white border and **the word printed on the arrow**. Reading a
+printed word is the most reliable thing a vision model does — far more
+reliable than judging a colour — so the word becomes the primary signal and
+the colour the fallback when it is blurred or cropped. That removes every
+colour-matching failure at once: black on navy, red on red, lime against
+yellow, and outlines colliding with the black and white meanings.
+
+**The words, kept short because the longest one sets the text size:**
+
+| Arrow | Word | Prints as |
+|---|---|---|
+| Red | HOLE | hole / tear / rip |
+| Orange | STAIN | stain / discoloration |
+| Blue | WEAR | pilling / fabric wear |
+| Green | FADE | fading |
+| Yellow | SNAG | snag / pulled thread |
+| Black | ZIP | the zip, broken or missing |
+| Black | BUTTON | the button, broken or missing |
+| White | SEE NOTE | *nothing — the seller writes it* |
+
+**White says SEE NOTE, not DESCRIBE** (Aaron's calls 2026-10-06). The arrows
+appear in buyer-facing photos, and DESCRIBE read as an instruction written for
+the app. SEE NOTE tells the buyer where to look instead.
+
+**It is stacked on two lines — SEE above NOTE.** On one line those eight
+characters print at a 0.27" cap, half the size of every other arrow and about
+11px in the AI's copy. Stacked, each line is four characters and prints at
+0.51" — the same as HOLE. The message costs nothing as long as it is not on
+one line.
+
+**Black is two arrows, ZIP and BUTTON**, rather than one generic hardware one.
+That is more useful to a buyer, and those are the two hardware faults that
+actually turn up. **Consequence: merging keys on the WORD, not the colour.**
+Two BUTTON arrows become one line; a ZIP and a BUTTON stay separate even
+though both are black.
+
+**The yellow arrow is deliberately unassigned** (2026-10-06). The candidates
+are SNAG (a pulled thread — the most common flaw none of the six cover), SEAM
+(a split seam, which a buyer reads differently from a hole, since a seam can
+be sewn) and PRINT (cracked graphics, only worth it if they list many printed
+tees). Rather than guess, **use the SEE NOTE arrow for a few weeks and see
+what keeps getting typed by hand** — that is what the catch-all is for, and
+the data decides the colour instead of us. Note that yellow is the weakest
+colour against cream, beige and light grey, so whatever it ends up meaning
+should ideally be a flaw that appears on darker garments.
+
+**Sizing, from what the AI is actually sent.** The analysis photo is 600px on
+its long edge. What matters is not the arrow's size in inches but **how much
+of the frame it fills** — at the framing used for flaw close-ups (arrow about
+a third of the width), a 5" arrow with these short words puts the cap height
+around 14px, which reads. The same arrow with a long word like DESCRIBE drops
+to 11px, and at 3.5" it falls to single figures. That is why the words are
+short: **the longest word sets the size for the whole set.**
+
+Finish: satin paint — enough sheen not to look chalky, not enough to throw a
+highlight across a letter.
 
 - **Black gets the rarest type on purpose.** It is the hardest colour to see,
   and black clothing is common. Missing hardware is rare, so the risk is low.
@@ -61,8 +160,35 @@ purple arrow against an "orange" key would have been thrown away silently.
 - **White is a flaw, not just a flag** (Aaron, 2026-09-29). It means something
   IS wrong. Used when the AI would struggle, or when the wording has to be
   exact.
-- Red, purple, blue and green read clearly against almost anything and should
+- Red, orange, blue and green read clearly against almost anything and should
   carry the everyday work.
+
+## What the arrows actually do, measured (2026-10-05)
+Eight drafts of one L.L.Bean flannel, one arrow colour at a time, then four
+of them re-run after the wording fix.
+
+| Arrow | Result |
+|---|---|
+| Red | ✅ "Tear at the left pocket and hem." |
+| Red ×2 | ✅ merged into one line naming both places |
+| Green | ✅ "Fading at the top of the hood." — **lime reads as green, not yellow** |
+| Blue | ✅ pilling |
+| White | ✅ no description, and a note telling the seller to write it |
+| Black | ❌ **missed, twice** |
+| No arrows | ✅ empty list |
+| Orange | **never tested as a colour — the words replaced it** |
+
+**Green was the one expected to fail** and it is reliable. **Black is the one
+that fails.**
+
+**The colour-only system was never fully proven** — orange never once reached
+the code under its old name, and the words replaced it before it could be.
+That is fine: the words are the signal now, and the colour is only a fallback.
+
+**Still to test:** the whole word system on a garment. Every result above was
+from the colour-only version, which the words have now replaced. Black failing
+twice is the result that still matters — the word on a black arrow should
+rescue it, and that is the single most valuable test left.
 
 ## The field — 8b, BUILT 2026-10-02
 Top level of the vision reply, beside `notes_for_seller`:

@@ -178,10 +178,10 @@ export function measurementOf(observations, what) {
 // 2026-09-28). Silence reads as an oversight; a plain "None" is an answer.
 // The list comes from the seller's Flaws box on the draft, seeded by the AI
 // and corrected by eye, so what's printed here has been looked at.
-// The mark on a flaw line the seller still has to write. A white arrow means
-// "a real flaw, but I'll word this one myself" (users' call 2026-09-29), so
-// the AI never describes it — this placeholder holds its place in the list
-// instead, and nothing may post while one is still there.
+// The mark on a flaw line the seller still has to write. A SEE NOTE arrow
+// means "a real flaw, but I'll word this one myself" (users' call
+// 2026-09-29), so the AI never describes it — this placeholder holds its
+// place in the list instead, and nothing may post while one is still there.
 export const FLAW_TODO = "⚠";
 
 // Anywhere in the line, not just at the start: by the time it reaches the
@@ -198,18 +198,20 @@ export function hasUnwrittenFlaw(lines) {
   return (Array.isArray(lines) ? lines : String(lines || "").split("\n")).some(isFlawTodo);
 }
 
-// Seed the Flaws box from the arrows the AI read (8b). One line per entry —
-// the AI has already merged same-coloured arrows into a single line. White
-// arrows become the placeholder, naming the spot and the photo so the seller
-// can find the thing without hunting.
+// The flaw lines, from the arrows the AI read (8b). One line per entry — the
+// AI has already merged arrows carrying the same word. A SEE NOTE arrow
+// becomes the placeholder, naming the spot and the photo so the seller can
+// find the thing without hunting.
 export function flawSeed(flaws) {
   if (!Array.isArray(flaws)) return [];
   return flaws
     .map((f) => {
-      if (f?.color === "white") {
+      // Keyed on the word, with the old colour kept as a fallback so drafts
+      // analyzed before the arrows carried words still read correctly.
+      if (f?.word === "see note" || (!f?.word && f?.color === "white")) {
         const place = f.where ? `, ${f.where}` : "";
         const shot = f.photo ? ` (AI photo ${f.photo})` : "";
-        return `${FLAW_TODO} White arrow${place}${shot} — describe this one`;
+        return `${FLAW_TODO} SEE NOTE arrow${place}${shot} — describe this one`;
       }
       return String(f?.text || "").trim();
     })

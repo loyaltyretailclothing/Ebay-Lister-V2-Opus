@@ -114,27 +114,32 @@ You must return a JSON object with these fields:
     "style_number": "Style number, model number, or product code from tag — NOT RN numbers, NOT UPC/barcodes, NOT care codes. null if not found.",
     "...any other details you observe": "Include ALL details you can identify from the photos"
   },
-  "flaws": [{ "color": "One of: red, purple, blue, green, black, white — the colour of the arrow marking this flaw", "photo": "Which AI photo the arrow is in, as a number", "where": "Where on the garment, a few words (e.g. 'left cuff', 'right front thigh')", "text": "One short sentence describing the flaw, or null for a white arrow — see FLAWS" }],
+  "flaws": [{ "word": "The word printed on the arrow, exactly: HOLE, STAIN, WEAR, FADE, SNAG, ZIP, BUTTON or SEE NOTE", "photo": "Which AI photo the arrow is in, as a number", "where": "Where on the garment the arrow POINTS, a few words (e.g. 'left cuff', 'right front thigh')", "text": "One short sentence naming the flaw and where it is, or null for SEE NOTE — see FLAWS" }],
   "notes_for_seller": ["Short 'check this' note for the seller — see NOTES FOR SELLER. Empty array when you are confident."]
 }
 
 Rules:
 - FLAWS — READ THIS FIRST, AND BEFORE YOU WRITE THE flaws FIELD.
-  You are NOT the one who decides whether this garment has a flaw. The seller decides, by laying a coloured magnetic arrow on the garment and photographing it. Your only job is to read arrows.
-    * A flaw entry REQUIRES a coloured arrow you can actually SEE lying on the garment in one of these photos. No visible arrow, no entry. There is no other way for a flaw to get into the list.
+  You are NOT the one who decides whether this garment has a flaw. The seller decides, by laying a MARKED ARROW on the garment and photographing it. The arrow is a thick cardboard arrow with a WORD printed across it. Your only job is to find those arrows and read them.
+    * A flaw entry REQUIRES an arrow you can actually SEE lying on the garment in one of these photos. No visible arrow, no entry. There is no other way for a flaw to get into the list.
     * If you see NO arrow in any photo, "flaws" is [] — an empty array. This is the normal case and it is the correct answer even when the garment plainly shows wear, pilling, fading, marks, loose threads or damage. Say NOTHING about any of it — not in flaws, not in notes_for_seller, not anywhere. An unmarked mark is not a flaw. A worn-looking garment with no arrows has no flaws.
     * NEVER infer a flaw from the condition of the garment, from how used it looks, or from your own judgement. If you find yourself writing a flaw because you noticed something rather than because you saw an arrow, stop and delete it.
-  When an arrow IS visible, the COLOUR tells you what kind of flaw it is — do not work it out yourself. Each colour allows a SHORT LIST of words, and you pick exactly ONE of them, whichever fits what you can see:
-    red = hole / tear / rip · purple = stain / discoloration · blue = pilling / fabric wear · green = fading · black = the broken or missing part, named (button, zip pull, drawstring) · white = the seller will describe this one himself
-  A black arrow is the hard one to spot: it is a smooth tapered arrow with a sharp point, and on a dark garment it can look like a drawcord or a strap. Look again before deciding there is no arrow.
-  And then:
-    1. PICK ONE WORD from that colour's list — never two, never joined by "or". Do NOT write "hole or tear", "pilling or fabric wear", "stain or discoloration". Choose the one that matches what you can see and write only that: "Tear at the left cuff", not "Hole or tear at the left cuff".
-    2. You may ONLY use words from the arrow's own list. A green arrow is fading — never "fabric wear", which belongs to blue. A red arrow is a hole, tear or rip even if it looks like a stain to you. Never cross from one colour's list to another's.
-    3. Write it as a short plain sentence: the thing, then where it is. "Hole at the left cuff." "Discoloration on the right front." "Pilling under both arms." "Fading across the shoulders." Nothing else — no hedging, no "visible", no "appears to be".
+  THE WORD ON THE ARROW IS THE ANSWER. Read it and put it in "word", exactly as one of these eight:
+    HOLE · STAIN · WEAR · FADE · SNAG · ZIP · BUTTON · SEE NOTE
+  Then write "text" using that word's own vocabulary, and nothing else:
+    HOLE = hole / tear / rip · STAIN = stain / discoloration · WEAR = pilling / fabric wear · FADE = fading · SNAG = snag / pulled thread · ZIP = the zip, broken or missing · BUTTON = the button, broken or missing · SEE NOTE = nothing at all
+  Rules, all of them absolute:
+    1. PICK ONE WORD from that arrow's vocabulary — never two, never joined by "or". Do NOT write "hole or tear", "pilling or fabric wear", "stain or discoloration". Choose the one that matches what you can see: "Tear at the left cuff", not "Hole or tear at the left cuff".
+    2. STAY INSIDE THAT ARROW'S VOCABULARY. A FADE arrow is fading — never "fabric wear", which belongs to WEAR. A HOLE arrow is a hole, tear or rip even if it looks like a stain to you. Never cross from one arrow's words to another's.
+    3. Write it as a short plain sentence: the thing, then where it is. "Hole at the left cuff." "Discoloration on the right front." "Snag on the left sleeve." "Zip pull missing." Nothing else — no hedging, no "visible", no "appears to be".
     4. NEVER say how big a flaw is. No "small", "large", "quarter-sized", no measurements. The photos show it.
-    5. Two or more arrows of the SAME colour on one garment = ONE entry covering both, naming both places (e.g. "Holes at the left cuff and right elbow"). Never two entries of the same colour.
-    6. WHITE IS DIFFERENT. Set "text": null and describe nothing at all — the seller writes that one. Each white arrow is its own entry; white NEVER merges with anything, not even another white.
-    7. "photo" is which AI photo the arrow appears in, counting the photos you were given in order — the same numbering as notes_for_seller.
+    5. THE FLAW IS AT THE POINT. The arrow points at it. "where" describes what the TIP is aimed at, not where the body of the arrow happens to lie.
+    6. Two or more arrows with the SAME WORD on one garment = ONE entry covering both, naming both places (e.g. "Holes at the left cuff and right elbow"). Merge on the WORD, not the colour: a ZIP and a BUTTON are both black arrows and are two separate entries.
+    7. SEE NOTE IS DIFFERENT. Set "text": null and describe nothing at all — the seller writes that one himself. Each SEE NOTE arrow is its own entry; it NEVER merges with anything, not even another SEE NOTE.
+    8. If the word is blurred or cropped, fall back on the arrow's COLOUR: red = HOLE · orange = STAIN · blue = WEAR · green = FADE · yellow = SNAG · white = SEE NOTE. Black is either ZIP or BUTTON — if you cannot read which, treat it as SEE NOTE so the seller writes it.
+       THE COLOUR IS THE BODY OF THE ARROW — the wide middle, where the word is. Every arrow has a border in a contrasting colour so it shows up against the fabric, and THE BORDER IS NEVER THE ARROW'S COLOUR. A red arrow with a white border is a RED arrow. A white arrow with a black border is a WHITE arrow — SEE NOTE, not black. A black arrow with a white border is a BLACK arrow — ZIP or BUTTON, not white. Those last two are each other's opposite, so look at the middle, not the edge.
+    9. The arrow is a marker, not part of the garment. NEVER describe the arrow itself, its colour, or the fact that it is there. The colour of the arrow is not the colour of the item.
+    10. "photo" is which AI photo the arrow appears in, counting the photos you were given in order — the same numbering as notes_for_seller.
 - KEYWORDS: follow the KEYWORDS rules above — SEO-ranked (Tier 1 best), 12-15 keywords, true for this item, no keyword spam
 - Be precise with brand names — spell them exactly as shown
 - SIZE COMES FROM THE TAG. The size in the title and in observations.size is the size printed on the tag, always. NEVER change it because a measurement suggests a different size — a 48" chest on a shirt tagged M is still an M. If a measurement disagrees with the tag, say so in notes_for_seller and leave the size alone.
@@ -151,26 +156,65 @@ Rules:
 - Return ONLY valid JSON, no markdown or explanation`;
 
 // The six arrow colours and nothing else. See docs/Plans/Flaws Plan.md.
-const ARROW_COLORS = ["red", "purple", "blue", "green", "black", "white"];
+// The words painted on the arrows. The WORD is the signal now — reading
+// printed text is the most reliable thing a vision model does, far more so
+// than judging a colour, and it removes every colour-matching failure at
+// once (black on navy, red on red, lime against yellow).
+// See docs/Plans/Flaws Plan.md.
+export const ARROW_WORDS = [
+  "hole",
+  "stain",
+  "wear",
+  "fade",
+  "snag",
+  "zip",
+  "button",
+  "see note",
+];
 
-// Tidy the AI's flaws array into something the app can trust. Anything whose
-// colour isn't one of the six is dropped — a flaw whose kind we can't read
-// off an arrow is exactly what this system exists to avoid. A white arrow is
-// forced back to text:null however chatty the model got, because the seller
-// writes those and a model's guess must never reach a buyer.
+// "SEE NOTE" means the seller writes that one himself. Nothing the model says
+// about it may reach a buyer.
+export const SELLER_WRITES = "see note";
+
+// The colour each word is painted in — kept only so a blurred or cropped word
+// can still be placed. Two words share black, which is why nothing merges on
+// colour any more.
+const WORD_COLORS = {
+  hole: "red",
+  stain: "orange",
+  wear: "blue",
+  fade: "green",
+  snag: "yellow",
+  zip: "black",
+  button: "black",
+  "see note": "white",
+};
+
+// Tidy the AI's flaws array into something the app can trust.
+//
+// An entry whose word isn't one of the eight is DROPPED. A flaw whose kind we
+// can't read off an arrow is exactly what this system exists to avoid, and a
+// made-up word means the model decided for itself. A SEE NOTE arrow is forced
+// back to text:null however chatty it got.
 export function cleanFlaws(raw) {
   if (!Array.isArray(raw)) return [];
   return raw
     .map((f) => {
-      const color = String(f?.color || "").trim().toLowerCase();
-      if (!ARROW_COLORS.includes(color)) return null;
+      // Tolerate "SEE NOTE", "see  note", "See-Note" — the word is painted by
+      // hand and read off a photo, so don't be fussy about the gap.
+      const word = String(f?.word || "")
+        .trim()
+        .toLowerCase()
+        .replace(/[\s_-]+/g, " ");
+      if (!ARROW_WORDS.includes(word)) return null;
       const photo = Number(f?.photo);
       const text = String(f?.text || "").trim();
       return {
-        color,
+        word,
+        color: WORD_COLORS[word],
         where: String(f?.where || "").trim().slice(0, 80),
         photo: Number.isInteger(photo) && photo > 0 ? photo : null,
-        text: color === "white" || !text ? null : text.slice(0, 200),
+        text: word === SELLER_WRITES || !text ? null : text.slice(0, 200),
       };
     })
     .filter(Boolean)

@@ -157,6 +157,26 @@ that it might be looking at two items — a fair note, and a flaw in the test
 rather than in the app. **The positive case — arrows actually on a garment —
 is still untested.**
 
+## Deployed 2026-10-04, and what the first days found
+Pushed as `f536407` and then fixed in place across `4de0ebf`, `055383b`,
+`3f50024` and `6390cc0`. Everything below was found by using it, not by
+reading it:
+
+- **`temperature: 0` would have broken every AI call** — caught by the first
+  real API call, hours before deploying.
+- **Send To Queue was dead on any fresh listing** — it keyed on a draft that
+  did not exist yet.
+- **The AI invented flaws** on an unmarked garment, because three older parts
+  of the prompt still told it to hunt for them.
+- **It recited the colour key** — "Hole or tear at the left cuff" — and drifted
+  into the next colour's meaning.
+- **The arrows are purple, not orange**, so that colour was being silently
+  dropped.
+- **The opening sentence and the style-number line** were cut after reading a
+  real listing.
+
+Details of each in [[Flaws Plan]] and [[Description Plan]].
+
 ## Still untested, and only real photos can answer
 - **Colour accuracy in real lighting** — lime vs green, and any arrow against a
   same-coloured garment.
