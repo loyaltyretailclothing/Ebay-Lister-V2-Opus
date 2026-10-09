@@ -58,6 +58,11 @@ export async function saveDraft(draftId, payload) {
           // every draft. See src/lib/batchAnalyze.js.
           batchPhase: String(payload.batch?.phase || ""),
           batchAt: payload.batch?.at || "",
+          // The Anthropic batch id, so a waiting draft can be checked
+          // WITHOUT opening it. Reading every queued draft once a minute to
+          // find this id is what exhausted Cloudinary's 500/hour admin limit
+          // on 2026-10-09 — see docs/Plans/Batch Analysis Plan.md.
+          batchId: payload.batch?.id || "",
           // How it was finished: "" (you asked for it), "batch", or "force"
           // (the queue let us down and the app ran it live).
           readyBy: payload.readyBy || "",
@@ -117,6 +122,9 @@ export async function listDrafts() {
         sku: ctx.sku || "",
         batchPhase: parseInt(ctx.batchPhase, 10) || 0,
         batchAt: ctx.batchAt || "",
+        // Empty on drafts queued before 2026-10-09; the collector falls back
+        // to opening the draft when it is missing.
+        batchId: ctx.batchId || "",
         readyBy: ctx.readyBy || "",
         createdAt: draftCreatedAt(id, r.created_at),
         url: r.secure_url,
@@ -135,22 +143,36 @@ export function draftCreatedAt(id, fallback) {
 }
 
 // Fetch a single draft's full payload (downloads the JSON blob).
-export async function getDraft(draftId) {
+//
+// Normally this costs TWO calls: one to ask Cloudinary where the file is,
+// then the download itself. Only the first counts against the 500-an-hour
+// admin limit, so a caller that already knows the URL — listDrafts returns
+// one on every row — can pass it in and skip that half entirely.
+//
+// Only pass a url that was just listed. It carries the asset's version, and
+// a stale one would read an older copy of the draft.
+export async function getDraft(draftId, { url } = {}) {
   const publicId = `${DRAFTS_FOLDER}/${draftId}`;
-  // Look up the resource to get its secure_url
-  let resource;
-  try {
-    resource = await cloudinary.api.resource(publicId, {
-      resource_type: "raw",
-    });
-  } catch (err) {
-    if (err?.error?.http_code === 404 || err?.http_code === 404) {
-      return null;
+  let secureUrl = url || "";
+
+  if (!secureUrl) {
+    let resource;
+    try {
+      resource = await cloudinary.api.resource(publicId, {
+        resource_type: "raw",
+      });
+    } catch (err) {
+      if (err?.error?.http_code === 404 || err?.http_code === 404) {
+        return null;
+      }
+      throw err;
     }
-    throw err;
+    secureUrl = resource.secure_url;
   }
 
-  const res = await fetch(resource.secure_url, { cache: "no-store" });
+  const res = await fetch(secureUrl, { cache: "no-store" });
+  // A supplied URL can be stale if the draft moved — fall back to asking.
+  if (res.status === 404 && url) return getDraft(draftId);
   if (!res.ok) {
     throw new Error(`Failed to fetch draft JSON: ${res.status}`);
   }

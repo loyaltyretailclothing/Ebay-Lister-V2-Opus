@@ -22,6 +22,7 @@ Open this `docs` folder in Obsidian with **"Open folder as vault."**
 - [[Batch Analysis Plan]] — camera drafts analyzed through Anthropic's queue at half price; drafts show their phase and can be pulled out (built 2026-09-28, not pushed)
 - [[Release - Descriptions and Flaws]] — **the next release**: five parts that only work together, waiting on the arrows (2026-09-29)
 - [[Description Plan]] — a proper description for tops and bottoms: tag size above the measurements, flaws always stated, one photo line under them (built 2026-09-29, not wired in — waiting on the flaws system)
+- [[Markdown Plan]] — automatic markdowns and offers to watchers: three stages, report-only first, every rail written down (concept 2026-10-07)
 - [[Flaws Plan]] — coloured magnetic arrows mark each flaw and tell the AI what kind it is; white means the seller writes it and posting is blocked until they do (designed 2026-09-29, nothing built)
 - [[Old Listings (Parked)]] — desktop report of listings live 90+ days (watchers, views, click rate); built and tested, parked on branch `old-listings`, not live
 

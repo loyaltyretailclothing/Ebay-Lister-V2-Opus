@@ -86,6 +86,57 @@ Mobile was deliberately left alone.
 **Not yet exercised for real.** Submitting costs money and the account was
 empty, so the first live press is still to come.
 
+## The queue ate Cloudinary's rate limit — 2026-10-09
+**The drafts list and the photo library both stopped loading.** Not a code
+fault: Cloudinary's Admin API allows **500 operations an hour** and they were
+all gone. Everything returned 500 until the quota reset on the hour.
+
+**Why.** `BatchCollector` polls every 60 seconds while anything is queued, and
+every poll called `collectBatches`, which cost:
+
+- `listDrafts()` — 1 admin operation
+- **plus 1 per queued draft**, because `advance()` opened each one *purely to
+  read its batch id* before asking Anthropic whether it was ready
+
+So one queued draft in one tab was ~120 operations an hour, running whether
+anyone was using the app or not. Each extra tab or device multiplied it —
+a phone and a desktop each is 240, and four queued drafts across two tabs is
+over the cap on its own. Photos were never the cause: an upload is not an
+admin operation, and the library only reloads when it is opened.
+
+It is recent because the batch queue is recent. Before Send To Queue, drafts
+were analyzed live and nothing sat waiting.
+
+**The fix, three parts:**
+
+1. **Ask Anthropic first.** The batch id now rides along in the draft's
+   Cloudinary context, so `listDrafts` already has it and a waiting draft is
+   checked **without opening it**. Checking Anthropic costs nothing against
+   this quota. Drafts queued before this change have no id on the row and
+   fall back to the old path.
+2. **`getDraft` takes an optional URL.** It used to spend an admin call asking
+   where the file lives before downloading it; `listDrafts` already returns
+   that URL on every row. Only pass one that was just listed — it carries the
+   asset version, and a stale one would read an older copy.
+3. **One tab polls, not all of them.** A timestamp in `localStorage` claims
+   each round; the other tabs skip it. The busy beat also eased from 60
+   seconds to 2 minutes.
+
+**Effect:** one queued draft across two tabs went from roughly **240
+operations an hour to about 30**, and that 30 no longer grows with the number
+of tabs or queued drafts.
+
+### The same logs leaked the Cloudinary secret
+The Cloudinary SDK rejects with an object carrying the whole request,
+**including `request_options.auth` — the API key and secret in plain text** —
+and the routes logged that object. The secret was therefore written into
+Vercel's runtime logs every time one of these calls failed.
+
+`src/lib/logError.js` now reduces an SDK error to its message and HTTP code
+before logging, and the five Cloudinary routes use it. **The exposed secret
+should still be rotated** — redacting future logs does not unpublish the old
+ones.
+
 ## Known gaps
 - **Nothing has been through the real queue yet** — the wait times are the whole point and are unknown until it runs. The tracker will answer it within a week.
 - If the real median wait turns out to be hours rather than minutes, the fix already scoped is Aaron's one-tap category at review, which collapses the whole thing to a single call and a single trip. See [[AI Pipeline]].

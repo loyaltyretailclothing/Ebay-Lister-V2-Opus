@@ -186,20 +186,52 @@ async function afterVision(draft, text, usage) {
 
 // --- one draft --------------------------------------------------------------
 async function advance(row) {
-  const draft = await getDraft(row.id);
+  // ASK ANTHROPIC FIRST. A draft that is still queued needs nothing from
+  // Cloudinary, and checking Anthropic costs nothing against Cloudinary's
+  // 500-an-hour admin limit. Opening every waiting draft once a minute just
+  // to read its batch id is what exhausted that limit on 2026-10-09 and took
+  // the drafts list and the photo library down with it.
+  //
+  // The batch id now rides along on the draft's context, so the listing call
+  // already has it. Drafts queued before that change have no id on the row —
+  // those fall through to the old path and open the draft as before.
+  if (row.batchId) {
+    const early = await checkOne(row.batchId);
+    if (early.state === "waiting") return "waiting";
+    if (early.state === "failed") {
+      console.error(`Batch ${row.batchId} failed for ${row.id}: ${early.reason}`);
+      return "give-up";
+    }
+    // It has an answer, so now the draft is worth opening — and the row's
+    // own URL saves another lookup.
+    return finish(row, early);
+  }
+
+  const draft = await getDraft(row.id, { url: row.url });
   if (!draft?.batch?.id) return "gone";
-  const { id: batchId, phase } = draft.batch;
-  const waited = Date.now() - Date.parse(draft.batch.at || "");
-  const answer = await checkOne(batchId);
+  const answer = await checkOne(draft.batch.id);
 
   // Still queued is just still queued, however long it takes — the row goes
   // on saying which phase it's in. Only Anthropic giving up (it expires a
   // batch at 24 hours) makes the app step in.
   if (answer.state === "waiting") return "waiting";
   if (answer.state === "failed") {
-    console.error(`Batch ${batchId} failed for ${row.id}: ${answer.reason}`);
+    console.error(`Batch ${draft.batch.id} failed for ${row.id}: ${answer.reason}`);
     return "give-up";
   }
+  return apply(row, draft, answer);
+}
+
+// The draft has an answer waiting: open it and write the result back.
+async function finish(row, answer) {
+  const draft = await getDraft(row.id, { url: row.url });
+  if (!draft?.batch?.id) return "gone";
+  return apply(row, draft, answer);
+}
+
+async function apply(row, draft, answer) {
+  const { phase } = draft.batch;
+  const waited = Date.now() - Date.parse(draft.batch.at || "");
 
   if (phase === 1) {
     const { listing, nextBatch, tally } = await afterVision(draft, answer.text, answer.usage);

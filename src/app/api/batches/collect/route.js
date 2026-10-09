@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { logError } from "@/lib/logError";
 import { collectBatches, forceLive } from "@/lib/batchCollect";
 import { isDraftId } from "@/lib/drafts";
 
@@ -26,7 +27,7 @@ export async function POST(request) {
     }
     return NextResponse.json({ success: true, ...(await collectBatches()) });
   } catch (error) {
-    console.error("Batch collect failed:", error);
+    logError("Batch collect failed", error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }

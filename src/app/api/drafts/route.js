@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { logError } from "@/lib/logError";
 import {
   draftPhotoIds,
   getDraft,
@@ -15,7 +16,7 @@ export async function GET() {
     const drafts = await listDrafts();
     return NextResponse.json({ success: true, drafts });
   } catch (error) {
-    console.error("List drafts error:", error);
+    logError("List drafts error", error);
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }

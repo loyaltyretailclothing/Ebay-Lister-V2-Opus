@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { logError } from "@/lib/logError";
 import { sweepPhotos } from "@/lib/photoSweep";
 
 // Delete the photos of held items that posted more than half an hour ago,
@@ -12,7 +13,7 @@ export async function POST() {
     const result = await sweepPhotos();
     return NextResponse.json({ success: true, ...result });
   } catch (error) {
-    console.error("Photo sweep failed:", error);
+    logError("Photo sweep failed", error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { logError } from "@/lib/logError";
 import { deleteDraft, draftPhotoIds, getDraft, listDrafts, markPhotosHeld, saveDraft } from "@/lib/drafts";
 import { dueTime, sweepPhotos } from "@/lib/photoSweep";
 import { describeFailure, readReply } from "@/lib/publishError";
@@ -86,7 +87,7 @@ export async function GET(request) {
     try {
       swept = await sweepPhotos();
     } catch (err) {
-      console.error("Photo sweep failed during the hold run:", err);
+      logError("Photo sweep failed during the hold run", err);
     }
     // Drafts waiting on Anthropic's queue. A browser tab normally collects
     // these; this is the backstop for when nobody has the app open.

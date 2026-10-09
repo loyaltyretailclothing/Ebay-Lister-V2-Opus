@@ -1,4 +1,5 @@
 import cloudinary from "@/lib/cloudinary";
+import { logError } from "@/lib/logError";
 import { NextResponse } from "next/server";
 
 // Cloudinary's search API caps each call at 500 results and returns a
@@ -59,7 +60,7 @@ export async function GET(request) {
       next_cursor: result.next_cursor || null,
     });
   } catch (error) {
-    console.error("List error:", error);
+    logError("List error", error);
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }
