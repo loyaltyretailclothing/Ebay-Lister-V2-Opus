@@ -42,6 +42,83 @@ const ISO_PRESETS = [
 const DAYLIGHT_K = 5000;
 const WB_PRESETS = [{ label: "Daylight", k: DAYLIGHT_K }];
 
+// Zoom presets. 1x and 2x are the main lens; 0.8x is the ultra-wide with a
+// little crop back in, because the ultra-wide alone is far wider than wanted
+// (0.6x on the sellers' phone) and bows straight lines at the edges.
+//
+// The browser gives no field-of-view figure for a lens, so 0.8 cannot be
+// calculated — only arrived at. 1.3 on a 0.6x lens lands near 0.78x. Judged
+// by eye and adjusted; there is no API that would make this exact.
+const WIDE_ZOOM = 1.3;
+const PRESETS = [
+  { label: "0.8x", lens: "wide", zoom: WIDE_ZOOM },
+  { label: "1x", lens: "main", zoom: 1 },
+  { label: "2x", lens: "main", zoom: 2 },
+];
+
+// Remembering which camera is the ultra-wide. The deviceId is a random
+// string unique to one phone and browser, so it cannot be shipped in code —
+// it has to be found on the device and kept. Shannon's phone and Aaron's
+// will hold different values here.
+const LENS_KEY = "lister.wideLensId";
+const readCached = () => {
+  try {
+    return localStorage.getItem(LENS_KEY) || null;
+  } catch {
+    return null;
+  }
+};
+const writeCached = (id) => {
+  try {
+    if (id) localStorage.setItem(LENS_KEY, id);
+    else localStorage.removeItem(LENS_KEY);
+  } catch {
+    /* private mode — discovery just runs again next time */
+  }
+};
+
+// Find the ultra-wide among the back cameras.
+//
+// There is no "field of view" in the MediaTrack spec, so the lens has to be
+// identified by proxy. Wider lenses focus closer and reach their far limit
+// sooner — on the phone this was built against the two back cameras were
+// 0.05m/0.91m (ultra-wide) against 0.10m/4.86m (main), which is not a
+// marginal difference. The shortest far-focus limit wins.
+//
+// Returns null when there is nothing to choose from, in which case the 0.8x
+// preset is not offered at all rather than quietly doing nothing.
+async function findWideLens() {
+  if (!navigator.mediaDevices?.enumerateDevices) return null;
+  const devices = await navigator.mediaDevices.enumerateDevices();
+  const backs = devices.filter((d) => d.kind === "videoinput" && /back|environment|rear/i.test(d.label));
+  if (backs.length < 2) return null;
+
+  const scored = [];
+  for (const d of backs) {
+    let stream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: { deviceId: { exact: d.deviceId } },
+      });
+      const caps = stream.getVideoTracks()[0]?.getCapabilities?.() || {};
+      if (caps.focusDistance?.max != null) {
+        scored.push({ deviceId: d.deviceId, far: caps.focusDistance.max });
+      }
+    } catch {
+      /* a camera that will not open is simply not a candidate */
+    } finally {
+      stream?.getTracks().forEach((t) => t.stop());
+    }
+  }
+  if (scored.length < 2) return null;
+  scored.sort((a, b) => a.far - b.far);
+  // Only trust a clear gap. Two lenses with similar focus ranges are not a
+  // main/ultra-wide pair, and guessing between them would give a 0.8x button
+  // that zooms the wrong way.
+  if (scored[1].far < scored[0].far * 2) return null;
+  return scored[0].deviceId;
+}
+
 export default function Camera({ initialPhotos = [], onDone, onClose }) {
   const videoRef = useRef(null);
   const streamRef = useRef(null);
@@ -52,13 +129,23 @@ export default function Camera({ initialPhotos = [], onDone, onClose }) {
   // essentially zero latency, which is what you want for a shutter sound.
   const audioCtxRef = useRef(null);
   const shutterBufferRef = useRef(null);
+  // Going from 0.8x straight to 2x swaps the physical lens, and a new stream
+  // resets the crop. This carries the asked-for zoom across that restart so
+  // the tap lands where it was aimed instead of at 1x.
+  const pendingZoomRef = useRef(null);
 
   const [photos, setPhotos] = useState(initialPhotos); // [{ blob, url }]
   const [error, setError] = useState("");
   const [starting, setStarting] = useState(true);
   const [facingMode, setFacingMode] = useState("environment"); // "environment" | "user"
   const [flashOn, setFlashOn] = useState(false); // torch constraint if supported
-  const [zoom, setZoom] = useState(1); // 1 | 2 | 3
+  const [zoom, setZoom] = useState(1); // the crop applied to whichever lens is open
+  // "main" | "wide" — which back lens to open. 0.8x is a different camera,
+  // not a smaller number: our zoom constraint crops in and can never crop
+  // out, so the main lens at 1x is already as wide as it goes.
+  const [lens, setLens] = useState("main");
+  const [wideLensId, setWideLensId] = useState(null); // discovered once, then remembered
+  const [wideState, setWideState] = useState("unknown"); // unknown | finding | ready | none
   const [capabilities, setCapabilities] = useState(null);
   const [isoMode, setIsoMode] = useState("auto"); // "auto" | "manual"
   const [isoStops, setIsoStops] = useState([]); // presets clamped to device range
@@ -73,7 +160,13 @@ export default function Camera({ initialPhotos = [], onDone, onClose }) {
   const [streamVersion, setStreamVersion] = useState(0);
   const [focusPoint, setFocusPoint] = useState(null); // { x, y } in viewfinder px, for the animated indicator
 
-  // Start / restart the camera stream whenever facingMode changes.
+  // Start / restart the camera stream whenever the facing direction or the
+  // chosen lens changes.
+  //
+  // The wide lens is asked for by deviceId; everything else keeps the
+  // facingMode request it has always used, so the normal path is untouched
+  // on phones that have no second back camera.
+  const useWide = facingMode === "environment" && lens === "wide" && !!wideLensId;
   const startStream = useCallback(async () => {
     setStarting(true);
     setError("");
@@ -85,11 +178,17 @@ export default function Camera({ initialPhotos = [], onDone, onClose }) {
       }
 
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: { ideal: facingMode },
-          width: { ideal: 1920 },
-          height: { ideal: 1920 },
-        },
+        video: useWide
+          ? {
+              deviceId: { exact: wideLensId },
+              width: { ideal: 1920 },
+              height: { ideal: 1920 },
+            }
+          : {
+              facingMode: { ideal: facingMode },
+              width: { ideal: 1920 },
+              height: { ideal: 1920 },
+            },
         audio: false,
       });
 
@@ -105,8 +204,11 @@ export default function Camera({ initialPhotos = [], onDone, onClose }) {
       const caps = track.getCapabilities?.() || {};
       setCapabilities(caps);
 
-      // Reset all manual controls on a fresh stream.
-      setZoom(1);
+      // Reset all manual controls on a fresh stream. The wide lens comes up
+      // already cropped to 0.8x — opening it uncropped would show a much
+      // wider frame than the button promises, for a moment.
+      setZoom(useWide ? WIDE_ZOOM : (pendingZoomRef.current ?? 1));
+      pendingZoomRef.current = null;
       setFlashOn(false);
       setIsoMode("auto");
       setShutterMode("auto");
@@ -135,6 +237,17 @@ export default function Camera({ initialPhotos = [], onDone, onClose }) {
         setShutter(Math.round((min + max) / 2));
       }
     } catch (err) {
+      // A remembered wide lens that will no longer open — a different phone,
+      // a cleared browser profile, another app holding the camera. Forget it
+      // and drop back to the main lens rather than stranding the viewfinder.
+      if (useWide) {
+        console.error("Camera: wide lens would not open, falling back:", err);
+        writeCached(null);
+        setWideLensId(null);
+        setWideState("unknown");
+        setLens("main");
+        return;
+      }
       console.error("Camera start error:", err);
       setError(
         err.name === "NotAllowedError"
@@ -144,7 +257,10 @@ export default function Camera({ initialPhotos = [], onDone, onClose }) {
     } finally {
       setStarting(false);
     }
-  }, [facingMode]);
+    // `lens` is deliberately absent: it only matters through `useWide`, and
+    // listing it would restart the stream when switching lens on the front
+    // camera, where there is nothing to switch.
+  }, [facingMode, wideLensId, useWide]);
 
   useEffect(() => {
     startStream();
@@ -245,6 +361,55 @@ export default function Camera({ initialPhotos = [], onDone, onClose }) {
       cancelled = true;
     };
   }, [wbMode, wbTemp, streamVersion]);
+
+  // A wide lens found on a previous visit. Nothing is opened here — the
+  // check only happens when 0.8x is first tapped, so normal startup is not
+  // slowed down by probing cameras.
+  useEffect(() => {
+    const cached = readCached();
+    if (cached) {
+      setWideLensId(cached);
+      setWideState("ready");
+    }
+  }, []);
+
+  // Which preset is lit. The wide lens sitting at its own crop is 0.8x;
+  // everything else is read off the zoom.
+  const activePreset = useWide ? "0.8x" : zoom >= 2 ? "2x" : "1x";
+
+  async function pickPreset(preset) {
+    if (preset.lens === "main") {
+      // Coming off the wide lens means a new stream, so the zoom has to
+      // survive the restart; staying on the main lens is just a new crop.
+      if (useWide) pendingZoomRef.current = preset.zoom;
+      else setZoom(preset.zoom);
+      setLens("main");
+      return;
+    }
+    if (wideLensId) {
+      setLens("wide");
+      return;
+    }
+    // First tap: go and find it. Takes a second or two, since each back
+    // camera has to be opened to be identified.
+    setWideState("finding");
+    let found = null;
+    try {
+      found = await findWideLens();
+    } catch (e) {
+      console.error("Camera: wide lens search failed:", e);
+    }
+    if (found) {
+      writeCached(found);
+      setWideLensId(found);
+      setWideState("ready");
+      setLens("wide");
+    } else {
+      // No second back camera, or two too alike to tell apart. The button
+      // goes away rather than pretending to do something.
+      setWideState("none");
+    }
+  }
 
   const hasHardwareZoom = !!capabilities?.zoom;
   const hasTorch = !!capabilities?.torch;
@@ -513,15 +678,21 @@ export default function Camera({ initialPhotos = [], onDone, onClose }) {
                 className="absolute inset-x-0 bottom-3 flex justify-center gap-[7px]"
                 onClick={(e) => e.stopPropagation()}
               >
-                {[1, 2, 3].map((z) => (
+                {PRESETS.filter(
+                  // 0.8x only exists if a wide lens does. Until the first tap
+                  // we don't know, so it is offered; once a search comes back
+                  // empty it stops being offered at all.
+                  (p) => p.lens !== "wide" || (facingMode === "environment" && wideState !== "none")
+                ).map((p) => (
                   <button
-                    key={z}
+                    key={p.label}
                     type="button"
-                    onClick={() => setZoom(z)}
-                    aria-pressed={zoom === z}
-                    className={`cpill ${zoom === z ? "cpill-on" : ""}`}
+                    onClick={() => pickPreset(p)}
+                    disabled={wideState === "finding"}
+                    aria-pressed={activePreset === p.label}
+                    className={`cpill ${activePreset === p.label ? "cpill-on" : ""}`}
                   >
-                    {z}x
+                    {wideState === "finding" && p.lens === "wide" ? "…" : p.label}
                   </button>
                 ))}
               </div>
