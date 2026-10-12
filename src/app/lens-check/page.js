@@ -215,19 +215,19 @@ export default function CameraCheckPage() {
               <h2 className="lbl">Camera {i + 1}</h2>
               <div className="grow" />
               {caps.zoom && (
-                <span className={`pill ${zoomMin < 1 ? "pill-ok" : "pill-skip"}`}>
-                  {zoomMin < 1 ? `goes to ${zoomMin}x` : "cannot go below 1x"}
+                <span className={`pill pill-skip ${zoomMin < 1 ? "font-semibold text-ink" : ""}`}>
+                  {zoomMin < 1 ? `goes down to ${zoomMin}x` : "cannot go below 1x"}
                 </span>
               )}
             </div>
 
             <div className="flex gap-3 px-3 py-2.5">
               {c.thumb && (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={c.thumb}
-                  alt={`View from camera ${i + 1}`}
-                  className="size-[110px] shrink-0 rounded-field border border-line object-cover"
+                <span
+                  role="img"
+                  aria-label={`View from camera ${i + 1}`}
+                  className="block size-[110px] shrink-0 rounded-field border border-line bg-cover bg-center"
+                  style={{ backgroundImage: `url(${c.thumb})` }}
                 />
               )}
               <div className="min-w-0 grow">
@@ -305,7 +305,9 @@ export default function CameraCheckPage() {
               Copy
             </button>
           </div>
-          <textarea readOnly value={raw} rows={14} className="input m-3 w-[calc(100%-1.5rem)] font-mono text-sm" />
+          <div className="p-3">
+            <textarea readOnly value={raw} rows={14} className="input mono w-full text-sm" />
+          </div>
         </div>
       )}
     </div>
