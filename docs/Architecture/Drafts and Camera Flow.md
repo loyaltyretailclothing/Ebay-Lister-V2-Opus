@@ -35,3 +35,58 @@ Statuses: `processing` → `ready`, or `error` (photos and notes are kept so not
 - Drafts made with keywords show **keyword chips** under the title. Drafts made before keywords have no chips and keep their title and Theme exactly as saved.
 - Typing in the title updates the description's first line to match.
 - The category's allowed conditions are fetched, and an invalid saved condition is auto-corrected. See [[Conditions by Category]].
+
+## The 0.8x wide-angle attempt — tried and reverted 2026-10-12
+Asked for: `0.8x · 1x · 2x` presets in place of `1x · 2x · 3x` (3x was never
+used). Built three times, never worked on the phone, **reverted** in
+`2639f51`. Camera.js is back to its state at `3fcabf8`. What was measured is
+solid and worth keeping; what failed is worth not repeating.
+
+### Measured on the sellers' phone (read-only, `/lens-check`)
+- **No lens can zoom out.** All four cameras report
+  `zoom: {min: 1, max: 8, step: 0.1}`. Our presets apply a `zoom` constraint,
+  which crops *in* only — the main lens at 1x is already its full field of
+  view. **0.8x can never be a zoom value.** It is a different camera.
+- **Two back cameras are exposed**, and the second one is genuinely the
+  ultra-wide — confirmed by eye against its live preview, not inferred:
+
+  | | main | ultra-wide |
+  |---|---|---|
+  | Focus range | 0.10 – 4.86 m | 0.05 – 0.91 m |
+  | ISO floor | 12 | 19 |
+  | Max size | 4080×3060 | 4080×3060 |
+
+  The phone shows 0.6x **and** 3x natively but hands Chrome only two back
+  cameras, so at least one lens is withheld from the browser.
+- **White balance survives on both.** Each reports
+  `whiteBalanceMode: ["continuous","manual"]` and `colorTemperature`
+  2850–7000. The fear that Daylight would be lost on the auxiliary lens was
+  unfounded.
+- `deviceId` is random per phone and per browser, so the wide lens **cannot
+  be named in code** — it has to be found on the device.
+
+### Why all three attempts failed
+Every one died at the same step: identifying which back camera is the wide
+one requires opening each to read its capabilities, and **Android will not
+open a second back camera while another is in use.** Every probe failed, so
+the search concluded there was no wide lens and left 0.8x dead.
+
+1. Probed with the viewfinder live. Failed.
+2. Stopped the stream, then probed. Still failed — stopping tracks does not
+   release the device immediately.
+3. Probed on mount, before anything opened a camera. Should have worked;
+   never confirmed, because it was reverted first.
+
+All three were **shipped untested** — no machine here has two back cameras,
+so each fix was reasoning, not evidence. That is the actual lesson. If this
+is picked up again, the next step is not another blind fix: put the search's
+result on screen inside the camera page so a failure says what it found.
+
+### If it is revisited
+- Keep **1x and 2x on the main lens.** Taking them off the ultra-wide costs
+  real quality: cropped to match 1x it gives about 2440×1830, and at 2x about
+  1225×918 — below the 1600px we store.
+- 0.8x would be the ultra-wide cropped by roughly 1.3 (0.6 × 1.3 ≈ 0.78).
+  The browser exposes no field-of-view figure, so the number can only be
+  aimed at and judged by eye.
+- The diagnostic at `/lens-check` is still deployed, unlinked and read-only.
