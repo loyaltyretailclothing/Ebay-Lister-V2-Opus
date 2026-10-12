@@ -79,31 +79,30 @@ const writeCached = (id) => {
 
 // Find the ultra-wide among the back cameras.
 //
-// THE CALLER MUST STOP THE LIVE STREAM FIRST. Android will not open a second
-// back camera while one is already running — every probe fails with the
-// viewfinder up, and the search then wrongly concludes there is no wide lens.
+// THIS RUNS BEFORE THE VIEWFINDER OPENS, and that is the whole trick.
+// Android will not open a second back camera while one is already running,
+// so probing with a live stream fails every time — and stopping the stream
+// first does not help either, because the device is not released instantly.
+// Done before anything is open, there is nothing to race.
 //
 // There is no "field of view" in the MediaTrack spec, so the lens has to be
 // identified by proxy. Wider lenses focus closer and reach their far limit
-// sooner — on the phone this was built against, the two back cameras were
-// 0.91m (ultra-wide) against 4.86m (main), which is not a marginal
-// difference. A telephoto would sit the other side of the main lens, so
-// comparing against the lens already in use tells the two apart.
+// sooner: on the phone this was built against, the back cameras reported
+// 0.91m (ultra-wide) against 4.86m (main). A telephoto sits the other way —
+// it reaches further still — so the SHORTEST far-focus is the widest lens
+// even when three are present.
 //
-// `currentFar` is the running lens's focusDistance.max. Returns null when
-// nothing is clearly wider, in which case the 0.8x preset is withdrawn
-// rather than quietly doing nothing.
-async function findWideLens(currentId, currentFar) {
-  if (!navigator.mediaDevices?.enumerateDevices || currentFar == null) return null;
+// Returns null when no lens is clearly wider than the rest, in which case
+// 0.8x is shown dead rather than doing nothing on tap.
+async function findWideLens() {
+  if (!navigator.mediaDevices?.enumerateDevices) return null;
   const devices = await navigator.mediaDevices.enumerateDevices();
   // Labels can be blank depending on how permission was granted, so they are
-  // not relied on — each candidate is opened and asked what it is.
-  const others = devices.filter(
-    (d) => d.kind === "videoinput" && d.deviceId && d.deviceId !== currentId
-  );
+  // not relied on — each camera is opened and asked which way it faces.
+  const cams = devices.filter((d) => d.kind === "videoinput" && d.deviceId);
 
-  let best = null;
-  for (const d of others) {
+  const scored = [];
+  for (const d of cams) {
     let stream;
     try {
       stream = await navigator.mediaDevices.getUserMedia({
@@ -113,9 +112,7 @@ async function findWideLens(currentId, currentFar) {
       const facing = caps.facingMode;
       const isBack = !facing || facing.length === 0 || facing.includes("environment");
       const far = caps.focusDistance?.max;
-      if (isBack && far != null && (best === null || far < best.far)) {
-        best = { deviceId: d.deviceId, far };
-      }
+      if (isBack && far != null) scored.push({ deviceId: d.deviceId, far });
     } catch {
       /* a camera that will not open is simply not a candidate */
     } finally {
@@ -123,11 +120,13 @@ async function findWideLens(currentId, currentFar) {
     }
   }
 
-  // Only trust a clear gap. A lens with a similar focus range is not an
-  // ultra-wide, and a telephoto reaches further, not nearer — either way,
-  // guessing would give a 0.8x button that zooms the wrong way.
-  if (!best || best.far >= currentFar / 2) return null;
-  return best.deviceId;
+  if (scored.length < 2) return null;
+  scored.sort((a, b) => a.far - b.far);
+  // Only trust a clear gap. Two lenses with similar focus ranges are not a
+  // main/ultra-wide pair, and guessing between them would give a 0.8x button
+  // that zooms the wrong way.
+  if (scored[1].far < scored[0].far * 2) return null;
+  return scored[0].deviceId;
 }
 
 export default function Camera({ initialPhotos = [], onDone, onClose }) {
@@ -157,6 +156,9 @@ export default function Camera({ initialPhotos = [], onDone, onClose }) {
   const [lens, setLens] = useState("main");
   const [wideLensId, setWideLensId] = useState(null); // discovered once, then remembered
   const [wideState, setWideState] = useState("unknown"); // unknown | finding | ready | none
+  // The viewfinder waits for the lens search, because the search cannot run
+  // with a camera already open.
+  const [lensReady, setLensReady] = useState(false);
   const [capabilities, setCapabilities] = useState(null);
   const [isoMode, setIsoMode] = useState("auto"); // "auto" | "manual"
   const [isoStops, setIsoStops] = useState([]); // presets clamped to device range
@@ -179,6 +181,8 @@ export default function Camera({ initialPhotos = [], onDone, onClose }) {
   // on phones that have no second back camera.
   const useWide = facingMode === "environment" && lens === "wide" && !!wideLensId;
   const startStream = useCallback(async () => {
+    // Nothing may open a camera until the lens search has finished.
+    if (!lensReady) return;
     setStarting(true);
     setError("");
     try {
@@ -271,7 +275,7 @@ export default function Camera({ initialPhotos = [], onDone, onClose }) {
     // `lens` is deliberately absent: it only matters through `useWide`, and
     // listing it would restart the stream when switching lens on the front
     // camera, where there is nothing to switch.
-  }, [facingMode, wideLensId, useWide]);
+  }, [facingMode, wideLensId, useWide, lensReady]);
 
   useEffect(() => {
     startStream();
@@ -373,22 +377,47 @@ export default function Camera({ initialPhotos = [], onDone, onClose }) {
     };
   }, [wbMode, wbTemp, streamVersion]);
 
-  // A wide lens found on a previous visit. Nothing is opened here — the
-  // check only happens when 0.8x is first tapped, so normal startup is not
-  // slowed down by probing cameras.
+  // Work out which back camera is the ultra-wide, once, before the
+  // viewfinder opens — the search needs every camera free, so it cannot be
+  // deferred until 0.8x is tapped. Remembered afterwards, so this costs a
+  // second or two on the very first visit and nothing after that.
   useEffect(() => {
-    const cached = readCached();
-    if (cached) {
-      setWideLensId(cached);
-      setWideState("ready");
-    }
+    let cancelled = false;
+    (async () => {
+      const cached = readCached();
+      if (cached) {
+        setWideLensId(cached);
+        setWideState("ready");
+        setLensReady(true);
+        return;
+      }
+      setWideState("finding");
+      let found = null;
+      try {
+        found = await findWideLens();
+      } catch (e) {
+        console.error("Camera: wide lens search failed:", e);
+      }
+      if (cancelled) return;
+      if (found) {
+        writeCached(found);
+        setWideLensId(found);
+        setWideState("ready");
+      } else {
+        setWideState("none");
+      }
+      setLensReady(true);
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   // Which preset is lit. The wide lens sitting at its own crop is 0.8x;
   // everything else is read off the zoom.
   const activePreset = useWide ? "0.8x" : zoom >= 2 ? "2x" : "1x";
 
-  async function pickPreset(preset) {
+  function pickPreset(preset) {
     if (preset.lens === "main") {
       // Coming off the wide lens means a new stream, so the zoom has to
       // survive the restart; staying on the main lens is just a new crop.
@@ -397,42 +426,8 @@ export default function Camera({ initialPhotos = [], onDone, onClose }) {
       setLens("main");
       return;
     }
-    if (wideLensId) {
-      setLens("wide");
-      return;
-    }
-    // First tap: go and find it. Each candidate has to be opened to be
-    // identified, and Android will not open a second back camera while the
-    // viewfinder is live — so the current stream comes down first and the
-    // chosen lens brings it back up.
-    setWideState("finding");
-    setStarting(true);
-    const track = streamRef.current?.getVideoTracks?.()[0];
-    const currentId = track?.getSettings?.().deviceId;
-    const currentFar = capabilities?.focusDistance?.max;
-    streamRef.current?.getTracks().forEach((t) => t.stop());
-    streamRef.current = null;
-
-    let found = null;
-    try {
-      found = await findWideLens(currentId, currentFar);
-    } catch (e) {
-      console.error("Camera: wide lens search failed:", e);
-    }
-
-    if (found) {
-      writeCached(found);
-      setWideLensId(found);
-      setWideState("ready");
-      setLens("wide");
-      // Changing those restarts the stream on the wide lens by itself.
-    } else {
-      // No second back camera, or nothing clearly wider than the one in use.
-      // The button goes away rather than pretending to do something — and
-      // the viewfinder has to be put back, since it was stopped to look.
-      setWideState("none");
-      startStream();
-    }
+    // The lens was found on mount, so this is only ever a switch.
+    if (wideLensId) setLens("wide");
   }
 
   const hasHardwareZoom = !!capabilities?.zoom;
