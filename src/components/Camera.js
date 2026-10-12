@@ -79,30 +79,42 @@ const writeCached = (id) => {
 
 // Find the ultra-wide among the back cameras.
 //
+// THE CALLER MUST STOP THE LIVE STREAM FIRST. Android will not open a second
+// back camera while one is already running — every probe fails with the
+// viewfinder up, and the search then wrongly concludes there is no wide lens.
+//
 // There is no "field of view" in the MediaTrack spec, so the lens has to be
 // identified by proxy. Wider lenses focus closer and reach their far limit
-// sooner — on the phone this was built against the two back cameras were
-// 0.05m/0.91m (ultra-wide) against 0.10m/4.86m (main), which is not a
-// marginal difference. The shortest far-focus limit wins.
+// sooner — on the phone this was built against, the two back cameras were
+// 0.91m (ultra-wide) against 4.86m (main), which is not a marginal
+// difference. A telephoto would sit the other side of the main lens, so
+// comparing against the lens already in use tells the two apart.
 //
-// Returns null when there is nothing to choose from, in which case the 0.8x
-// preset is not offered at all rather than quietly doing nothing.
-async function findWideLens() {
-  if (!navigator.mediaDevices?.enumerateDevices) return null;
+// `currentFar` is the running lens's focusDistance.max. Returns null when
+// nothing is clearly wider, in which case the 0.8x preset is withdrawn
+// rather than quietly doing nothing.
+async function findWideLens(currentId, currentFar) {
+  if (!navigator.mediaDevices?.enumerateDevices || currentFar == null) return null;
   const devices = await navigator.mediaDevices.enumerateDevices();
-  const backs = devices.filter((d) => d.kind === "videoinput" && /back|environment|rear/i.test(d.label));
-  if (backs.length < 2) return null;
+  // Labels can be blank depending on how permission was granted, so they are
+  // not relied on — each candidate is opened and asked what it is.
+  const others = devices.filter(
+    (d) => d.kind === "videoinput" && d.deviceId && d.deviceId !== currentId
+  );
 
-  const scored = [];
-  for (const d of backs) {
+  let best = null;
+  for (const d of others) {
     let stream;
     try {
       stream = await navigator.mediaDevices.getUserMedia({
         video: { deviceId: { exact: d.deviceId } },
       });
       const caps = stream.getVideoTracks()[0]?.getCapabilities?.() || {};
-      if (caps.focusDistance?.max != null) {
-        scored.push({ deviceId: d.deviceId, far: caps.focusDistance.max });
+      const facing = caps.facingMode;
+      const isBack = !facing || facing.length === 0 || facing.includes("environment");
+      const far = caps.focusDistance?.max;
+      if (isBack && far != null && (best === null || far < best.far)) {
+        best = { deviceId: d.deviceId, far };
       }
     } catch {
       /* a camera that will not open is simply not a candidate */
@@ -110,13 +122,12 @@ async function findWideLens() {
       stream?.getTracks().forEach((t) => t.stop());
     }
   }
-  if (scored.length < 2) return null;
-  scored.sort((a, b) => a.far - b.far);
-  // Only trust a clear gap. Two lenses with similar focus ranges are not a
-  // main/ultra-wide pair, and guessing between them would give a 0.8x button
-  // that zooms the wrong way.
-  if (scored[1].far < scored[0].far * 2) return null;
-  return scored[0].deviceId;
+
+  // Only trust a clear gap. A lens with a similar focus range is not an
+  // ultra-wide, and a telephoto reaches further, not nearer — either way,
+  // guessing would give a 0.8x button that zooms the wrong way.
+  if (!best || best.far >= currentFar / 2) return null;
+  return best.deviceId;
 }
 
 export default function Camera({ initialPhotos = [], onDone, onClose }) {
@@ -390,24 +401,37 @@ export default function Camera({ initialPhotos = [], onDone, onClose }) {
       setLens("wide");
       return;
     }
-    // First tap: go and find it. Takes a second or two, since each back
-    // camera has to be opened to be identified.
+    // First tap: go and find it. Each candidate has to be opened to be
+    // identified, and Android will not open a second back camera while the
+    // viewfinder is live — so the current stream comes down first and the
+    // chosen lens brings it back up.
     setWideState("finding");
+    setStarting(true);
+    const track = streamRef.current?.getVideoTracks?.()[0];
+    const currentId = track?.getSettings?.().deviceId;
+    const currentFar = capabilities?.focusDistance?.max;
+    streamRef.current?.getTracks().forEach((t) => t.stop());
+    streamRef.current = null;
+
     let found = null;
     try {
-      found = await findWideLens();
+      found = await findWideLens(currentId, currentFar);
     } catch (e) {
       console.error("Camera: wide lens search failed:", e);
     }
+
     if (found) {
       writeCached(found);
       setWideLensId(found);
       setWideState("ready");
       setLens("wide");
+      // Changing those restarts the stream on the wide lens by itself.
     } else {
-      // No second back camera, or two too alike to tell apart. The button
-      // goes away rather than pretending to do something.
+      // No second back camera, or nothing clearly wider than the one in use.
+      // The button goes away rather than pretending to do something — and
+      // the viewfinder has to be put back, since it was stopped to look.
       setWideState("none");
+      startStream();
     }
   }
 
@@ -679,22 +703,31 @@ export default function Camera({ initialPhotos = [], onDone, onClose }) {
                 onClick={(e) => e.stopPropagation()}
               >
                 {PRESETS.filter(
-                  // 0.8x only exists if a wide lens does. Until the first tap
-                  // we don't know, so it is offered; once a search comes back
-                  // empty it stops being offered at all.
-                  (p) => p.lens !== "wide" || (facingMode === "environment" && wideState !== "none")
-                ).map((p) => (
-                  <button
-                    key={p.label}
-                    type="button"
-                    onClick={() => pickPreset(p)}
-                    disabled={wideState === "finding"}
-                    aria-pressed={activePreset === p.label}
-                    className={`cpill ${activePreset === p.label ? "cpill-on" : ""}`}
-                  >
-                    {wideState === "finding" && p.lens === "wide" ? "…" : p.label}
-                  </button>
-                ))}
+                  // The wide lens is a back camera, so 0.8x has no meaning on
+                  // the selfie camera.
+                  (p) => p.lens !== "wide" || facingMode === "environment"
+                ).map((p) => {
+                  const isWide = p.lens === "wide";
+                  // A search that came back empty leaves the button in place
+                  // but plainly dead — it vanishing was taken for a crash.
+                  const dead = isWide && wideState === "none";
+                  const busy = isWide && wideState === "finding";
+                  return (
+                    <button
+                      key={p.label}
+                      type="button"
+                      onClick={() => pickPreset(p)}
+                      disabled={dead || wideState === "finding"}
+                      aria-pressed={activePreset === p.label}
+                      aria-label={dead ? "0.8x — no wide lens on this phone" : p.label}
+                      className={`cpill ${activePreset === p.label ? "cpill-on" : ""} ${
+                        dead ? "opacity-40" : ""
+                      }`}
+                    >
+                      {busy ? "…" : p.label}
+                    </button>
+                  );
+                })}
               </div>
             </>
           )}
